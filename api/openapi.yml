@@ -1,0 +1,406 @@
+# Missing information and assumptions:
+#
+# - Detailed request and response schemas for each endpoint are needed.
+# - Error response codes need to be defined for each operation.
+# - Path and query parameters need to be fully specified with types and descriptions.
+# - For the llm-process endpoint, the exact nature of "multiple text fields or text-id parameters"
+#   needs clarification for accurate schema definition.
+
+openapi: "3.1.0"
+info:
+  title: "DHaMPS VDB API"
+  version: "0.0.1"
+
+servers:
+  - url: "https://example.com/"
+
+paths:
+  /users:
+    put:
+      summary: Create or update a user
+      operationId: putAdminUsers
+      tags:
+        - Admin
+      security:
+        - pasetoAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                email:
+                  type: string
+                apiKey:
+                  type: string
+      responses:
+        "200":
+          description: User created or updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  username:
+                    type: string
+                  email:
+                    type: string
+        "401":
+          description: Unauthorized
+        "400":
+          description: Bad Request
+
+    # Repeat this pattern for POST and GET (all users' handles)
+
+  /users/{user}:
+    get:
+      summary: Get information about a specific user
+      operationId: getAdminUser
+      tags:
+        - Admin
+      security:
+        - pasetoAuth: []
+      parameters:
+        - name: user
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: User found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/user"
+        "401":
+          description: Unauthorized
+        "404":
+          description: User not found
+
+    patch:
+      summary: Update a specific user
+      operationId: patchAdminUser
+      tags:
+        - Admin
+      security:
+        - pasetoAuth: []
+      parameters:
+        - name: user
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                email:
+                  type: string
+                apiKey:
+                  type: string
+      responses:
+        "200":
+          description: User updated
+        "401":
+          description: Unauthorized
+        "404":
+          description: User not found
+
+    # Repeat this pattern for DELETE
+
+  /projects/{user}:
+    put:
+      summary: Create or update a project
+      operationId: putUserProjects
+      tags:
+        - Projects
+      security:
+        - pasetoAuth: []
+      # Parameters and request body definition goes here
+      responses:
+        "200":
+          description: Project created or updated
+        "401":
+          description: Unauthorized
+
+    # Repeat this pattern for POST and GET
+
+  /projects/{user}/{project}:
+    get:
+      summary: Get information about a specific project
+      operationId: getUserProject
+      tags:
+        - Projects
+      security:
+        - pasetoAuth: []
+      parameters:
+        - name: user
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: project
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Project found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/project"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Project not found
+
+    # Repeat this pattern for PATCH and DELETE
+
+  /embeddings/{user}/{project}:
+    put:
+      summary: Create or update embeddings for a project
+      operationId: putProjectEmbeddings
+      tags:
+        - Embeddings
+      security:
+        - pasetoAuth: []
+      # Define request and response structure
+    post:
+      summary: Create embeddings for provided text
+      operationId: postProjectEmbeddings
+      tags:
+        - Embeddings
+      security:
+        - pasetoAuth: []
+      # Define request and response structure
+
+    # Repeat this pattern for GET and DELETE (all the project's embeddings)
+
+  /embeddings/{user}/{project}/{id}:
+    get:
+      summary: Get information about a specific embedding
+      operationId: getProjectEmbedding
+      tags:
+        - Embeddings
+      security:
+        - pasetoAuth: []
+      parameters:
+        - name: user
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: project
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Embedding found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/embedding"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Embedding not found
+
+    # Repeat this pattern for PATCH and DELETE
+
+  /similars/{user}/{project}:
+    post:
+      summary: Create similar items for a project
+      operationId: postProjectSimilars
+      tags:
+        - Similars
+      security:
+        - pasetoAuth: []
+      # Define request and response structure
+
+  /similars/{user}/{project}/{id}:
+    get:
+      summary: Retrieve similar items
+      operationId: getProjectSimilars
+      tags:
+        - Similars
+      security:
+        - pasetoAuth: []
+      parameters:
+        - name: count
+          in: query
+          schema:
+            type: integer
+        - name: threshold
+          in: query
+          schema:
+            type: number
+      # Define response structure
+
+  /llm-process:
+    post:
+      summary: Process text with LLM service
+      operationId: llmProcess
+      tags:
+        - LLM
+      security:
+        - pasetoAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                serviceId:
+                  type: string
+                projectId:
+                  type: string
+                contextId:
+                  type: string
+                textFields:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: Processed successfully
+        "401":
+          description: Unauthorized
+
+components:
+  securitySchemes:
+    pasetoAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: PASETO
+  schemas:
+    user:
+      type: object
+      properties:
+        handle:
+          type: string
+          minLength: 3
+          maxLength: 20
+        name:
+          type: string
+          minLength: 3
+          maxLength: 50
+        email:
+          type: string
+          format: email
+        apiKey:
+          type: string
+          minLength: 32
+          maxLength: 32
+        projects:
+          type: array
+          items:
+            type: string
+            minLength: 3
+            maxLength: 50
+      required:
+        - handle
+        - email
+        - apiKey
+    project:
+      type: object
+      properties:
+        handle:
+          type: string
+          minLength: 3
+          maxLength: 50
+        description:
+          type: string
+          maxLength: 255
+        authorizedReaders:
+          type: array
+          items:
+            type: string
+            minLength: 3
+            maxLength: 20
+          uniqueItems: true
+          default: ["*"]
+        llmservices:
+          type: array
+          items:
+            type: string
+            minLength: 3
+            maxLength: 50
+      required:
+        - handle
+    llmService:
+      type: object
+      properties:
+        serviceName:
+          type: string
+        endpoint:
+          type: string
+          format: uri
+        token:
+          type: string
+        tokenMethod:
+          type: string
+          enum:
+            - header
+            - query
+          default: header
+        contextData:
+          type: string
+          maxLength: 255
+        systemPrompt:
+          type: string
+          maxLength: 255
+        requestTemplate:
+          type: string
+        respFieldname:
+          type: string
+      required:
+        - serviceName
+        - endpoint
+    embedding:
+      type: object
+      properties:
+        id:
+          type: string
+          minLength: 32
+          maxLength: 32
+        text:
+          type: string
+        vector:
+          type: array
+          items:
+            type: number
+        metadata:
+          type: array
+          items:
+            type: object
+            properties:
+              key: string
+              value: string
+            required: key
+      required:
+        - id
+    similars:
+      type: array
+      items:
+        type: string
