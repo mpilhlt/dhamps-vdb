@@ -1,0 +1,14 @@
+version: "2"
+servers:
+- engine: "postgresql"
+  uri: "postgresql://${SERVICE_DB_USER}:${SERVICE_DB_PASSWORD}@${SERVICE_DB_HOST}:${SERVICE_DB_PORT}/${SERVICE_DB_NAME}"
+sql:
+  - engine: "postgresql"
+    queries: "internal/database/queries/queries.sql"
+    schema: "internal/database/migrations"
+    gen:
+      go:
+        package: "database"
+        out: "internal/database"
+        sql_package: "pgx/v5"
+        emit_json_tags: true

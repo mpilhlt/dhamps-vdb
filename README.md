@@ -42,3 +42,36 @@ dhamps-vdb/
 │       └── llm_process.go
 └── web/                      // web resources for the html response
 ```
+
+The application checks and migrates the database schema to the appropriate version if possible. It presupposes however, that a suitable database and user (with appropriate privileges) have been created.
+
+A local container with a pg_vector-enabled postgresql can be run like this:
+
+```bash
+$ podman run -p 8888:5432 -e POSTGRES_PASSWORD=password pgvector/pgvector:0.7.4-pg16
+```
+
+But be aware that the filesystem is not persisted if you run it like this. That means that when you stop and restart the container, you will have to re-setup the database as described below.
+
+You can connect to it from a second terminal like so:
+
+```bash
+$ psql -p 8888 -h localhost -U postgres -d postgres
+```
+
+And then set up the database like this:
+
+```sql
+postgres=# CREATE DATABASE my_vectors;
+postgres=# CREATE USER my_user WITH PASSWORD 'my-password';
+postgres=# GRANT ALL PRIVILEGES ON DATABASE "my_vectors" to my_user;
+postgres=# \c my_vectors
+postgres=# GRANT ALL ON SCHEMA public TO my_user;
+postgres=# CREATE EXTENSION IF NOT EXISTS vector;
+```
+
+For testing (i.e. without compiling and deploying), you can go to the main directory of the git repository and launch the vdb app like this:
+
+```bash
+go run main.go --port=8880 --db-port=8888 --db-user=my_user --db-password=my-password --db-name=my_vectors
+```

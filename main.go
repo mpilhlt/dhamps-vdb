@@ -20,7 +20,9 @@ func main() {
   // Create a CLI app
   cli := humacli.New(func(hooks humacli.Hooks, options *models.Options) {
 
-    fmt.Printf("Options are debug:%v host:%v port: %v dbhost:%s dbname:%s\n",
+    println()
+    println("=== Starting DH@MPS Vector Database ...")
+    fmt.Printf("    Options are debug:%v host:%v port: %v dbhost:%s dbname:%s\n",
       options.Debug, options.Host, options.Port, options.DBHost, options.DBName)
 
     // Initialize the database
