@@ -1,16 +1,16 @@
 package database
 
 // This is mostly from https://github.com/tardisx/embed_tern,
-// with some adjustments for how it is called in my app's context.
+// with some adjustments for pgxpool and for how it is called in my app's context.
 
 import (
-  "context"
-  "embed"
-  "fmt"
-  "io/fs"
+	"context"
+	"embed"
+	"fmt"
+	"io/fs"
 
-  "github.com/jackc/pgx/v5"
-  "github.com/jackc/tern/v2/migrate"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/tern/v2/migrate"
 )
 
 const versionTable = "db_version"

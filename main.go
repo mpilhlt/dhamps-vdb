@@ -1,20 +1,23 @@
 package main
 
 import (
-  "context"
-  "fmt"
-  "net/http"
-  "time"
+	"context"
+	"fmt"
+	"net/http"
+	"os"
+	"time"
 
-  "github.com/mpilhlt/dhamps-vdb/internal/handlers"
-  "github.com/mpilhlt/dhamps-vdb/internal/models"
-  "github.com/mpilhlt/dhamps-vdb/internal/database"
+	"github.com/mpilhlt/dhamps-vdb/internal/database"
+	"github.com/mpilhlt/dhamps-vdb/internal/handlers"
+	"github.com/mpilhlt/dhamps-vdb/internal/models"
 
-  "github.com/danielgtaylor/huma/v2/adapters/humago"
-  "github.com/danielgtaylor/huma/v2/humacli"
+	"github.com/danielgtaylor/huma/v2/adapters/humago"
+	"github.com/danielgtaylor/huma/v2/humacli"
 
-  huma "github.com/danielgtaylor/huma/v2"
+	huma "github.com/danielgtaylor/huma/v2"
 )
+
+// TODO: Set up timeouts (e.g. in server definition)!
 
 func main() {
   // Create a CLI app
@@ -26,20 +29,30 @@ func main() {
       options.Debug, options.Host, options.Port, options.DBHost, options.DBName)
 
     // Initialize the database
-    database.InitDB(options)
+    pool, err := database.InitDB(options)
+    if err != nil {
+      fmt.Printf("    Unable to connect to database: %v\n", err)
+      os.Exit(1)
+    }
+
+    // Define standard key generator (for API keys)
+    keyGen := handlers.StandardKeyGen{}
 
     // Create a new router & API
     router := http.NewServeMux()
     api := humago.New(router, huma.DefaultConfig("DHaMPS Vector Database API", "0.0.1"))
 
     // Add routes to the API
-    addRoutes(api)
+    err = handlers.AddRoutes(pool, keyGen, api)
+    if err != nil {
+      fmt.Printf("    Unable to add routes: %v\n", err)
+      os.Exit(1)
+    }
 
     // Create the HTTP server
     server := &http.Server{
       Addr:    fmt.Sprintf("%s:%d", options.Host, options.Port),
       Handler: router,
-      // TODO: Set up timeouts!
     }
 
     // Start server
@@ -55,19 +68,11 @@ func main() {
       fmt.Printf("Shutting down API server on port %d...\n", options.Port)
       ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
       defer cancel()
-      server.Shutdown(ctx)
+      _ = server.Shutdown(ctx)
     })
 
   })
 
   // Run the CLI. When passed no commands, it starts the server.
   cli.Run()
-}
-
-func addRoutes(api huma.API) {
-  handlers.RegisterUsersRoutes(api)
-  handlers.RegisterProjectsRoutes(api)
-  handlers.RegisterEmbeddingsRoutes(api)
-  // handlers.RegisterSimilarRoutes(api)
-  // handlers.RegisterLLMProcessRoutes(api)
 }

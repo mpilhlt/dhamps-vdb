@@ -75,3 +75,22 @@ For testing (i.e. without compiling and deploying), you can go to the main direc
 ```bash
 go run main.go --port=8880 --db-port=8888 --db-user=my_user --db-password=my-password --db-name=my_vectors
 ```
+
+Actual (mostly integration) tests are run like this:
+
+```bash
+systemctl --user start podman.socket
+export DOCKER_HOST=unix://$XDG_RUNTIME_DIR/podman/podman.sock
+go test -v ./...
+```
+
+## TODO
+
+- [ ] **Tests**
+- [ ] User **authentication**
+- [ ] User **restrictions** on some API calls
+- [ ] Catch post to existing resources
+- [ ] Use **transactions** (most importantly, when an action requires several queries, e.g. projects being added and then linked to several read-authorized users)
+- [ ] **Rate limiting**
+- [ ] Validate with metadata schema
+- [ ] **Link or Unlink** users/LLMs as standalone operations

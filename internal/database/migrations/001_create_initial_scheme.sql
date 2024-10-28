@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS projects(
   "handle" VARCHAR(20) NOT NULL,
   "owner" VARCHAR(20) NOT NULL REFERENCES "users"("handle") ON DELETE CASCADE,
   "description" TEXT,
+  "metadata_scheme" TEXT,
   "created_at" TIMESTAMP NOT NULL,
   "updated_at" TIMESTAMP NOT NULL,
   UNIQUE ("handle", "owner")
@@ -31,23 +32,42 @@ CREATE INDEX IF NOT EXISTS projects_handle ON "projects"("handle");
 
 -- This creates the users_projects associations table.
 
-DO $$ BEGIN
-    IF to_regtype('vdb_role') IS NULL THEN
-        CREATE TYPE vdb_role AS ENUM ('owner', 'writer', 'reader');
-    END IF;
-END $$;
+CREATE TABLE IF NOT EXISTS vdb_roles(
+  "vdb_role" VARCHAR(20) PRIMARY KEY
+);
 
+INSERT INTO "vdb_roles"("vdb_role")
+VALUES ('owner'), ('writer'), ('reader');
 
 CREATE TABLE IF NOT EXISTS users_projects(
   "user_handle" VARCHAR(20) REFERENCES "users"("handle") ON DELETE CASCADE,
   "project_id" SERIAL REFERENCES "projects"("project_id") ON DELETE CASCADE,
-  "role" vdb_role NOT NULL,
+  "role" VARCHAR(20) NOT NULL REFERENCES "vdb_roles"("vdb_role"),
   "created_at" TIMESTAMP NOT NULL,
   "updated_at" TIMESTAMP NOT NULL,
   PRIMARY KEY ("user_handle", "project_id")
 );
 
 -- This creates the LLM Services table.
+
+-- This creates the api_standards table.
+
+CREATE TABLE IF NOT EXISTS key_methods(
+  "key_method" VARCHAR(20) PRIMARY KEY
+);
+
+INSERT INTO "key_methods"("key_method")
+VALUES ('auth_bearer'), ('body_form'), ('query_param'), ('custom_header');
+
+CREATE TABLE IF NOT EXISTS api_standards(
+  "handle" VARCHAR(20) PRIMARY KEY,
+  "description" TEXT,
+  "key_method" VARCHAR(20) NOT NULL REFERENCES "key_methods"("key_method"),
+  "key_field" VARCHAR(20),
+  "vector_size" INTEGER NOT NULL,
+  "created_at" TIMESTAMP NOT NULL,
+  "updated_at" TIMESTAMP NOT NULL
+);
 
 CREATE TABLE IF NOT EXISTS llmservices(
   "llmservice_id" SERIAL PRIMARY KEY,
@@ -69,7 +89,7 @@ CREATE INDEX IF NOT EXISTS llmservices_handle ON "llmservices"("handle");
 CREATE TABLE IF NOT EXISTS users_llmservices(
   "user" VARCHAR(20) NOT NULL REFERENCES "users"("handle") ON DELETE CASCADE,
   "llmservice" SERIAL NOT NULL REFERENCES "llmservices"("llmservice_id") ON DELETE CASCADE,
-  "role" vdb_role NOT NULL,
+  "role" VARCHAR(20) NOT NULL REFERENCES "vdb_roles"("vdb_role"),
   "created_at" TIMESTAMP NOT NULL,
   "updated_at" TIMESTAMP NOT NULL,
   PRIMARY KEY ("user", "llmservice")
@@ -89,12 +109,15 @@ CREATE TABLE IF NOT EXISTS projects_llmservices(
 
 CREATE TABLE IF NOT EXISTS embeddings(
   "id" SERIAL PRIMARY KEY,
+  "owner" VARCHAR(20) NOT NULL REFERENCES "users"("handle") ON DELETE CASCADE,
+  "project" SERIAL NOT NULL REFERENCES "projects"("project_id") ON DELETE CASCADE,
   "text_id" TEXT,
-  "embedding" HALFVEC,
+  "embedding" halfvec NOT NULL,
   "embedding_dim" INTEGER NOT NULL,
   "llmservice" SERIAL NOT NULL REFERENCES "llmservices"("llmservice_id"),
   "text" TEXT,
-  "metadata" JSONB,
+  -- TODO: add metadata handling
+  -- "metadata" jsonb,
   "created_at" TIMESTAMP NOT NULL,
   "updated_at" TIMESTAMP NOT NULL
 );
@@ -104,23 +127,6 @@ CREATE INDEX IF NOT EXISTS embeddings_text_id ON "embeddings"("text_id");
 -- We will create the index for the vector in a separate schema version
 -- CREATE INDEX ON embedding USING hnsw (embedding halfvec_cosine_ops) WITH (m = 16, ef_construction = 128);
 
--- This creates the api_standards table.
-
-DO $$ BEGIN
-    IF to_regtype('key_method') IS NULL THEN
-        CREATE TYPE key_method AS ENUM ('auth_bearer', 'body_form', 'query_param', 'custom_header');
-    END IF;
-END $$;
-
-CREATE TABLE IF NOT EXISTS api_standards(
-  "handle" VARCHAR(20) PRIMARY KEY,
-  "description" TEXT,
-  "key_method" key_method NOT NULL,
-  "key_field" VARCHAR(20),
-  "vector_size" INTEGER NOT NULL,
-  "created_at" TIMESTAMP NOT NULL,
-  "updated_at" TIMESTAMP NOT NULL
-);
 
 ---- create above / drop below ----
 
@@ -137,6 +143,8 @@ DROP INDEX IF EXISTS projects_handle;
 -- This removes the users_projects associations table.
 
 DROP TABLE IF EXISTS users_projects;
+
+DROP TABLE IF EXISTS vdb_roles;
 
 -- This removes the LLM Services table.
 
@@ -160,15 +168,9 @@ DROP INDEX IF EXISTS embeddings_text_id;
 
 -- This removes the api_standards table.
 
+DROP TABLE IF EXISTS key_methods;
+
 DROP TABLE IF EXISTS api_standards;
-
--- This removes the key_method enum type.
-
-DROP TYPE IF EXISTS "key_method";
-
--- This removes the vdb_role enum type.
-
-DROP TYPE IF EXISTS "vdb_role";
 
 -- This removes the vector extension.
 -- Again, as we have disabled it above,

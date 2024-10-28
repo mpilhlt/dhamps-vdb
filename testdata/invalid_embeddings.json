@@ -1,0 +1,10 @@
+{
+  "foo": "https://id.salamanca.school/texts/W0001:vol1.1.1.1.1",
+  "vector": [],
+  "vector_dim": 512,
+  "llmservice": 1,
+  "text": "This is a test document",
+  "project_id": 1,
+  "user": "alice",
+  "project": "test1"
+}
