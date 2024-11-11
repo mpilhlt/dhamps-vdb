@@ -21,3 +21,13 @@ sql:
           - db_type: "jsonb"
             go_type:
               type: "map[string]interface{}"
+        rename:
+          llmservice_id: "LLMServiceID"
+          llmservice_handle: "LLMServiceHandle"
+          project_id: "ProjectID"
+          text_id: "TextID"
+          # - column: "users.vdb_api_key"
+          #   go_type:
+          #     type: "[]byte"
+        # rename:
+        #   decode: "VdbApiKey"

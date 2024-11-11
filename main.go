@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/mpilhlt/dhamps-vdb/internal/auth"
 	"github.com/mpilhlt/dhamps-vdb/internal/database"
 	"github.com/mpilhlt/dhamps-vdb/internal/handlers"
 	"github.com/mpilhlt/dhamps-vdb/internal/models"
@@ -17,62 +18,70 @@ import (
 	huma "github.com/danielgtaylor/huma/v2"
 )
 
-// TODO: Set up timeouts (e.g. in server definition)!
+// TODO: Set up limits (e.g. in server definition):
+//       <https://huma.rocks/features/request-limits/>
 
 func main() {
-  // Create a CLI app
-  cli := humacli.New(func(hooks humacli.Hooks, options *models.Options) {
+	// Create a CLI app
+	cli := humacli.New(func(hooks humacli.Hooks, options *models.Options) {
 
-    println()
-    println("=== Starting DH@MPS Vector Database ...")
-    fmt.Printf("    Options are debug:%v host:%v port: %v dbhost:%s dbname:%s\n",
-      options.Debug, options.Host, options.Port, options.DBHost, options.DBName)
+		println()
+		println("=== Starting DH@MPS Vector Database ...")
+		fmt.Printf("    Options are debug:%v host:%v port: %v dbhost:%s dbname:%s\n",
+			options.Debug, options.Host, options.Port, options.DBHost, options.DBName)
 
-    // Initialize the database
-    pool, err := database.InitDB(options)
-    if err != nil {
-      fmt.Printf("    Unable to connect to database: %v\n", err)
-      os.Exit(1)
-    }
+		// Initialize the database
+		pool, err := database.InitDB(options)
+		if err != nil {
+			fmt.Printf("    Unable to connect to database: %v\n", err)
+			os.Exit(1)
+		}
 
-    // Define standard key generator (for API keys)
-    keyGen := handlers.StandardKeyGen{}
+		// Define standard key generator (for API keys)
+		keyGen := handlers.StandardKeyGen{}
 
-    // Create a new router & API
-    router := http.NewServeMux()
-    api := humago.New(router, huma.DefaultConfig("DHaMPS Vector Database API", "0.0.1"))
+		// Create a new router & API
+		config := huma.DefaultConfig("DHaMPS Vector Database API", "0.0.1")
+		config.Components.SecuritySchemes = auth.Config
+		router := http.NewServeMux()
+		api := humago.New(router, config)
+		api.UseMiddleware(auth.APIKeyAdminAuth(api, options))
+		api.UseMiddleware(auth.APIKeyOwnerAuth(api, pool, options))
+		api.UseMiddleware(auth.APIKeyReaderAuth(api, pool, options))
+		api.UseMiddleware(auth.AuthTermination(api))
 
-    // Add routes to the API
-    err = handlers.AddRoutes(pool, keyGen, api)
-    if err != nil {
-      fmt.Printf("    Unable to add routes: %v\n", err)
-      os.Exit(1)
-    }
+		// Add routes to the API
+		err = handlers.AddRoutes(pool, keyGen, api)
+		if err != nil {
+			fmt.Printf("    Unable to add routes: %v\n", err)
+			os.Exit(1)
+		}
 
-    // Create the HTTP server
-    server := &http.Server{
-      Addr:    fmt.Sprintf("%s:%d", options.Host, options.Port),
-      Handler: router,
-    }
+		// Create the HTTP server
+		// TODO: Add limits to the server (e.g. timeouts, max header size, etc.)
+		server := &http.Server{
+			Addr:    fmt.Sprintf("%s:%d", options.Host, options.Port),
+			Handler: router,
+		}
 
-    // Start server
-    hooks.OnStart(func() {
-      fmt.Printf("Starting API server on port %d...\n", options.Port)
-      if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-        fmt.Printf("listen: %s\n", err)
-      }
-    })
+		// Start server
+		hooks.OnStart(func() {
+			fmt.Printf("Starting API server on port %d...\n", options.Port)
+			if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				fmt.Printf("listen: %s\n", err)
+			}
+		})
 
-    // Gracefully shutdown server
-    hooks.OnStop(func() {
-      fmt.Printf("Shutting down API server on port %d...\n", options.Port)
-      ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-      defer cancel()
-      _ = server.Shutdown(ctx)
-    })
+		// Gracefully shutdown server
+		hooks.OnStop(func() {
+			fmt.Printf("Shutting down API server on port %d...\n", options.Port)
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			_ = server.Shutdown(ctx)
+		})
 
-  })
+	})
 
-  // Run the CLI. When passed no commands, it starts the server.
-  cli.Run()
+	// Run the CLI. When passed no commands, it starts the server.
+	cli.Run()
 }

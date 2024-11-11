@@ -7,10 +7,11 @@
 -- This creates the users table.
 
 CREATE TABLE IF NOT EXISTS users(
-  "handle" VARCHAR(20) PRIMARY KEY,
+  "user_handle" VARCHAR(20) PRIMARY KEY,
   "name" TEXT,
   "email" TEXT UNIQUE NOT NULL,
-  "vdb_api_key" CHAR(32) UNIQUE NOT NULL,
+  -- "vdb_api_key" BYTEA UNIQUE NOT NULL,
+  "vdb_api_key" CHAR(64) UNIQUE NOT NULL,
   "created_at" TIMESTAMP NOT NULL,
   "updated_at" TIMESTAMP NOT NULL
 );
@@ -19,16 +20,16 @@ CREATE TABLE IF NOT EXISTS users(
 
 CREATE TABLE IF NOT EXISTS projects(
   "project_id" SERIAL PRIMARY KEY,
-  "handle" VARCHAR(20) NOT NULL,
-  "owner" VARCHAR(20) NOT NULL REFERENCES "users"("handle") ON DELETE CASCADE,
+  "project_handle" VARCHAR(20) NOT NULL,
+  "owner" VARCHAR(20) NOT NULL REFERENCES "users"("user_handle") ON DELETE CASCADE,
   "description" TEXT,
   "metadata_scheme" TEXT,
   "created_at" TIMESTAMP NOT NULL,
   "updated_at" TIMESTAMP NOT NULL,
-  UNIQUE ("handle", "owner")
+  UNIQUE ("owner", "project_handle")
 );
 
-CREATE INDEX IF NOT EXISTS projects_handle ON "projects"("handle");
+CREATE INDEX IF NOT EXISTS projects_handle ON "projects"("project_handle");
 
 -- This creates the users_projects associations table.
 
@@ -40,7 +41,7 @@ INSERT INTO "vdb_roles"("vdb_role")
 VALUES ('owner'), ('writer'), ('reader');
 
 CREATE TABLE IF NOT EXISTS users_projects(
-  "user_handle" VARCHAR(20) REFERENCES "users"("handle") ON DELETE CASCADE,
+  "user_handle" VARCHAR(20) REFERENCES "users"("user_handle") ON DELETE CASCADE,
   "project_id" SERIAL REFERENCES "projects"("project_id") ON DELETE CASCADE,
   "role" VARCHAR(20) NOT NULL REFERENCES "vdb_roles"("vdb_role"),
   "created_at" TIMESTAMP NOT NULL,
@@ -60,7 +61,7 @@ INSERT INTO "key_methods"("key_method")
 VALUES ('auth_bearer'), ('body_form'), ('query_param'), ('custom_header');
 
 CREATE TABLE IF NOT EXISTS api_standards(
-  "handle" VARCHAR(20) PRIMARY KEY,
+  "api_standard_handle" VARCHAR(20) PRIMARY KEY,
   "description" TEXT,
   "key_method" VARCHAR(20) NOT NULL REFERENCES "key_methods"("key_method"),
   "key_field" VARCHAR(20),
@@ -71,50 +72,50 @@ CREATE TABLE IF NOT EXISTS api_standards(
 
 CREATE TABLE IF NOT EXISTS llmservices(
   "llmservice_id" SERIAL PRIMARY KEY,
-  "handle" VARCHAR(20) NOT NULL,
-  "owner" VARCHAR(20) NOT NULL REFERENCES "users"("handle") ON DELETE CASCADE,
+  "llmservice_handle" VARCHAR(20) NOT NULL,
+  "owner" VARCHAR(20) NOT NULL REFERENCES "users"("user_handle") ON DELETE CASCADE,
   "description" TEXT,
   "endpoint" TEXT NOT NULL,
   "api_key" TEXT,
-  "api_standard" VARCHAR(20) NOT NULL REFERENCES "api_standards"("handle"),
+  "api_standard" VARCHAR(20) NOT NULL REFERENCES "api_standards"("api_standard_handle"),
   "created_at" TIMESTAMP NOT NULL,
   "updated_at" TIMESTAMP NOT NULL,
-  UNIQUE ("handle", "owner")
+  UNIQUE ("owner", "llmservice_handle")
 );
 
-CREATE INDEX IF NOT EXISTS llmservices_handle ON "llmservices"("handle");
+CREATE INDEX IF NOT EXISTS llmservices_handle ON "llmservices"("llmservice_handle");
 
 -- This creates the users_llmservices associations table.
 
 CREATE TABLE IF NOT EXISTS users_llmservices(
-  "user" VARCHAR(20) NOT NULL REFERENCES "users"("handle") ON DELETE CASCADE,
-  "llmservice" SERIAL NOT NULL REFERENCES "llmservices"("llmservice_id") ON DELETE CASCADE,
+  "user_handle" VARCHAR(20) NOT NULL REFERENCES "users"("user_handle") ON DELETE CASCADE,
+  "llmservice_id" SERIAL NOT NULL REFERENCES "llmservices"("llmservice_id") ON DELETE CASCADE,
   "role" VARCHAR(20) NOT NULL REFERENCES "vdb_roles"("vdb_role"),
   "created_at" TIMESTAMP NOT NULL,
   "updated_at" TIMESTAMP NOT NULL,
-  PRIMARY KEY ("user", "llmservice")
+  PRIMARY KEY ("user_handle", "llmservice_id")
 );
 
 -- This creates the projects_llmservices associations table.
 
 CREATE TABLE IF NOT EXISTS projects_llmservices(
-  "project" SERIAL NOT NULL REFERENCES "projects"("project_id") ON DELETE CASCADE,
-  "llmservice" SERIAL NOT NULL REFERENCES "llmservices"("llmservice_id") ON DELETE CASCADE,
+  "project_id" SERIAL NOT NULL REFERENCES "projects"("project_id") ON DELETE CASCADE,
+  "llmservice_id" SERIAL NOT NULL REFERENCES "llmservices"("llmservice_id") ON DELETE CASCADE,
   "created_at" TIMESTAMP NOT NULL,
   "updated_at" TIMESTAMP NOT NULL,
-  PRIMARY KEY ("project", "llmservice")
+  PRIMARY KEY ("project_id", "llmservice_id")
 );
 
 -- This creates the embeddings table.
 
 CREATE TABLE IF NOT EXISTS embeddings(
   "id" SERIAL PRIMARY KEY,
-  "owner" VARCHAR(20) NOT NULL REFERENCES "users"("handle") ON DELETE CASCADE,
-  "project" SERIAL NOT NULL REFERENCES "projects"("project_id") ON DELETE CASCADE,
+  "owner" VARCHAR(20) NOT NULL REFERENCES "users"("user_handle") ON DELETE CASCADE,
+  "project_id" SERIAL NOT NULL REFERENCES "projects"("project_id") ON DELETE CASCADE,
   "text_id" TEXT,
   "embedding" halfvec NOT NULL,
   "embedding_dim" INTEGER NOT NULL,
-  "llmservice" SERIAL NOT NULL REFERENCES "llmservices"("llmservice_id"),
+  "llmservice_id" SERIAL NOT NULL REFERENCES "llmservices"("llmservice_id"),
   "text" TEXT,
   -- TODO: add metadata handling
   -- "metadata" jsonb,

@@ -1,5 +1,5 @@
 {
-  "handle": "alice",
+  "user_handle": "alice",
   "name": "Alice Doe",
   "email": "alice@foo.bar"
 }

@@ -4,8 +4,8 @@ import "net/http"
 
 // Project is a project that a user is a member of.
 type Project struct {
-	Id                int          `json:"project_id" doc:"Unique project identifier"`
-	Handle            string       `json:"handle" minLength:"3" maxLength:"20" example:"my-gpt-4" doc:"Project handle"`
+	ProjectId         int          `json:"project_id" doc:"Unique project identifier"`
+	ProjectHandle     string       `json:"project_handle" minLength:"3" maxLength:"20" example:"my-gpt-4" doc:"Project handle"`
 	Description       string       `json:"description,omitempty" maxLength:"255" doc:"Description of the project."`
 	MetadataScheme    string       `json:"metadataScheme,omitempty" doc:"Metadata json scheme used in the project."`
 	AuthorizedReaders []string     `json:"authorizedReaders,omitempty" default:"" example:"[\"jdoe\",\"foobar\"]" doc:"Account names allowed to retrieve information from the project. Defaults to everyone ([\"*\"])"`
@@ -13,7 +13,7 @@ type Project struct {
 }
 
 type ProjectSubmission struct {
-	Handle            string       `json:"handle" minLength:"3" maxLength:"20" example:"my-gpt-4" doc:"Project handle"`
+	ProjectHandle     string       `json:"project_handle" minLength:"3" maxLength:"20" example:"my-gpt-4" doc:"Project handle"`
 	Description       string       `json:"description,omitempty" maxLength:"255" doc:"Description of the project."`
 	MetadataScheme    string       `json:"metadataScheme,omitempty" doc:"Metadata json scheme used in the project."`
 	AuthorizedReaders []string     `json:"authorizedReaders,omitempty" default:"" example:"[\"jdoe\",\"foobar\"]" doc:"Account names allowed to retrieve information from the project. Defaults to everyone ([\"*\"])"`
@@ -25,36 +25,36 @@ type ProjectSubmission struct {
 // The response structs must be structs with fields for the output headers and body of the operation, if any.
 
 // Put/post project
-// PUT Path: "/projects/{user}/{project}"
+// PUT Path: "/projects/{user_handle}/{project_handle}"
 
 type PutProjectRequest struct {
-	User    string `json:"user" path:"user" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
-	Project string `json:"project" path:"project" maxLength:"20" minLength:"3" example:"my-gpt-4" doc:"Project handle"`
-	Body    ProjectSubmission
+	UserHandle    string `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
+	ProjectHandle string `json:"project_handle" path:"project_handle" maxLength:"20" minLength:"3" example:"my-gpt-4" doc:"Project handle"`
+	Body          ProjectSubmission
 }
 
 // POST Path: "/projects/{user}"
 
 type PostProjectRequest struct {
-	User string `json:"user" path:"user" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
-	Body ProjectSubmission
+	UserHandle string `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
+	Body       ProjectSubmission
 }
 
 type UploadProjectResponse struct {
 	Header []http.Header `json:"header,omitempty" doc:"Response headers"`
 	Body   struct {
-		Handle string `json:"id" doc:"Handle of created or updated project"`
-		Id     int    `json:"project_id" doc:"Unique project identifier"`
+		ProjectHandle string `json:"project_handle" doc:"Handle of created or updated project"`
+		ProjectId     int    `json:"project_id" doc:"Unique project identifier"`
 	}
 }
 
 // Get all projects by user
-// Path: "/projects/{user}"
+// Path: "/projects/{user_handle}"
 
 type GetProjectsRequest struct {
-	User   string `json:"user" path:"user" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
-	Limit  int    `json:"limit,omitempty" query:"limit" minimum:"1" maximum:"200" example:"10" default:"10" doc:"Maximum number of projects to return"`
-	Offset int    `json:"offset,omitempty" query:"offset" minimum:"0" example:"0" default:"0" doc:"Offset into the list of projects"`
+	UserHandle string `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
+	Limit      int    `json:"limit,omitempty" query:"limit" minimum:"1" maximum:"200" example:"10" default:"10" doc:"Maximum number of projects to return"`
+	Offset     int    `json:"offset,omitempty" query:"offset" minimum:"0" example:"0" default:"0" doc:"Offset into the list of projects"`
 }
 
 type GetProjectsResponse struct {
@@ -66,11 +66,11 @@ type GetProjectsResponse struct {
 }
 
 // Get single project
-// Path: "/projects/{user}/{project}"
+// Path: "/projects/{user_handle}/{project_handle}"
 
 type GetProjectRequest struct {
-	User    string `json:"user" path:"user" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
-	Project string `json:"project" path:"project" maxLength:"20" minLength:"3" example:"my-gpt-4" doc:"Project handle"`
+	UserHandle    string `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
+	ProjectHandle string `json:"project_handle" path:"project_handle" maxLength:"20" minLength:"3" example:"my-gpt-4" doc:"Project handle"`
 }
 
 type GetProjectResponse struct {
@@ -81,11 +81,11 @@ type GetProjectResponse struct {
 }
 
 // Delete project
-// Path: "/projects/{user}/{project}"
+// Path: "/projects/{user_handle}/{project_handle}"
 
 type DeleteProjectRequest struct {
-	User    string `json:"user" path:"user" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
-	Project string `json:"project" path:"project" maxLength:"20" minLength:"3" example:"my-gpt-4" doc:"Project handle"`
+	UserHandle    string `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
+	ProjectHandle string `json:"project_handle" path:"project_handle" maxLength:"20" minLength:"3" example:"my-gpt-4" doc:"Project handle"`
 }
 
 type DeleteProjectResponse struct {

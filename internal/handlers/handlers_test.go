@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mpilhlt/dhamps-vdb/internal/auth"
 	"github.com/mpilhlt/dhamps-vdb/internal/database"
 	"github.com/mpilhlt/dhamps-vdb/internal/handlers"
 	"github.com/mpilhlt/dhamps-vdb/internal/models"
@@ -56,6 +57,7 @@ var (
 		DBName:     "testdb",
 		DBUser:     "test",
 		DBPassword: "test",
+		AdminKey:   "Password123",
 	}
 	connPool *pgxpool.Pool
 	teardown func()
@@ -174,8 +176,15 @@ func startTestServer(t *testing.T, pool *pgxpool.Pool, keyGen handlers.RandomKey
 	*/
 
 	// Create a new router & API
+	config := huma.DefaultConfig("DHaMPS Vector Database API", "0.0.1")
+	config.Components.SecuritySchemes = auth.Config
 	router := http.NewServeMux()
-	api := humago.New(router, huma.DefaultConfig("DHaMPS Vector Database API", "0.0.1"))
+	api := humago.New(router, config)
+	api.UseMiddleware(auth.APIKeyAdminAuth(api, &options))
+	api.UseMiddleware(auth.APIKeyOwnerAuth(api, pool, &options))
+	api.UseMiddleware(auth.APIKeyReaderAuth(api, pool, &options))
+	api.UseMiddleware(auth.AuthTermination(api))
+
 	err := handlers.AddRoutes(pool, keyGen, api)
 	if err != nil {
 		fmt.Printf("Unable to add routes to API: %v", err)
@@ -252,15 +261,18 @@ func createUser(t *testing.T, userJSON string) (string, error) {
 	requestBody := bytes.NewReader([]byte(userJSON))
 	req, err := http.NewRequest(http.MethodPut, requestURL, requestBody)
 	assert.NoError(t, err)
+	req.Header.Set("Authorization", "Bearer "+options.AdminKey)
 	resp, err := http.DefaultClient.Do(req)
 	assert.NoError(t, err)
 	defer resp.Body.Close()
 	// get API key for user alice from response body
 	body, err := io.ReadAll(resp.Body)
 	assert.NoError(t, err)
+	// fmt.Printf("Response body: %v\n", string(body))
 	userInfo := models.HandleAPIStruct{}
 	err = json.Unmarshal(body, &userInfo)
 	assert.NoError(t, err)
+	// fmt.Printf("        User info: %v\n", userInfo)
 	return userInfo.APIKey, nil
 }
 

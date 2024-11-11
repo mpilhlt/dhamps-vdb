@@ -48,7 +48,7 @@ The application checks and migrates the database schema to the appropriate versi
 A local container with a pg_vector-enabled postgresql can be run like this:
 
 ```bash
-$ podman run -p 8888:5432 -e POSTGRES_PASSWORD=password pgvector/pgvector:0.7.4-pg16
+$> podman run -p 8888:5432 -e POSTGRES_PASSWORD=password pgvector/pgvector:0.7.4-pg16
 ```
 
 But be aware that the filesystem is not persisted if you run it like this. That means that when you stop and restart the container, you will have to re-setup the database as described below.
@@ -56,7 +56,7 @@ But be aware that the filesystem is not persisted if you run it like this. That 
 You can connect to it from a second terminal like so:
 
 ```bash
-$ psql -p 8888 -h localhost -U postgres -d postgres
+$> psql -p 8888 -h localhost -U postgres -d postgres
 ```
 
 And then set up the database like this:
@@ -73,24 +73,29 @@ postgres=# CREATE EXTENSION IF NOT EXISTS vector;
 For testing (i.e. without compiling and deploying), you can go to the main directory of the git repository and launch the vdb app like this:
 
 ```bash
-go run main.go --port=8880 --db-port=8888 --db-user=my_user --db-password=my-password --db-name=my_vectors
+$> go run main.go --port=8880 --db-port=8888 --db-user=my_user --db-password=my-password --db-name=my_vectors
 ```
 
 Actual (mostly integration) tests are run like this:
 
 ```bash
-systemctl --user start podman.socket
-export DOCKER_HOST=unix://$XDG_RUNTIME_DIR/podman/podman.sock
-go test -v ./...
+$> systemctl --user start podman.socket
+$> export DOCKER_HOST=unix://$XDG_RUNTIME_DIR/podman/podman.sock
+$> go test -v ./...
 ```
 
 ## TODO
 
-- [ ] **Tests**
-- [ ] User **authentication**
-- [ ] User **restrictions** on some API calls
-- [ ] Catch post to existing resources
+- [√] Tests
+- [√] Catch post to existing resources
+- [ ] User **authentication** & **restrictions** on some API calls
+- [ ] LLM handling
+  - [ ] calls to LLM services
 - [ ] Use **transactions** (most importantly, when an action requires several queries, e.g. projects being added and then linked to several read-authorized users)
-- [ ] **Rate limiting**
-- [ ] Validate with metadata schema
+- [ ] Limits
+- [ ] environment/options handling (<https://huma.rocks/features/cli/>)
+- [ ] handle more metadata
+- [ ] Validation with metadata schema
 - [ ] **Link or Unlink** users/LLMs as standalone operations
+- [ ] allow transfer of projects from one owner to another
+- [ ] proper logging with more verbose (debug) and quiet (production) mode
