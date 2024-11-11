@@ -215,7 +215,7 @@ func TestUserFunc(t *testing.T) {
 			if v.expectBody != "" {
 				fr := new(bytes.Buffer)
 				err = json.Indent(fr, respBody, "", "  ")
-				// assert.NoError(t, err)
+				assert.NoError(t, err)
 				formattedResp = fr.String()
 			}
 			// if (resp.StatusCode != http.StatusOK) || (resp.StatusCode != int(v.expectStatus)) {
