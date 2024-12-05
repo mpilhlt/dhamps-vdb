@@ -51,11 +51,27 @@ var Config = map[string]*huma.SecurityScheme{
 //	the chain.
 func AuthTermination(api huma.API) func(ctx huma.Context, next func(huma.Context)) {
 	return func(ctx huma.Context, next func(huma.Context)) {
+		// Check if the current operation requires authentication
+		isAuthRequired := false
+		for _, securityScheme := range ctx.Operation().Security {
+			if len(securityScheme) > 0 {
+				isAuthRequired = true
+				break
+			}
+		}
+
+		if !isAuthRequired {
+			// No authentication required for this operation
+			next(ctx)
+			return
+		}
+
+		// Check if any authentication middleware has set AuthUserKey
 		if _, ok := ctx.Context().Value(AuthUserKey).(string); ok {
 			next(ctx)
 			return
 		}
-		fmt.Print("Authentication failed.\n")
+		fmt.Print("        Authentication failed.\n")
 		_ = huma.WriteErr(api, ctx, http.StatusUnauthorized, "Authentication failed. Perhaps a missing or incorrect API key?")
 	}
 }
@@ -141,10 +157,11 @@ func APIKeyOwnerAuth(api huma.API, pool *pgxpool.Pool, options *models.Options) 
 			return
 		}
 
+		// fmt.Printf("        check owner hash against API token: %s/%s ...\n", storedHash, token)
 		if apiKeyIsValid(token, storedHash) {
 			ctx = huma.WithValue(ctx, IsOwnerKey, true)
 			ctx = huma.WithValue(ctx, AuthUserKey, owner)
-			fmt.Print("        Owner authentication successful\n")
+			fmt.Printf("        Owner authentication successful: %s\n", owner)
 			next(ctx)
 			return
 		}

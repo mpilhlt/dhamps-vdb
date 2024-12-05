@@ -11,7 +11,6 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -22,7 +21,6 @@ import (
 
 	huma "github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humago"
-	"github.com/danielgtaylor/huma/v2/humatest"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -257,6 +255,7 @@ func (m *MockKeyGen) RandomKey(len int) (string, error) {
 // createUser creates a user and returns the API key and an error value
 // it accepts a JSON string encoding the user object as input
 func createUser(t *testing.T, userJSON string) (string, error) {
+	fmt.Print("    Creating user (\"alice\") for testing ...\n")
 	requestURL := fmt.Sprintf("http://%s:%d/users/alice", options.Host, options.Port)
 	requestBody := bytes.NewReader([]byte(userJSON))
 	req, err := http.NewRequest(http.MethodPut, requestURL, requestBody)
@@ -265,6 +264,7 @@ func createUser(t *testing.T, userJSON string) (string, error) {
 	resp, err := http.DefaultClient.Do(req)
 	assert.NoError(t, err)
 	defer resp.Body.Close()
+
 	// get API key for user alice from response body
 	body, err := io.ReadAll(resp.Body)
 	assert.NoError(t, err)
@@ -272,6 +272,7 @@ func createUser(t *testing.T, userJSON string) (string, error) {
 	userInfo := models.HandleAPIStruct{}
 	err = json.Unmarshal(body, &userInfo)
 	assert.NoError(t, err)
+	fmt.Printf("        Successfully created user (handle: \"%s\", apiKey: \"%s\").\n", userInfo.UserHandle, userInfo.APIKey)
 	// fmt.Printf("        User info: %v\n", userInfo)
 	return userInfo.APIKey, nil
 }
@@ -279,8 +280,9 @@ func createUser(t *testing.T, userJSON string) (string, error) {
 // createProject creates a project and returns the project ID and an error value
 // it accepts a JSON string encoding the project object as input
 func createProject(t *testing.T, projectJSON string, user string, apiKey string) (int, error) {
+	fmt.Print("    Creating project ")
 	jsonInput := &struct {
-		Handle      string `json:"handle" doc:"Handle of created or updated project"`
+		Handle      string `json:"project_handle" doc:"Handle of created or updated project"`
 		Description string `json:"description" doc:"Description of the project"`
 	}{}
 	err := json.Unmarshal([]byte(projectJSON), jsonInput)
@@ -288,6 +290,7 @@ func createProject(t *testing.T, projectJSON string, user string, apiKey string)
 		fmt.Printf("Error unmarshalling project JSON: %v\n", err)
 	}
 	assert.NoError(t, err)
+	fmt.Printf("(\"%s/%s\") for testing ...\n", user, jsonInput.Handle)
 
 	requestURL := fmt.Sprintf("http://%s:%d/projects/%s/%s", options.Host, options.Port, user, jsonInput.Handle)
 	requestBody := bytes.NewReader([]byte(projectJSON))
@@ -304,8 +307,8 @@ func createProject(t *testing.T, projectJSON string, user string, apiKey string)
 	assert.NoError(t, err)
 
 	projectInfo := &struct {
-		Handle string `json:"id" doc:"Handle of created or updated project"`
-		Id     int    `json:"project_id" doc:"Unique project identifier"`
+		ProjectHandle string `json:"project_handle" doc:"Handle of created or updated project"`
+		ProjectID     int    `json:"project_id" doc:"Unique project identifier"`
 	}{}
 	err = json.Unmarshal(body, &projectInfo)
 	if err != nil {
@@ -313,67 +316,98 @@ func createProject(t *testing.T, projectJSON string, user string, apiKey string)
 	}
 	assert.NoError(t, err)
 
-	return projectInfo.Id, nil
+	fmt.Printf("        Successfully created project (handle \"%s/%s\", id \"%d\").\n", user, projectInfo.ProjectHandle, projectInfo.ProjectID)
+	return projectInfo.ProjectID, nil
+}
+
+// createAPIStandard creates an API standard defintion for testing and returns the handle and an error value
+// it accepts a JSON string encoding the API standard object as input
+func createAPIStandard(t *testing.T, apiStandardJSON string, apiKey string) (string, error) {
+	fmt.Print("    Creating API standard ")
+	jsonInput := &struct {
+		APIStandardHandle string `json:"api_standard_handle" doc:"Handle of created or updated api standard"`
+		Description       string `json:"description" doc:"Description of the api standard"`
+		KeyMethod         string `json:"key_method" doc:"Method used to authenticate the API standard"`
+		KeyField          string `json:"key_field" doc:"Field in the request used to authenticate the API standard"`
+	}{}
+	err := json.Unmarshal([]byte(apiStandardJSON), jsonInput)
+	if err != nil {
+		fmt.Printf("\nError unmarshalling api standard JSON: %v\n", err)
+	}
+	assert.NoError(t, err)
+	fmt.Printf("(\"%s\") for testing ...\n", jsonInput.APIStandardHandle)
+
+	requestURL := fmt.Sprintf("http://%s:%d/api-standards/%s", options.Host, options.Port, jsonInput.APIStandardHandle)
+	requestBody := bytes.NewReader([]byte(apiStandardJSON))
+	req, err := http.NewRequest(http.MethodPut, requestURL, requestBody)
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	assert.NoError(t, err)
+
+	resp, err := http.DefaultClient.Do(req)
+	assert.NoError(t, err)
+	defer resp.Body.Close()
+
+	// get API handle from response body
+	body, err := io.ReadAll(resp.Body)
+	assert.NoError(t, err)
+
+	APIStandardInfo := &struct {
+		APIStandardHandle string `json:"api_standard_handle" doc:"Handle of created or updated api standard"`
+	}{}
+	err = json.Unmarshal(body, &APIStandardInfo)
+	if err != nil {
+		fmt.Printf("Error unmarshalling api standard info: %v\nbody: %v", err, string(body))
+	}
+	assert.NoError(t, err)
+
+	fmt.Printf("        Successfully created API Standard (handle \"%s\").\n", APIStandardInfo.APIStandardHandle)
+	return APIStandardInfo.APIStandardHandle, nil
+}
+
+// createLLMService creates an LLM service definition for testing and returns the handle and an error value
+// it accepts a JSON string encoding the LLM service object as input
+func createLLMService(t *testing.T, llmServiceJSON string, user, apiKey string) (string, error) {
+	fmt.Print("    Creating LLM service ")
+	jsonInput := &struct {
+		LLMServiceHandle string `json:"llm_service_handle" doc:"Handle of created or updated LLM service"`
+		Description      string `json:"description" doc:"Description of the LLM service"`
+	}{}
+	err := json.Unmarshal([]byte(llmServiceJSON), jsonInput)
+	if err != nil {
+		fmt.Printf("Error unmarshalling LLM service JSON: %v\n", err)
+	}
+	assert.NoError(t, err)
+	fmt.Printf("(\"%s\") for testing ...\n", jsonInput.LLMServiceHandle)
+
+	requestURL := fmt.Sprintf("http://%s:%d/llm-services/%s/%s", options.Host, options.Port, user, jsonInput.LLMServiceHandle)
+	requestBody := bytes.NewReader([]byte(llmServiceJSON))
+	req, err := http.NewRequest(http.MethodPut, requestURL, requestBody)
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	assert.NoError(t, err)
+
+	resp, err := http.DefaultClient.Do(req)
+	assert.NoError(t, err)
+	defer resp.Body.Close()
+
+	// get LLM service handle from response body
+	body, err := io.ReadAll(resp.Body)
+	assert.NoError(t, err)
+
+	LLMServiceInfo := &struct {
+		LLMServiceHandle string `json:"llm_service_handle" doc:"Handle of created or updated LLM service"`
+	}{}
+	err = json.Unmarshal(body, &LLMServiceInfo)
+	if err != nil {
+		fmt.Printf("Error unmarshalling LLM service info: %v\nbody: %v", err, string(body))
+	}
+	assert.NoError(t, err)
+
+	fmt.Printf("        Successfully created LLM Service (handle \"%s\").\n", LLMServiceInfo.LLMServiceHandle)
+	return LLMServiceInfo.LLMServiceHandle, nil
 }
 
 // isJSON checks if a string is a valid JSON.
 func isJSON(str string) bool {
 	var js json.RawMessage
 	return json.Unmarshal([]byte(str), &js) == nil
-}
-
-// --- After setup, here come some actual tests ---
-
-func TestMyAPI(t *testing.T) {
-	t.Skip("skipping TestMyAPI")
-	// Get a database connection pool
-	connPool, err, teardown := getTestDatabase()
-	if err != nil {
-		fmt.Printf("Unable to get database connection pool: %v", err)
-		teardown()
-		os.Exit(1)
-	}
-	if connPool == nil {
-		fmt.Print("Database connection pool is nil")
-		teardown()
-		os.Exit(1)
-	}
-	defer connPool.Close()
-	defer teardown()
-	fmt.Print("\n    Database ready\n")
-
-	// Create a mock key generator
-	mockKeyGen := new(MockKeyGen)
-	// Set up expectations for the mock key generator
-	mockKeyGen.On("randomKey", 32).Return("abcdefabcdefabcd", nil)
-
-	_, api := humatest.New(t)
-
-	// Register routes...
-	err = handlers.AddRoutes(connPool, mockKeyGen, api)
-	assert.NoError(t, err)
-
-	// Make a GET request
-	resp := api.Get("/some/path?foo=bar")
-	if resp.Code != http.StatusOK {
-		t.Errorf("Unexpected status code %v", resp.Code)
-	}
-
-	// Make a PUT request
-	resp = api.Put("/some/path",
-		"My-Header: abc123",
-		map[string]any{
-			"author": "daniel",
-			"rating": 5,
-		})
-	if resp.Code != http.StatusOK {
-		t.Errorf("Unexpected status code %v", resp.Code)
-	}
-
-	if !strings.Contains(resp.Body.String(), "some text") {
-		t.Errorf("Unexpected response body %v", resp.Body.String())
-	}
-
-	// Verify that the expectations regarding the mock key generation were met
-	mockKeyGen.AssertExpectations(t)
 }

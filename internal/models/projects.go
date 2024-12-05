@@ -4,7 +4,7 @@ import "net/http"
 
 // Project is a project that a user is a member of.
 type Project struct {
-	ProjectId         int          `json:"project_id" doc:"Unique project identifier"`
+	ProjectID         int          `json:"project_id" doc:"Unique project identifier"`
 	ProjectHandle     string       `json:"project_handle" minLength:"3" maxLength:"20" example:"my-gpt-4" doc:"Project handle"`
 	Description       string       `json:"description,omitempty" maxLength:"255" doc:"Description of the project."`
 	MetadataScheme    string       `json:"metadataScheme,omitempty" doc:"Metadata json scheme used in the project."`
@@ -44,7 +44,7 @@ type UploadProjectResponse struct {
 	Header []http.Header `json:"header,omitempty" doc:"Response headers"`
 	Body   struct {
 		ProjectHandle string `json:"project_handle" doc:"Handle of created or updated project"`
-		ProjectId     int    `json:"project_id" doc:"Unique project identifier"`
+		ProjectID     int    `json:"project_id" doc:"Unique project identifier"`
 	}
 }
 

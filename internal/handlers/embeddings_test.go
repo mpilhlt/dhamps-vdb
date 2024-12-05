@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -15,8 +14,6 @@ import (
 )
 
 func TestEmbeddingsFunc(t *testing.T) {
-	t.Skip("Skipping Embeddings tests")
-
 	// Get the database connection pool from package variable
 	pool := connPool
 
@@ -30,17 +27,34 @@ func TestEmbeddingsFunc(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Create user to be used in project tests
-	aliceJSON := `{"handle": "alice", "name": "Alice Doe", "email": "alice@foo.bar"}`
-	fmt.Print("    Creating user (alice) for testing ...\n")
+	aliceJSON := `{"user_handle": "alice", "name": "Alice Doe", "email": "alice@foo.bar"}`
 	aliceAPIKey, err := createUser(t, aliceJSON)
-	assert.NoError(t, err)
+	if err != nil {
+		t.Fatalf("Error creating user alice for testing: %v\n", err)
+	}
 
-	// Create project to be used in embedding tests
-	projectJSON := `{"handle": "test1", "description": "A test project"}`
-	fmt.Print("    Creating project (test1) for testing ...\n")
-	projectID, err := createProject(t, projectJSON, "alice", aliceAPIKey)
-	assert.NoError(t, err)
-	fmt.Printf("    Project ID: %s\n", strconv.Itoa(projectID))
+	// Create project to be used in embeddings tests
+	projectJSON := `{"project_handle": "test1", "description": "A test project"}`
+	_, err = createProject(t, projectJSON, "alice", aliceAPIKey)
+	if err != nil {
+		t.Fatalf("Error creating project alice/test1 for testing: %v\n", err)
+	}
+
+	// Create API standard to be used in embeddings tests
+	apiStandardJSON := `{"api_standard_handle": "openai", "description": "OpenAI Embeddings API", "key_method": "auth_bearer", "key_field": "Authorization" }`
+	_, err = createAPIStandard(t, apiStandardJSON, options.AdminKey)
+	if err != nil {
+		t.Fatalf("Error creating API standard openai for testing: %v\n", err)
+	}
+
+	// Create LLM Service to be used in embeddings tests
+	llmServiceJSON := `{ "llm_service_handle": "openai-large", "endpoint": "https://api.openai.com/v1/embeddings", "description": "My OpenAI full text-embedding-3-large service", "api_key": "0123456789", "api_standard": "openai", "model": "text-embedding-3-large", "dimensions": 3072}`
+	_, err = createLLMService(t, llmServiceJSON, "alice", aliceAPIKey)
+	if err != nil {
+		t.Fatalf("Error creating LLM service openai-large for testing: %v\n", err)
+	}
+
+	fmt.Printf("\nRunning embeddings tests ...\n\n")
 
 	// Define test cases
 	tt := []struct {
@@ -53,13 +67,184 @@ func TestEmbeddingsFunc(t *testing.T) {
 		expectStatus int16
 	}{
 		{
-			name:         "Valid get all embeddings",
+			name:         "Post embeddings, invalid json",
+			method:       http.MethodPost,
+			requestPath:  "/embeddings/alice/test1",
+			bodyPath:     "../../testdata/invalid_embeddings.json",
+			apiKeyHeader: aliceAPIKey,
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Unprocessable Entity\",\n  \"status\": 422,\n  \"detail\": \"validation failed\",\n  \"errors\": [\n    {\n      \"message\": \"expected required property text_id to be present\",\n      \"location\": \"body.embeddings[0]\",\n      \"value\": {\n        \"foo\": \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.1.1.1.1\",\n        \"llm_service_id\": 1,\n        \"project_handle\": \"test1\",\n        \"text\": \"This is a test document\",\n        \"user_handle\": \"alice\",\n        \"vector\": [],\n        \"vector_dim\": 10\n      }\n    },\n    {\n      \"message\": \"unexpected property\",\n      \"location\": \"body.embeddings[0].foo\",\n      \"value\": {\n        \"foo\": \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.1.1.1.1\",\n        \"llm_service_id\": 1,\n        \"project_handle\": \"test1\",\n        \"text\": \"This is a test document\",\n        \"user_handle\": \"alice\",\n        \"vector\": [],\n        \"vector_dim\": 10\n      }\n    }\n  ]\n}\n",
+			expectStatus: http.StatusUnprocessableEntity,
+		},
+		{
+			name:         "Post embeddings, unauthorized",
+			method:       http.MethodPost,
+			requestPath:  "/embeddings/alice/test1",
+			bodyPath:     "../../testdata/valid_embeddings.json",
+			apiKeyHeader: "",
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Unauthorized\",\n  \"status\": 401,\n  \"detail\": \"Authentication failed. Perhaps a missing or incorrect API key?\"\n}\n",
+			expectStatus: http.StatusUnauthorized,
+		},
+		{
+			name:         "Valid post embeddings",
+			method:       http.MethodPost,
+			requestPath:  "/embeddings/alice/test1",
+			bodyPath:     "../../testdata/valid_embeddings.json",
+			apiKeyHeader: aliceAPIKey,
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/UploadProjEmbeddingsResponseBody.json\",\n  \"ids\": [\n    \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.1.1.1.1\"\n  ]\n}\n",
+			expectStatus: http.StatusCreated,
+		},
+		{
+			name:         "Get project embeddings, wrong path",
+			method:       http.MethodGet,
+			requestPath:  "/embeddings/alice/testX",
+			bodyPath:     "",
+			apiKeyHeader: aliceAPIKey,
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Not Found\",\n  \"status\": 404,\n  \"detail\": \"user alice's project testX not found\"\n}\n",
+			expectStatus: http.StatusNotFound,
+		},
+		{
+			name:         "Get project embeddings, unauthorized",
+			method:       http.MethodGet,
+			requestPath:  "/embeddings/alice/test1",
+			bodyPath:     "",
+			apiKeyHeader: "",
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Unauthorized\",\n  \"status\": 401,\n  \"detail\": \"Authentication failed. Perhaps a missing or incorrect API key?\"\n}\n",
+			expectStatus: http.StatusUnauthorized,
+		},
+		{
+			name:         "Valid get project embeddings",
 			method:       http.MethodGet,
 			requestPath:  "/embeddings/alice/test1",
 			bodyPath:     "",
 			apiKeyHeader: aliceAPIKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Not Found\",\n  \"status\": 404,\n  \"detail\": \"no embeddings found.\"\n}\n",
-			expectStatus: 404,
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/GetProjEmbeddingsResponseBody.json\",\n  \"embeddings\": [\n    {\n      \"text_id\": \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.1.1.1.1\",\n      \"vector\": [\n        -0.020843506,\n        0.01852417,\n        0.05328369,\n        0.07141113,\n        0.020004272\n      ],\n      \"vector_dim\": 5,\n      \"llm_service_id\": 1,\n      \"text\": \"This is a test document\",\n      \"project_id\": 1,\n      \"user_handle\": \"alice\",\n      \"project_handle\": \"test1\"\n    }\n  ]\n}\n",
+			expectStatus: http.StatusOK,
+		},
+		{
+			name:         "Get document embeddings, wrong path",
+			method:       http.MethodGet,
+			requestPath:  "/embeddings/alice/test1/nonexistent",
+			bodyPath:     "",
+			apiKeyHeader: aliceAPIKey,
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Not Found\",\n  \"status\": 404,\n  \"detail\": \"no embeddings found for user alice, project test1, id nonexistent.\"\n}\n",
+			expectStatus: http.StatusNotFound,
+		},
+		{
+			name:         "Get document embeddings, unauthorized",
+			method:       http.MethodGet,
+			requestPath:  "/embeddings/alice/test1/https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.1.1.1.1",
+			bodyPath:     "",
+			apiKeyHeader: "",
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Unauthorized\",\n  \"status\": 401,\n  \"detail\": \"Authentication failed. Perhaps a missing or incorrect API key?\"\n}\n",
+			expectStatus: http.StatusUnauthorized,
+		},
+		{
+			name:         "Valid get document embeddings",
+			method:       http.MethodGet,
+			requestPath:  "/embeddings/alice/test1/https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.1.1.1.1",
+			bodyPath:     "",
+			apiKeyHeader: aliceAPIKey,
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/Embeddings.json\",\n  \"text_id\": \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.1.1.1.1\",\n  \"vector\": [\n    -0.020843506,\n    0.01852417,\n    0.05328369,\n    0.07141113,\n    0.020004272\n  ],\n  \"vector_dim\": 5,\n  \"llm_service_id\": 1,\n  \"text\": \"This is a test document\",\n  \"user_handle\": \"\",\n  \"project_handle\": \"\"\n}\n",
+			expectStatus: http.StatusOK,
+		},
+		{
+			name:         "Delete document embeddings, wrong path",
+			method:       http.MethodDelete,
+			requestPath:  "/embeddings/alice/test1/nonexistent",
+			bodyPath:     "",
+			apiKeyHeader: aliceAPIKey,
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Not Found\",\n  \"status\": 404,\n  \"detail\": \"no embeddings found for user alice, project test1, id nonexistent.\"\n}\n",
+			expectStatus: http.StatusNotFound,
+		},
+		{
+			name:         "Valid post embeddings",
+			method:       http.MethodPost,
+			requestPath:  "/embeddings/alice/test1",
+			bodyPath:     "../../testdata/valid_embeddings.json",
+			apiKeyHeader: aliceAPIKey,
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/UploadProjEmbeddingsResponseBody.json\",\n  \"ids\": [\n    \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.1.1.1.1\"\n  ]\n}\n",
+			expectStatus: http.StatusCreated,
+		},
+		{
+			name:         "Delete document embeddings, unauthorized",
+			method:       http.MethodDelete,
+			requestPath:  "/embeddings/alice/test1/https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.1.1.1.1",
+			bodyPath:     "",
+			apiKeyHeader: "",
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Unauthorized\",\n  \"status\": 401,\n  \"detail\": \"Authentication failed. Perhaps a missing or incorrect API key?\"\n}\n",
+			expectStatus: http.StatusUnauthorized,
+		},
+		{
+			name:         "Valid post embeddings",
+			method:       http.MethodPost,
+			requestPath:  "/embeddings/alice/test1",
+			bodyPath:     "../../testdata/valid_embeddings.json",
+			apiKeyHeader: aliceAPIKey,
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/UploadProjEmbeddingsResponseBody.json\",\n  \"ids\": [\n    \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.1.1.1.1\"\n  ]\n}\n",
+			expectStatus: http.StatusCreated,
+		},
+		{
+			name:         "Delete all project embeddings, wrong path",
+			method:       http.MethodDelete,
+			requestPath:  "/embeddings/alice/nonexistant",
+			bodyPath:     "",
+			apiKeyHeader: aliceAPIKey,
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Not Found\",\n  \"status\": 404,\n  \"detail\": \"alice's project nonexistant not found\"\n}\n",
+			expectStatus: http.StatusNotFound,
+		},
+		{
+			name:         "Valid post embeddings",
+			method:       http.MethodPost,
+			requestPath:  "/embeddings/alice/test1",
+			bodyPath:     "../../testdata/valid_embeddings.json",
+			apiKeyHeader: aliceAPIKey,
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/UploadProjEmbeddingsResponseBody.json\",\n  \"ids\": [\n    \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.1.1.1.1\"\n  ]\n}\n",
+			expectStatus: http.StatusCreated,
+		},
+		{
+			name:         "Delete all projet embeddings, unauthorized",
+			method:       http.MethodDelete,
+			requestPath:  "/embeddings/alice/test1",
+			bodyPath:     "",
+			apiKeyHeader: "",
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Unauthorized\",\n  \"status\": 401,\n  \"detail\": \"Authentication failed. Perhaps a missing or incorrect API key?\"\n}\n",
+			expectStatus: http.StatusUnauthorized,
+		},
+		{
+			name:         "Valid post embeddings",
+			method:       http.MethodPost,
+			requestPath:  "/embeddings/alice/test1",
+			bodyPath:     "../../testdata/valid_embeddings.json",
+			apiKeyHeader: aliceAPIKey,
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/UploadProjEmbeddingsResponseBody.json\",\n  \"ids\": [\n    \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.1.1.1.1\"\n  ]\n}\n",
+			expectStatus: http.StatusCreated,
+		},
+		{
+			name:         "Valid delete document embeddings",
+			method:       http.MethodDelete,
+			requestPath:  "/embeddings/alice/test1/https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.1.1.1.1",
+			bodyPath:     "",
+			apiKeyHeader: aliceAPIKey,
+			expectBody:   "",
+			expectStatus: http.StatusNoContent,
+		},
+		{
+			name:         "Valid post embeddings",
+			method:       http.MethodPost,
+			requestPath:  "/embeddings/alice/test1",
+			bodyPath:     "../../testdata/valid_embeddings.json",
+			apiKeyHeader: aliceAPIKey,
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/UploadProjEmbeddingsResponseBody.json\",\n  \"ids\": [\n    \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.1.1.1.1\"\n  ]\n}\n",
+			expectStatus: http.StatusCreated,
+		},
+		{
+			name:         "Valid delete all project embeddings",
+			method:       http.MethodDelete,
+			requestPath:  "/embeddings/alice/test1",
+			bodyPath:     "",
+			apiKeyHeader: aliceAPIKey,
+			expectBody:   "",
+			expectStatus: http.StatusNoContent,
 		},
 	}
 
@@ -129,31 +314,22 @@ func TestEmbeddingsFunc(t *testing.T) {
 	mockKeyGen.AssertExpectations(t)
 
 	// Cleanup removes items created by the put function test
-	// (deleting '/users/alice' should delete all the projects and embeddings connected
-	//  to alice as well)
+	// (deleting '/users/alice' should delete all the
+	//  projects, llmservices and embeddings connected to alice as well)
 	t.Cleanup(func() {
-		tt := []struct {
-			name        string
-			requestPath string
-		}{
-			{
-				name:        "clean up alice",
-				requestPath: "/users/alice",
-			},
-		}
+		fmt.Print("\n\nRunning cleanup ...\n\n")
 
-		for _, v := range tt {
-			fmt.Printf("Running cleanup: %s\n", v.name)
-			requestURL := fmt.Sprintf("http://%s:%d%s", options.Host, options.Port, v.requestPath)
-			req, err := http.NewRequest(http.MethodDelete, requestURL, nil)
-			assert.NoError(t, err)
-			_, err = http.DefaultClient.Do(req)
-			if err != nil && err.Error() != "no rows in result set" {
-				t.Fatalf("Error sending request: %v\n", err)
-			}
-			assert.NoError(t, err)
+		requestURL := fmt.Sprintf("http://%s:%d/admin/reset-db", options.Host, options.Port)
+		req, err := http.NewRequest(http.MethodGet, requestURL, nil)
+		assert.NoError(t, err)
+		req.Header.Set("Authorization", "Bearer "+options.AdminKey)
+		_, err = http.DefaultClient.Do(req)
+		if err != nil && err.Error() != "no rows in result set" {
+			t.Fatalf("Error sending request: %v\n", err)
 		}
-		fmt.Print("Shutting down server\n")
+		assert.NoError(t, err)
+
+		fmt.Print("Shutting down server\n\n")
 		shutDownServer()
 	})
 

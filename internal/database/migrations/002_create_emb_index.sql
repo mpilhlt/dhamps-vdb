@@ -22,16 +22,16 @@
 
 -- However, you can only create indexes on rows with the same number of dimensions (using expression and partial indexing):
 
--- CREATE INDEX embeddings_vector ON embeddings USING hnsw (embedding halfvec_cosine_ops) WITH (m = 16, ef_construction = 128);
-CREATE INDEX IF NOT EXISTS embeddings_vector_384  ON embeddings USING hnsw ((embedding::halfvec(384))  halfvec_cosine_ops) WITH (m = 24, ef_construction = 200) WHERE (embedding_dim = 384);  -- Cohere embed-multilingual-light-v3.0, embed-english-light-v3.0
-CREATE INDEX IF NOT EXISTS embeddings_vector_768  ON embeddings USING hnsw ((embedding::halfvec(768))  halfvec_cosine_ops) WITH (m = 24, ef_construction = 200) WHERE (embedding_dim = 768);  -- BERT base, Cohere embed-multilingual-v2.0, Gemini Embeddings
-CREATE INDEX IF NOT EXISTS embeddings_vector_1024 ON embeddings USING hnsw ((embedding::halfvec(1024)) halfvec_cosine_ops) WITH (m = 24, ef_construction = 200) WHERE (embedding_dim = 1024); -- BERT large, SBERT, Cohere embed-multilingual-v3.0, embed-english-v3.0
-CREATE INDEX IF NOT EXISTS embeddings_vector_1536 ON embeddings USING hnsw ((embedding::halfvec(1536)) halfvec_cosine_ops) WITH (m = 24, ef_construction = 200) WHERE (embedding_dim = 1536); -- OpenAI text-embedding-ada-002, text-embedding-3-small
-CREATE INDEX IF NOT EXISTS embeddings_vector_3072 ON embeddings USING hnsw ((embedding::halfvec(3072)) halfvec_cosine_ops) WITH (m = 24, ef_construction = 200) WHERE (embedding_dim = 3072); -- OpenAI text-embedding-3-large
--- CREATE INDEX IF NOT EXISTS embeddings_vector_4096 ON embeddings USING hnsw ((embedding::halfvec(4096)) halfvec_cosine_ops) WITH (m = 24, ef_construction = 200) WHERE (embedding_dim = 4096); -- Cohere embed-english-v2.0, Llama 3.1, Mistral 7B, OpenAI text-embedding-ada-001
+-- CREATE INDEX embeddings_vector ON embeddings USING hnsw (vector halfvec_cosine_ops) WITH (m = 16, ef_construction = 128);
+CREATE INDEX IF NOT EXISTS embeddings_vector_384  ON embeddings USING hnsw ((vector::halfvec(384))  halfvec_cosine_ops) WITH (m = 24, ef_construction = 200) WHERE (vector_dim = 384);  -- Cohere embed-multilingual-light-v3.0, embed-english-light-v3.0
+CREATE INDEX IF NOT EXISTS embeddings_vector_768  ON embeddings USING hnsw ((vector::halfvec(768))  halfvec_cosine_ops) WITH (m = 24, ef_construction = 200) WHERE (vector_dim = 768);  -- BERT base, Cohere embed-multilingual-v2.0, Gemini Embeddings
+CREATE INDEX IF NOT EXISTS embeddings_vector_1024 ON embeddings USING hnsw ((vector::halfvec(1024)) halfvec_cosine_ops) WITH (m = 24, ef_construction = 200) WHERE (vector_dim = 1024); -- BERT large, SBERT, Cohere embed-multilingual-v3.0, embed-english-v3.0
+CREATE INDEX IF NOT EXISTS embeddings_vector_1536 ON embeddings USING hnsw ((vector::halfvec(1536)) halfvec_cosine_ops) WITH (m = 24, ef_construction = 200) WHERE (vector_dim = 1536); -- OpenAI text-embedding-ada-002, text-embedding-3-small
+CREATE INDEX IF NOT EXISTS embeddings_vector_3072 ON embeddings USING hnsw ((vector::halfvec(3072)) halfvec_cosine_ops) WITH (m = 24, ef_construction = 200) WHERE (vector_dim = 3072); -- OpenAI text-embedding-3-large
+-- CREATE INDEX IF NOT EXISTS embeddings_vector_4096 ON embeddings USING hnsw ((vector::halfvec(4096)) halfvec_cosine_ops) WITH (m = 24, ef_construction = 200) WHERE (embedding_dim = 4096); -- Cohere embed-english-v2.0, Llama 3.1, Mistral 7B, OpenAI text-embedding-ada-001
 
 -- You can then use the index to find the nearest neighbors of a vector:
--- SELECT * FROM embeddings WHERE model_id = 123 ORDER BY embedding::vector(768) <-> '[3,1,2,...]' LIMIT 5;
+-- SELECT * FROM embeddings WHERE model_id = 123 ORDER BY vector::vector(768) <-> '[3,1,2,...]' LIMIT 5;
 
 SET hnsw.ef_search = 100;
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/mpilhlt/dhamps-vdb/internal/database"
 	"github.com/mpilhlt/dhamps-vdb/internal/models"
@@ -11,40 +12,41 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/pgvector/pgvector-go"
 )
 
 // Get user and project
-func getUserProj(ctx context.Context, user, project string) (string, int32, error) {
+func getUserProj(ctx context.Context, user, project string) (string, string, int32, error) {
 	// Check if user and project exist
 	u, err := getUserFunc(ctx, &models.GetUserRequest{UserHandle: user})
 	if err != nil {
-		return "", 0, huma.Error500InternalServerError(fmt.Sprintf("unable to get user %s", user))
-	} else if u.Body.UserHandle != user {
-		return "", 0, huma.Error404NotFound(fmt.Sprintf("user %s not found", user))
+		if err.Error() == "no rows in result set" || err.Error() == fmt.Sprintf("user %s not found", user) {
+			return "", "", 0, huma.Error404NotFound(fmt.Sprintf("user %s not found", user))
+		}
+		return "", "", 0, huma.Error500InternalServerError(fmt.Sprintf("unable to get user %s. %v", user, err))
+	}
+	if u.Body.UserHandle != user {
+		return "", "", 0, huma.Error404NotFound(fmt.Sprintf("user %s not found", user))
 	}
 	p, err := getProjectFunc(ctx, &models.GetProjectRequest{UserHandle: user, ProjectHandle: project})
 	if err != nil {
-		return "", 0, huma.Error500InternalServerError(fmt.Sprintf("unable to get %s's project %s", user, project))
-	} else if p.Body.Project.ProjectHandle != project {
-		return "", 0, huma.Error404NotFound(fmt.Sprintf("%s's project %s not found", user, project))
+		if err.Error() == "no rows in result set" || err.Error() == fmt.Sprintf("user %s's project %s not found", user, project) {
+			return "", "", 0, huma.Error404NotFound(fmt.Sprintf("%s's project %s not found", user, project))
+		}
+		return "", "", 0, huma.Error500InternalServerError(fmt.Sprintf("unable to get %s's project %s. %v", user, project, err))
 	}
-	return u.Body.UserHandle, int32(p.Body.Project.ProjectId), nil
+	if p.Body.Project.ProjectHandle != project {
+		return "", "", 0, huma.Error404NotFound(fmt.Sprintf("%s's project %s not found", user, project))
+	}
+	return u.Body.UserHandle, p.Body.Project.ProjectHandle, int32(p.Body.Project.ProjectID), nil
 }
 
 // Create a new embeddings
 func postProjEmbeddingsFunc(ctx context.Context, input *models.PostProjEmbeddingsRequest) (*models.UploadProjEmbeddingsResponse, error) {
-	if len(input.Body.Embeddings) == 0 {
-		return nil, huma.Error400BadRequest("nothing to do, because len(embeddings) == 0.")
-	}
-
 	// Check if user and project exist
-	u, p, err := getUserProj(ctx, input.UserHandle, input.ProjectHandle)
+	_, _, pid, err := getUserProj(ctx, input.UserHandle, input.ProjectHandle)
 	if err != nil {
-		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get user %s", input.UserHandle))
-	} else if u != input.UserHandle {
-		return nil, huma.Error404NotFound(fmt.Sprintf("user %s not found", input.UserHandle))
-	} else if p == 0 {
-		return nil, huma.Error404NotFound(fmt.Sprintf("project %s not found", input.ProjectHandle))
+		return nil, err
 	}
 
 	// Get the database connection pool from the context
@@ -59,20 +61,21 @@ func postProjEmbeddingsFunc(ctx context.Context, input *models.PostProjEmbedding
 	for _, embedding := range input.Body.Embeddings {
 		// Build query parameters (embeddings)
 		params := database.UpsertEmbeddingsParams{
-			Owner:        u,
-			ProjectID:    p,
 			TextID:       pgtype.Text{String: embedding.TextID, Valid: true},
-			Embedding:    embedding.Vector,
-			EmbeddingDim: embedding.VectorDim,
+			Owner:        input.UserHandle,
+			ProjectID:    pid,
 			LLMServiceID: embedding.LLMServiceID,
 			Text:         pgtype.Text{String: embedding.Text, Valid: true},
+			Vector:       pgvector.NewHalfVector(embedding.Vector),
+			VectorDim:    embedding.VectorDim,
 			// TODO: add metadata handling
 			// Metadata: embedding.Metadata,
 		}
 		// Run the queries (upload embeddings)
 		result, err := queries.UpsertEmbeddings(ctx, params)
 		if err != nil {
-			return nil, huma.Error500InternalServerError("unable to upload embeddings")
+			fmt.Printf("Error: %v\n(Params were: %v)\n", err, params)
+			return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to upload embeddings. %v", err))
 		}
 		ids = append(ids, result.TextID.String)
 	}
@@ -84,59 +87,55 @@ func postProjEmbeddingsFunc(ctx context.Context, input *models.PostProjEmbedding
 }
 
 func getProjEmbeddingsFunc(ctx context.Context, input *models.GetProjEmbeddingsRequest) (*models.GetProjEmbeddingsResponse, error) {
+	// Check if user exists
+	if _, err := getUserFunc(ctx, &models.GetUserRequest{UserHandle: input.UserHandle}); err != nil {
+		return nil, err
+	}
+
+	// Check if project exists
+	if _, err := getProjectFunc(ctx, &models.GetProjectRequest{UserHandle: input.UserHandle, ProjectHandle: input.ProjectHandle}); err != nil {
+		return nil, err
+	}
+
 	// Get the database connection pool from the context
 	pool, err := GetDBPool(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	// Check if user exists
-	queries := database.New(pool)
-	_, err = queries.RetrieveUser(ctx, input.UserHandle)
-	if err != nil {
-		if err.Error() == "no rows in result set" {
-			return nil, huma.Error404NotFound(fmt.Sprintf("user %s not found", input.UserHandle))
-		}
-		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to check if user %s exists before deleting. %v", input.UserHandle, err))
-	}
-	user := input.UserHandle
-
-	// Check if project exists
-	p, err := queries.RetrieveProject(ctx, database.RetrieveProjectParams{Owner: input.UserHandle, ProjectHandle: input.ProjectHandle})
-	if err != nil {
-		if err.Error() == "no rows in result set" {
-			return nil, huma.Error404NotFound(fmt.Sprintf("project %s not found for user %s", input.ProjectHandle, input.UserHandle))
-		}
-		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to check if project %s exists before deleting. %v", input.ProjectHandle, err))
-	}
-	project := p.ProjectHandle
-
 	// Build query parameters (embeddings)
 	params := database.GetEmbeddingsByProjectParams{
-		Owner:         user,
-		ProjectHandle: project,
+		Owner:         input.UserHandle,
+		ProjectHandle: input.ProjectHandle,
 		Limit:         int32(input.Limit),
 		Offset:        int32(input.Offset),
 	}
 
 	// Run the query
+	queries := database.New(pool)
 	embeddings, err := queries.GetEmbeddingsByProject(ctx, params)
 	if err != nil {
-		return nil, huma.Error500InternalServerError("unable to get embeddings")
+		if err.Error() == "no rows in result set" {
+			return nil, huma.Error404NotFound(fmt.Sprintf("no embeddings found for user %s, project %s.", input.UserHandle, input.ProjectHandle))
+		}
+		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get embeddings for user %s, project %s. %v", input.UserHandle, input.ProjectHandle, err))
 	}
 	if len(embeddings) == 0 {
-		return nil, huma.Error404NotFound("no embeddings found.")
+		return nil, huma.Error404NotFound(fmt.Sprintf("no embeddings found for user %s, project %s.", input.UserHandle, input.ProjectHandle))
 	}
 
 	// Build the response
 	e := []models.Embeddings{}
 	for _, embedding := range embeddings {
 		e = append(e, models.Embeddings{
-			TextID:       embedding.TextID.String,
-			Vector:       embedding.Embedding,
-			VectorDim:    embedding.EmbeddingDim,
-			LLMServiceID: embedding.LLMServiceID,
-			Text:         embedding.Text.String,
+			TextID:        embedding.TextID.String,
+			UserHandle:    embedding.Owner,
+			ProjectHandle: embedding.ProjectHandle,
+			ProjectID:     int(embedding.ProjectID),
+			Vector:        embedding.Vector.Slice(),
+			VectorDim:     embedding.VectorDim,
+			LLMServiceID:  embedding.LLMServiceID,
+			Text:          embedding.Text.String,
 		})
 	}
 	response := &models.GetProjEmbeddingsResponse{}
@@ -146,13 +145,12 @@ func getProjEmbeddingsFunc(ctx context.Context, input *models.GetProjEmbeddingsR
 
 func deleteProjEmbeddingsFunc(ctx context.Context, input *models.DeleteProjEmbeddingsRequest) (*models.DeleteProjEmbeddingsResponse, error) {
 	// Check if user and project exist
-	u, p, err := getUserProj(ctx, input.UserHandle, input.ProjectHandle)
+	_, _, _, err := getUserProj(ctx, input.UserHandle, input.ProjectHandle)
 	if err != nil {
-		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get user %s", input.UserHandle))
-	} else if u != input.UserHandle {
-		return nil, huma.Error404NotFound(fmt.Sprintf("user %s not found", input.UserHandle))
-	} else if p == 0 {
-		return nil, huma.Error404NotFound(fmt.Sprintf("project %s not found", input.ProjectHandle))
+		if err.Error() == "no rows in result set" || err == huma.Error404NotFound(fmt.Sprintf("user %s's project %s not found", input.UserHandle, input.ProjectHandle)) {
+			return nil, huma.Error404NotFound(fmt.Sprintf("project %s of user %s not found", input.ProjectHandle, input.UserHandle))
+		}
+		return nil, err
 	}
 
 	// Get the database connection pool from the context
@@ -163,7 +161,7 @@ func deleteProjEmbeddingsFunc(ctx context.Context, input *models.DeleteProjEmbed
 
 	// Build query parameters (embeddings)
 	params := database.DeleteEmbeddingsByProjectParams{
-		Owner:         u,
+		Owner:         input.UserHandle,
 		ProjectHandle: input.ProjectHandle,
 	}
 
@@ -171,25 +169,22 @@ func deleteProjEmbeddingsFunc(ctx context.Context, input *models.DeleteProjEmbed
 	queries := database.New(pool)
 	err = queries.DeleteEmbeddingsByProject(ctx, params)
 	if err != nil {
-		return nil, huma.Error500InternalServerError("unable to delete embeddings")
+		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to delete embeddings for %s's project %s. %v", input.UserHandle, input.ProjectHandle, err))
 	}
 
 	// Build the response
 	response := &models.DeleteProjEmbeddingsResponse{}
-	response.Body = fmt.Sprintf("Successfully deleted all embeddings for %s's project %s", input.UserHandle, input.ProjectHandle)
-
 	return response, nil
 }
 
 func getDocEmbeddingsFunc(ctx context.Context, input *models.GetDocEmbeddingsRequest) (*models.GetDocEmbeddingsResponse, error) {
 	// Check if user and project exist
-	u, p, err := getUserProj(ctx, input.UserHandle, input.ProjectHandle)
+	_, _, _, err := getUserProj(ctx, input.UserHandle, input.ProjectHandle)
 	if err != nil {
-		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get user %s", input.UserHandle))
-	} else if u != input.UserHandle {
-		return nil, huma.Error404NotFound(fmt.Sprintf("user %s not found", input.UserHandle))
-	} else if p == 0 {
-		return nil, huma.Error404NotFound(fmt.Sprintf("project %s not found", input.ProjectHandle))
+		if err.Error() == "no rows in result set" {
+			return nil, huma.Error404NotFound(fmt.Sprintf("project %s of user %s not found", input.ProjectHandle, input.UserHandle))
+		}
+		return nil, err
 	}
 
 	// Get the database connection pool from the context
@@ -198,46 +193,64 @@ func getDocEmbeddingsFunc(ctx context.Context, input *models.GetDocEmbeddingsReq
 		return nil, err
 	}
 
+	textid := url.QueryEscape(input.TextID)
+
 	// Build query parameters (embeddings)
 	params := database.RetrieveEmbeddingsParams{
-		Owner:         u,
+		Owner:         input.UserHandle,
 		ProjectHandle: input.ProjectHandle,
-		TextID:        pgtype.Text{String: input.TextID, Valid: true},
+		TextID:        pgtype.Text{String: textid, Valid: true},
 	}
+
+	// fmt.Printf("getDocEmbeddings, textid: %v\n", textid)
 
 	// Run the query
 	queries := database.New(pool)
-	embedding, err := queries.RetrieveEmbeddings(ctx, params)
+	embeddings, err := queries.RetrieveEmbeddings(ctx, params)
 	if err != nil {
-		return nil, huma.Error500InternalServerError("unable to get embeddings")
+		if err.Error() == "no rows in result set" {
+			return nil, huma.Error404NotFound(fmt.Sprintf("no embeddings found for user %s, project %s, id %s.", input.UserHandle, input.ProjectHandle, textid))
+		}
+		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get embeddings for user %s, project %s, id %s. %v", input.UserHandle, input.ProjectHandle, textid, err))
 	}
-	if embedding.TextID.String == "" {
-		return nil, huma.Error404NotFound("no embeddings found.")
+	if embeddings.TextID.String == "" {
+		return nil, huma.Error404NotFound(fmt.Sprintf("no embeddings found for user %s, project %s, id %s.", input.UserHandle, input.ProjectHandle, textid))
 	}
 
 	// Build the response
 	e := models.Embeddings{
-		TextID:       embedding.TextID.String,
-		Vector:       embedding.Embedding,
-		VectorDim:    embedding.EmbeddingDim,
-		LLMServiceID: embedding.LLMServiceID,
-		Text:         embedding.Text.String,
+		TextID:       embeddings.TextID.String,
+		Vector:       embeddings.Vector.Slice(),
+		VectorDim:    embeddings.VectorDim,
+		LLMServiceID: embeddings.LLMServiceID,
+		Text:         embeddings.Text.String,
 	}
 	response := &models.GetDocEmbeddingsResponse{}
-	response.Body.Embeddings = e
+	response.Body = e
 
 	return response, nil
 }
 
 func deleteDocEmbeddingsFunc(ctx context.Context, input *models.DeleteDocEmbeddingsRequest) (*models.DeleteDocEmbeddingsResponse, error) {
 	// Check if user and project exist
-	u, p, err := getUserProj(ctx, input.UserHandle, input.ProjectHandle)
+	_, _, _, err := getUserProj(ctx, input.UserHandle, input.ProjectHandle)
 	if err != nil {
-		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get user %s", input.UserHandle))
-	} else if u != input.UserHandle {
-		return nil, huma.Error404NotFound(fmt.Sprintf("user %s not found", input.UserHandle))
-	} else if p == 0 {
-		return nil, huma.Error404NotFound(fmt.Sprintf("project %s not found", input.ProjectHandle))
+		if err.Error() == "no rows in result set" {
+			return nil, huma.Error404NotFound(fmt.Sprintf("project %s of user %s not found", input.ProjectHandle, input.UserHandle))
+		}
+		return nil, err
+	}
+
+	textid := url.QueryEscape(input.TextID)
+
+	// Check if embeddings with ID exist
+	textidForChecking := input.TextID // the getDocEmbeddings expects a url-decoded path parameter
+	_, err = getDocEmbeddingsFunc(ctx, &models.GetDocEmbeddingsRequest{UserHandle: input.UserHandle, ProjectHandle: input.ProjectHandle, TextID: textidForChecking})
+	if err != nil {
+		if err.Error() == "no rows in result set" {
+			return nil, huma.Error404NotFound(fmt.Sprintf("text id %s in %s's project %s not found", textid, input.UserHandle, input.ProjectHandle))
+		}
+		return nil, err
 	}
 
 	// Get the database connection pool from the context
@@ -246,34 +259,36 @@ func deleteDocEmbeddingsFunc(ctx context.Context, input *models.DeleteDocEmbeddi
 		return nil, err
 	}
 
-	// Build query parameters (embeddings)
+	// Build query parameters for DeleteEmbeddings
 	params := database.DeleteDocEmbeddingsParams{
-		Owner:         u,
+		Owner:         input.UserHandle,
 		ProjectHandle: input.ProjectHandle,
-		TextID:        pgtype.Text{String: input.TextID, Valid: true},
+		TextID:        pgtype.Text{String: textid, Valid: true},
 	}
+
+	// fmt.Printf("deleteDocEmbeddings, textid: %v\n", textid)
 
 	// Run the query
 	queries := database.New(pool)
 	err = queries.DeleteDocEmbeddings(ctx, params)
 	if err != nil {
-		return nil, huma.Error500InternalServerError("unable to delete embeddings")
+		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to delete embeddings for text id %s in %s's project %s. %v", textid, input.UserHandle, input.ProjectHandle, err))
 	}
 
 	// Build the response
 	response := &models.DeleteDocEmbeddingsResponse{}
-	response.Body = fmt.Sprintf("Successfully deleted embeddings for document %s (%s's project %s)", input.TextID, input.UserHandle, input.ProjectHandle)
 	return response, nil
 }
 
 // RegisterEmbeddingsRoutes registers all the embeddings routes with the API
-func RegisterEmbeddingsRoutes(pool *pgxpool.Pool, keyGen RandomKeyGenerator, api huma.API) error {
+func RegisterEmbeddingsRoutes(pool *pgxpool.Pool, api huma.API) error {
 	// Define huma.Operations for each route
 	postProjEmbeddingsOp := huma.Operation{
-		OperationID: "postEmbeddings",
-		Method:      http.MethodPost,
-		Path:        "/embeddings/{user_handle}/{project_handle}",
-		Summary:     "Create embeddings for a project",
+		OperationID:   "postEmbeddings",
+		Method:        http.MethodPost,
+		Path:          "/embeddings/{user_handle}/{project_handle}",
+		DefaultStatus: http.StatusCreated,
+		Summary:       "Create embeddings for a project",
 		Security: []map[string][]string{
 			{"adminAuth": []string{"admin"}},
 			{"ownerAuth": []string{"owner"}},
@@ -293,10 +308,11 @@ func RegisterEmbeddingsRoutes(pool *pgxpool.Pool, keyGen RandomKeyGenerator, api
 		Tags: []string{"embeddings"},
 	}
 	deleteProjEmbeddingsOp := huma.Operation{
-		OperationID: "deleteEmbeddings",
-		Method:      http.MethodDelete,
-		Path:        "/embeddings/{user_handle}/{project_handle}",
-		Summary:     "Delete all embeddings for a project",
+		OperationID:   "deleteEmbeddings",
+		Method:        http.MethodDelete,
+		Path:          "/embeddings/{user_handle}/{project_handle}",
+		DefaultStatus: http.StatusNoContent,
+		Summary:       "Delete all embeddings for a project",
 		Security: []map[string][]string{
 			{"adminAuth": []string{"admin"}},
 			{"ownerAuth": []string{"owner"}},
@@ -316,10 +332,11 @@ func RegisterEmbeddingsRoutes(pool *pgxpool.Pool, keyGen RandomKeyGenerator, api
 		Tags: []string{"embeddings"},
 	}
 	deleteDocEmbeddingsOp := huma.Operation{
-		OperationID: "deleteDocEmbeddings",
-		Method:      http.MethodDelete,
-		Path:        "/embeddings/{user_handle}/{project_handle}/{text_id}",
-		Summary:     "Delete embeddings for a specific document",
+		OperationID:   "deleteDocEmbeddings",
+		Method:        http.MethodDelete,
+		Path:          "/embeddings/{user_handle}/{project_handle}/{text_id}",
+		DefaultStatus: http.StatusNoContent,
+		Summary:       "Delete embeddings for a specific document",
 		Security: []map[string][]string{
 			{"adminAuth": []string{"admin"}},
 			{"ownerAuth": []string{"owner"}},

@@ -22,10 +22,11 @@ sql:
             go_type:
               type: "map[string]interface{}"
         rename:
-          llmservice_id: "LLMServiceID"
-          llmservice_handle: "LLMServiceHandle"
+          llm_service_id: "LLMServiceID"
+          llm_service_handle: "LLMServiceHandle"
           project_id: "ProjectID"
           text_id: "TextID"
+          api_standard_handle: "APIStandardHandle"
           # - column: "users.vdb_api_key"
           #   go_type:
           #     type: "[]byte"

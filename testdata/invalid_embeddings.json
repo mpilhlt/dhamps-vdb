@@ -1,10 +1,11 @@
-{
-  "foo": "https://id.salamanca.school/texts/W0001:vol1.1.1.1.1",
-  "vector": [],
-  "vector_dim": 512,
-  "llmservice_id": 1,
-  "text": "This is a test document",
-  "project_id": 1,
-  "user_handle": "alice",
-  "project_handle": "test1"
+{ "embeddings":
+  [{
+    "foo": "https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.1.1.1.1",
+    "user_handle": "alice",
+    "project_handle": "test1",
+    "llm_service_id": 1,
+    "text": "This is a test document",
+    "vector": [],
+    "vector_dim": 10
+  }]
 }

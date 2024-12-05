@@ -7,6 +7,38 @@ Vector Database for the DH at Max Planck Society initiative
 
 [![Release](https://img.shields.io/github/release/golang-standards/project-layout.svg?style=flat-square)](https://github.com/golang-standards/project-layout/releases/latest)
 
+## Introduction
+
+This is an application serving an API to handle embeddings. It stores embeddings in a PostgreSQL backend and uses its vector support, but allows you to manage different users, projects, and LLM configurations via a simple Restful API.
+
+The typical use case is as a component of a Retrieval Augmented Generation (RAG) workflow: You create embeddings for a collection of text snippets and upload them to this API. For each text snippet, you upload a text identifier, the embeddings vector and, optionally, metadata or the text itself. Then, you can later
+
+- POST another text and get the most similar texts in the database, or
+- GET the most similar texts for a text that is already in the database by specifying the text's identifier in an URL
+
+In both cases, the service returns a list of text identifiers that you can then use in your own processing, perhaps based on other means of providing the respective texts.
+
+## Features
+
+- OpenAPI documentation
+- Supports different embeddings configurations (e.g. dimensions)
+- Rights management (authentication via API token)
+
+## Getting started
+
+### Authenticating (providing the API key)
+
+### Rate limiting
+
+### API Versioning
+
+## Endpoints
+
+| Endpoint | Method | Description | Allowed Users |
+|----------|--------|-------------|---------------|
+
+For a more detailed, and always up-to-date documentation of the endpoints, see the automatically generated OpenAPI document.
+
 ## Code creation and structure
 
 This API is programmed in go and uses the [huma](https://huma.rocks/) framework with go's stock `http.ServeMux()` routing.
@@ -84,18 +116,33 @@ $> export DOCKER_HOST=unix://$XDG_RUNTIME_DIR/podman/podman.sock
 $> go test -v ./...
 ```
 
-## TODO
+## Roadmap
 
 - [√] Tests
 - [√] Catch post to existing resources
-- [ ] User **authentication** & **restrictions** on some API calls
-- [ ] LLM handling
-  - [ ] calls to LLM services
+- [√] User authentication & restrictions on some API calls
+- [ ] When testing, check cleanup by adding a new query/function to see if all tables are empty
+- [ ] Check if pagination is supported consistently
+- [ ] Check if input is validated consistently
+- [ ] API versioning
+- [ ] **Link or unlink** users/LLMs as standalone operations
+- [ ] **Transfer** of projects from one owner to another as new operation
+- [ ] handle more **metadata**
+  - [ ] Validation with metadata schema
+- [ ] Implement and make consequent use of **max_idle** (5), **max_concurr** (5), **timeouts**, and **cancellations**
 - [ ] Use **transactions** (most importantly, when an action requires several queries, e.g. projects being added and then linked to several read-authorized users)
-- [ ] Limits
-- [ ] environment/options handling (<https://huma.rocks/features/cli/>)
-- [ ] handle more metadata
-- [ ] Validation with metadata schema
-- [ ] **Link or Unlink** users/LLMs as standalone operations
-- [ ] allow transfer of projects from one owner to another
-- [ ] proper logging with more verbose (debug) and quiet (production) mode
+- [ ] better **options** handling (<https://huma.rocks/features/cli/>)
+- [ ] proper **logging** with `--verbose` and `--quiet` modes
+- [ ] **Dockerization**
+- [ ] **Rate limiting** (redis, sliding window, implement headers)
+- [ ] **Concurrency** (leaky bucket)
+- [ ] **Batch mode**
+- [ ] Caching
+- [ ] HTML UI?
+- [ ] LLM handling
+  - [ ] allow API keys for services to be read from env variables (on the server, but still maybe useful)
+  - [ ] calls to LLM services
+
+## License
+
+## Versions

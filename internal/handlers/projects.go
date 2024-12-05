@@ -21,22 +21,17 @@ func putProjectFunc(ctx context.Context, input *models.PutProjectRequest) (*mode
 		return nil, huma.Error400BadRequest(fmt.Sprintf("project handle in URL (%s) does not match project handle in body (%s)", input.ProjectHandle, input.Body.ProjectHandle))
 	}
 
+	// Check if user exists
+	if _, err := getUserFunc(ctx, &models.GetUserRequest{UserHandle: input.UserHandle}); err != nil {
+		return nil, err
+	}
+
 	// Get the database connection pool from the context
 	pool, err := GetDBPool(ctx)
 	if err != nil {
 		return nil, err
 	} else if pool == nil {
 		return nil, huma.Error500InternalServerError("database connection pool is nil")
-	}
-
-	// Check if user exists
-	queries := database.New(pool)
-	_, err = queries.RetrieveUser(ctx, input.UserHandle)
-	if err != nil {
-		if err.Error() == "no rows in result set" {
-			return nil, huma.Error404NotFound(fmt.Sprintf("user %s not found", input.UserHandle))
-		}
-		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to check if user %s exists before deleting. %v", input.UserHandle, err))
 	}
 
 	// 1. Upload project
@@ -74,16 +69,17 @@ func putProjectFunc(ctx context.Context, input *models.PutProjectRequest) (*mode
 		Owner:         input.UserHandle,
 	}
 
+	queries := database.New(pool)
 	p, err := queries.UpsertProject(ctx, project)
 	if err != nil {
-		return nil, huma.Error500InternalServerError("unable to upload project")
+		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to upload project. %v", err))
 	}
 
 	// 2. Link project and owner
 	params := database.LinkProjectToUserParams{ProjectID: p.ProjectID, UserHandle: input.UserHandle, Role: "owner"}
 	_, err = queries.LinkProjectToUser(ctx, params)
 	if err != nil {
-		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to link project to owner %s", input.UserHandle))
+		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to link project to owner %s. %v", input.UserHandle, err))
 	}
 
 	// 3. Link project and other assigned readers
@@ -91,7 +87,7 @@ func putProjectFunc(ctx context.Context, input *models.PutProjectRequest) (*mode
 		params := database.LinkProjectToUserParams{ProjectID: p.ProjectID, UserHandle: reader, Role: "reader"}
 		_, err := queries.LinkProjectToUser(ctx, params)
 		if err != nil {
-			return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to upload project reader %s", reader))
+			return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to upload project reader %s. %v", reader, err))
 		}
 		// registeredReaders = append(registeredReaders, u.UserHandle)
 	}
@@ -99,6 +95,7 @@ func putProjectFunc(ctx context.Context, input *models.PutProjectRequest) (*mode
 	// 4. Build the response
 	response := &models.UploadProjectResponse{}
 	response.Body.ProjectHandle = p.ProjectHandle
+	response.Body.ProjectID = int(p.ProjectID)
 
 	return response, nil
 }
@@ -110,29 +107,25 @@ func postProjectFunc(ctx context.Context, input *models.PostProjectRequest) (*mo
 
 // Get all projects for a specific user
 func getProjectsFunc(ctx context.Context, input *models.GetProjectsRequest) (*models.GetProjectsResponse, error) {
+	// Check if user exists
+	if _, err := getUserFunc(ctx, &models.GetUserRequest{UserHandle: input.UserHandle}); err != nil {
+		return nil, err
+	}
+
 	// Get the database connection pool from the context
 	pool, err := GetDBPool(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	// Check if user exists
-	queries := database.New(pool)
-	_, err = queries.RetrieveUser(ctx, input.UserHandle)
-	if err != nil {
-		if err.Error() == "no rows in result set" {
-			return nil, huma.Error404NotFound(fmt.Sprintf("user %s not found", input.UserHandle))
-		}
-		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to check if user %s exists before deleting. %v", input.UserHandle, err))
-	}
-
 	// Run the queries
+	queries := database.New(pool)
 	p, err := queries.GetProjectsByUser(ctx, database.GetProjectsByUserParams{UserHandle: input.UserHandle, Limit: int32(input.Limit), Offset: int32(input.Offset)})
 	if err != nil {
 		if err.Error() == "no rows in result set" {
 			return nil, huma.Error404NotFound(fmt.Sprintf("no projects found for user %s", input.UserHandle))
 		}
-		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get projects for user %s", input.UserHandle))
+		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get projects for user %s. %v", input.UserHandle, err))
 	}
 	projects := []models.Project{}
 	// Get the authorized reader accounts for each project
@@ -140,13 +133,13 @@ func getProjectsFunc(ctx context.Context, input *models.GetProjectsRequest) (*mo
 		readers := []string{}
 		rows, err := queries.GetUsersByProject(ctx, database.GetUsersByProjectParams{Owner: input.UserHandle, ProjectHandle: project.ProjectHandle, Limit: 999, Offset: 0})
 		if err != nil {
-			return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get readers for %s's project %s", input.UserHandle, project.ProjectHandle))
+			return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get readers for %s's project %s. %v", input.UserHandle, project.ProjectHandle, err))
 		}
 		for _, row := range rows {
 			readers = append(readers, row.UserHandle)
 		}
 		projects = append(projects, models.Project{
-			ProjectId:         int(project.ProjectID),
+			ProjectID:         int(project.ProjectID),
 			ProjectHandle:     project.ProjectHandle,
 			Description:       project.Description.String,
 			AuthorizedReaders: readers,
@@ -163,20 +156,15 @@ func getProjectsFunc(ctx context.Context, input *models.GetProjectsRequest) (*mo
 
 // Retrieve a specific project
 func getProjectFunc(ctx context.Context, input *models.GetProjectRequest) (*models.GetProjectResponse, error) {
+	// Check if user exists
+	if _, err := getUserFunc(ctx, &models.GetUserRequest{UserHandle: input.UserHandle}); err != nil {
+		return nil, err
+	}
+
 	// Get the database connection pool from the context
 	pool, err := GetDBPool(ctx)
 	if err != nil {
 		return nil, err
-	}
-
-	// Check if user exists
-	queries := database.New(pool)
-	_, err = queries.RetrieveUser(ctx, input.UserHandle)
-	if err != nil {
-		if err.Error() == "no rows in result set" {
-			return nil, huma.Error404NotFound(fmt.Sprintf("user %s not found", input.UserHandle))
-		}
-		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to check if user %s exists before deleting. %v", input.UserHandle, err))
 	}
 
 	// Build the query parameters
@@ -186,18 +174,19 @@ func getProjectFunc(ctx context.Context, input *models.GetProjectRequest) (*mode
 	}
 
 	// Run the queries
+	queries := database.New(pool)
 	p, err := queries.RetrieveProject(ctx, params)
 	if err != nil {
 		if err.Error() == "no rows in result set" {
 			return nil, huma.Error404NotFound(fmt.Sprintf("user %s's project %s not found", input.UserHandle, input.ProjectHandle))
 		}
-		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get project %s for user %s", input.ProjectHandle, input.UserHandle))
+		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get project %s for user %s. %v", input.ProjectHandle, input.UserHandle, err))
 	}
 	// Get the authorized reader accounts for the project
 	readers := []string{}
 	rows, err := queries.GetUsersByProject(ctx, database.GetUsersByProjectParams{Owner: input.UserHandle, ProjectHandle: input.ProjectHandle, Limit: 999, Offset: 0})
 	if err != nil {
-		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get authorized reader accounts for %s's project %s", input.UserHandle, input.ProjectHandle))
+		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get authorized reader accounts for %s's project %s. %v", input.UserHandle, input.ProjectHandle, err))
 	}
 	for _, row := range rows {
 		readers = append(readers, row.UserHandle)
@@ -206,6 +195,7 @@ func getProjectFunc(ctx context.Context, input *models.GetProjectRequest) (*mode
 	// Build the response
 	response := &models.GetProjectResponse{}
 	response.Body.Project = models.Project{
+		ProjectID:         int(p.ProjectID),
 		ProjectHandle:     p.ProjectHandle,
 		Description:       p.Description.String,
 		MetadataScheme:    p.MetadataScheme.String,
@@ -217,29 +207,20 @@ func getProjectFunc(ctx context.Context, input *models.GetProjectRequest) (*mode
 }
 
 func deleteProjectFunc(ctx context.Context, input *models.DeleteProjectRequest) (*models.DeleteProjectResponse, error) {
+	// Check if user exists
+	if _, err := getUserFunc(ctx, &models.GetUserRequest{UserHandle: input.UserHandle}); err != nil {
+		return nil, err
+	}
+
 	// Get the database connection pool from the context
 	pool, err := GetDBPool(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	// Check if user exists
-	queries := database.New(pool)
-	_, err = queries.RetrieveUser(ctx, input.UserHandle)
-	if err != nil {
-		if err.Error() == "no rows in result set" {
-			return nil, huma.Error404NotFound(fmt.Sprintf("user %s not found", input.UserHandle))
-		}
-		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to check if user %s exists before deleting. %v", input.UserHandle, err))
-	}
-
 	// Check if project exists
-	_, err = queries.RetrieveProject(ctx, database.RetrieveProjectParams{Owner: input.UserHandle, ProjectHandle: input.ProjectHandle})
-	if err != nil {
-		if err.Error() == "no rows in result set" {
-			return nil, huma.Error404NotFound(fmt.Sprintf("project %s not found for user %s", input.ProjectHandle, input.UserHandle))
-		}
-		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to check if project %s exists before deleting. %v", input.ProjectHandle, err))
+	if _, err = getProjectFunc(ctx, &models.GetProjectRequest{UserHandle: input.UserHandle, ProjectHandle: input.ProjectHandle}); err != nil {
+		return nil, err
 	}
 
 	// Build the query parameters
@@ -249,9 +230,10 @@ func deleteProjectFunc(ctx context.Context, input *models.DeleteProjectRequest) 
 	}
 
 	// Run the query
+	queries := database.New(pool)
 	err = queries.DeleteProject(ctx, params)
 	if err != nil {
-		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to delete project %s for user %s", input.ProjectHandle, input.UserHandle))
+		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to delete project %s for user %s. %v", input.ProjectHandle, input.UserHandle, err))
 	}
 
 	// Build the response
@@ -261,7 +243,7 @@ func deleteProjectFunc(ctx context.Context, input *models.DeleteProjectRequest) 
 }
 
 // RegisterProjectRoutes registers all the project routes with the API
-func RegisterProjectsRoutes(pool *pgxpool.Pool, keyGen RandomKeyGenerator, api huma.API) error {
+func RegisterProjectsRoutes(pool *pgxpool.Pool, api huma.API) error {
 	// Define huma.Operations for each route
 	putProjectOp := huma.Operation{
 		OperationID:   "putProject",

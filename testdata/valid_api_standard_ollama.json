@@ -1,0 +1,6 @@
+{
+  "api_standard_handle": "ollama",
+  "description": "Ollama Embeddings API, Version 1, as documented in https://github.com/ollama/ollama/blob/main/docs/api.md#generate-embeddings",
+  "key_method": "auth_bearer",
+  "key_field": "Authorization"
+}

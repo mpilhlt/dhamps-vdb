@@ -49,8 +49,6 @@ CREATE TABLE IF NOT EXISTS users_projects(
   PRIMARY KEY ("user_handle", "project_id")
 );
 
--- This creates the LLM Services table.
-
 -- This creates the api_standards table.
 
 CREATE TABLE IF NOT EXISTS key_methods(
@@ -65,68 +63,72 @@ CREATE TABLE IF NOT EXISTS api_standards(
   "description" TEXT,
   "key_method" VARCHAR(20) NOT NULL REFERENCES "key_methods"("key_method"),
   "key_field" VARCHAR(20),
-  "vector_size" INTEGER NOT NULL,
   "created_at" TIMESTAMP NOT NULL,
   "updated_at" TIMESTAMP NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS llmservices(
-  "llmservice_id" SERIAL PRIMARY KEY,
-  "llmservice_handle" VARCHAR(20) NOT NULL,
+-- This creates the LLM Services table.
+
+CREATE TABLE IF NOT EXISTS llm_services(
+  "llm_service_id" SERIAL PRIMARY KEY,
+  "llm_service_handle" VARCHAR(20) NOT NULL,
   "owner" VARCHAR(20) NOT NULL REFERENCES "users"("user_handle") ON DELETE CASCADE,
-  "description" TEXT,
   "endpoint" TEXT NOT NULL,
+  "description" TEXT,
   "api_key" TEXT,
   "api_standard" VARCHAR(20) NOT NULL REFERENCES "api_standards"("api_standard_handle"),
+  "model" TEXT NOT NULL,
+  "dimensions" INTEGER NOT NULL,
   "created_at" TIMESTAMP NOT NULL,
   "updated_at" TIMESTAMP NOT NULL,
-  UNIQUE ("owner", "llmservice_handle")
+  UNIQUE ("owner", "llm_service_handle")
 );
 
-CREATE INDEX IF NOT EXISTS llmservices_handle ON "llmservices"("llmservice_handle");
+CREATE INDEX IF NOT EXISTS llm_services_handle ON "llm_services"("llm_service_handle");
 
--- This creates the users_llmservices associations table.
+-- This creates the users_llm_services associations table.
 
-CREATE TABLE IF NOT EXISTS users_llmservices(
+CREATE TABLE IF NOT EXISTS users_llm_services(
   "user_handle" VARCHAR(20) NOT NULL REFERENCES "users"("user_handle") ON DELETE CASCADE,
-  "llmservice_id" SERIAL NOT NULL REFERENCES "llmservices"("llmservice_id") ON DELETE CASCADE,
+  "llm_service_id" SERIAL NOT NULL REFERENCES "llm_services"("llm_service_id") ON DELETE CASCADE,
   "role" VARCHAR(20) NOT NULL REFERENCES "vdb_roles"("vdb_role"),
   "created_at" TIMESTAMP NOT NULL,
   "updated_at" TIMESTAMP NOT NULL,
-  PRIMARY KEY ("user_handle", "llmservice_id")
+  PRIMARY KEY ("user_handle", "llm_service_id")
 );
 
--- This creates the projects_llmservices associations table.
+-- This creates the projects_llm_services associations table.
 
-CREATE TABLE IF NOT EXISTS projects_llmservices(
+CREATE TABLE IF NOT EXISTS projects_llm_services(
   "project_id" SERIAL NOT NULL REFERENCES "projects"("project_id") ON DELETE CASCADE,
-  "llmservice_id" SERIAL NOT NULL REFERENCES "llmservices"("llmservice_id") ON DELETE CASCADE,
+  "llm_service_id" SERIAL NOT NULL REFERENCES "llm_services"("llm_service_id") ON DELETE CASCADE,
   "created_at" TIMESTAMP NOT NULL,
   "updated_at" TIMESTAMP NOT NULL,
-  PRIMARY KEY ("project_id", "llmservice_id")
+  PRIMARY KEY ("project_id", "llm_service_id")
 );
 
 -- This creates the embeddings table.
 
 CREATE TABLE IF NOT EXISTS embeddings(
-  "id" SERIAL PRIMARY KEY,
+  "embeddings_id" SERIAL PRIMARY KEY,
+  "text_id" TEXT,
   "owner" VARCHAR(20) NOT NULL REFERENCES "users"("user_handle") ON DELETE CASCADE,
   "project_id" SERIAL NOT NULL REFERENCES "projects"("project_id") ON DELETE CASCADE,
-  "text_id" TEXT,
-  "embedding" halfvec NOT NULL,
-  "embedding_dim" INTEGER NOT NULL,
-  "llmservice_id" SERIAL NOT NULL REFERENCES "llmservices"("llmservice_id"),
+  "llm_service_id" SERIAL NOT NULL REFERENCES "llm_services"("llm_service_id"),
   "text" TEXT,
+  "vector" halfvec NOT NULL,
+  "vector_dim" INTEGER NOT NULL,
   -- TODO: add metadata handling
   -- "metadata" jsonb,
   "created_at" TIMESTAMP NOT NULL,
-  "updated_at" TIMESTAMP NOT NULL
+  "updated_at" TIMESTAMP NOT NULL,
+  UNIQUE ("text_id", "owner", "project_id", "llm_service_id")
 );
 
 CREATE INDEX IF NOT EXISTS embeddings_text_id ON "embeddings"("text_id");
 
 -- We will create the index for the vector in a separate schema version
--- CREATE INDEX ON embedding USING hnsw (embedding halfvec_cosine_ops) WITH (m = 16, ef_construction = 128);
+-- CREATE INDEX ON embeddings USING hnsw (vector halfvec_cosine_ops) WITH (m = 16, ef_construction = 128);
 
 
 ---- create above / drop below ----
@@ -149,17 +151,17 @@ DROP TABLE IF EXISTS vdb_roles;
 
 -- This removes the LLM Services table.
 
-DROP TABLE IF EXISTS llmservices;
+DROP TABLE IF EXISTS llm_services;
 
-DROP INDEX IF EXISTS llmservices_handle;
+DROP INDEX IF EXISTS llm_services_handle;
 
--- This removes the users_llmservices associations table.
+-- This removes the users_llm_services associations table.
 
-DROP TABLE IF EXISTS users_llmservices;
+DROP TABLE IF EXISTS users_llm_services;
 
--- This removes the projects_llmservices associations table.
+-- This removes the projects_llm_services associations table.
 
-DROP TABLE IF EXISTS projects_llmservices;
+DROP TABLE IF EXISTS projects_llm_services;
 
 -- This removes the embeddings table.
 

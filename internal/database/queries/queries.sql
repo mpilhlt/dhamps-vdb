@@ -106,100 +106,93 @@ RETURNING *;
 
 -- name: UpsertLLM :one
 INSERT
-INTO llmservices (
-  "llmservice_handle", "owner", "description", "endpoint", "api_key", "api_standard", "created_at", "updated_at"
+INTO llm_services (
+  "llm_service_handle", "owner", "endpoint", "description", "api_key", "api_standard", "model", "dimensions", "created_at", "updated_at"
 ) VALUES (
-  $1, $2, $3, $4, $5, $6, NOW(), NOW()
+  $1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW()
 )
-ON CONFLICT ("owner", "llmservice_handle") DO UPDATE SET
-  "description" = $3,
-  "endpoint" = $4,
+ON CONFLICT ("owner", "llm_service_handle") DO UPDATE SET
+  "endpoint" = $3,
+  "description" = $4,
   "api_key" = $5,
   "api_standard" = $6,
+  "model" = $7,
+  "dimensions" = $8,
   "updated_at" = NOW()
-RETURNING "llmservice_id", "llmservice_handle", "owner";
+RETURNING "llm_service_id", "llm_service_handle", "owner";
 
 -- name: DeleteLLM :exec
 DELETE
-FROM llmservices
+FROM llm_services
 WHERE "owner" = $1
-AND "llmservice_handle" = $2;
+AND "llm_service_handle" = $2;
 
 -- name: RetrieveLLM :one
 SELECT *
-FROM llmservices
+FROM llm_services
 WHERE "owner" = $1
-AND "llmservice_handle" = $2
+AND "llm_service_handle" = $2
 LIMIT 1;
 
 -- name: LinkUserToLLM :exec
 INSERT
-INTO users_llmservices (
-  "user_handle", "llmservice_id", "role", "created_at", "updated_at"
+INTO users_llm_services (
+  "user_handle", "llm_service_id", "role", "created_at", "updated_at"
 ) VALUES (
   $1, $2, $3, NOW(), NOW()
 )
-ON CONFLICT ("user_handle", "llmservice_id") DO UPDATE SET
+ON CONFLICT ("user_handle", "llm_service_id") DO UPDATE SET
   "role" = $3,
   "updated_at" = NOW()
 RETURNING *;
 
 -- name: LinkProjectToLLM :exec
 INSERT
-INTO projects_llmservices (
-  "project_id", "llmservice_id", "created_at", "updated_at"
+INTO projects_llm_services (
+  "project_id", "llm_service_id", "created_at", "updated_at"
 ) VALUES (
   $1, $2, NOW(), NOW()
 )
-ON CONFLICT ("project_id", "llmservice_id") DO NOTHING
+ON CONFLICT ("project_id", "llm_service_id") DO NOTHING
 RETURNING *;
 
 -- name: GetLLMsByProject :many
-SELECT llmservices.*
-FROM llmservices
+SELECT llm_services.*
+FROM llm_services
 JOIN (
-  projects_llmservices JOIN projects
-  ON projects_llmservices."project_id" = projects."project_id"
+  projects_llm_services JOIN projects
+  ON projects_llm_services."project_id" = projects."project_id"
 )
-ON llmservices."llmservice_id" = projects_llmservices."llmservice_id"
+ON llm_services."llm_service_id" = projects_llm_services."llm_service_id"
 WHERE projects."owner" = $1
   AND projects."project_handle" = $2
-ORDER BY llmservices."llmservice_handle" ASC LIMIT $3 OFFSET $4;
+ORDER BY llm_services."llm_service_handle" ASC LIMIT $3 OFFSET $4;
 
 -- name: GetLLMsByUser :many
-SELECT llmservices.*
-FROM llmservices
-JOIN (
-  projects_llmservices JOIN users_projects
-  ON projects_llmservices."project_id" = users_projects."project_id"
-)
-ON llmservices."llmservice_id" = projects_llmservices."llmservice_id"
-WHERE users_projects."user_handle" = $1
-ORDER BY llmservices."llmservice_handle" ASC LIMIT $2 OFFSET $3;
+SELECT llm_services.*
+FROM llm_services
+WHERE llm_services."owner" = $1
+ORDER BY llm_services."llm_service_handle" ASC LIMIT $2 OFFSET $3;
 
 
 -- name: UpsertEmbeddings :one
 INSERT
 INTO embeddings (
-  "id", "owner", "project_id", "text_id", "embedding", "embedding_dim", "llmservice_id", "text", "created_at", "updated_at"
+  "text_id", "owner", "project_id", "llm_service_id", "text", "vector", "vector_dim", "created_at", "updated_at"
 ) VALUES (
-  $1, $2, $3, $4, $5, $6, $7, $9, NOW(), NOW()
+  $1, $2, $3, $4, $5, $6, $7, NOW(), NOW()
 )
-ON CONFLICT ("id") DO UPDATE SET
-  "text_id" = $2,
-  "owner" = $3,
-  "project_id" = $4,
-  "embedding" = $5,
-  "embedding_dim" = $6,
-  "llmservice_id" = $7,
-  "text" = $8,
+ON CONFLICT ("text_id", "owner", "project_id", "llm_service_id") DO UPDATE SET
+  "text" = $5,
+  "vector" = $6,
+  "vector_dim" = $7,
   "updated_at" = NOW()
-RETURNING "id", "text_id";
+RETURNING "embeddings_id", "text_id", "owner", "project_id", "llm_service_id";
 
 -- name: DeleteEmbeddingsByID :exec
 DELETE
 FROM embeddings
-WHERE "id" = $1;
+WHERE "embeddings_id" = $1;
 
 -- name: DeleteEmbeddingsByProject :exec
 DELETE
@@ -211,31 +204,19 @@ WHERE embeddings."owner" = $1
 AND embeddings."project_id" = e."project_id"
 AND p."project_handle" = $2;
 
--- DELETE FROM tv_episodes
--- USING tv_episodes AS ed
--- LEFT OUTER JOIN data AS nd ON
---    ed.file_name = nd.file_name AND 
---    ed.path = nd.path
--- WHERE
---    tv_episodes.id = ed.id AND
---    ed.cd_name = 'MediaLibraryDrive' AND nd.cd_name IS NULL;
-
 -- name: DeleteDocEmbeddings :exec
-DELETE
-FROM embeddings
-USING embeddings as e
-JOIN projects as p
-ON e."project_id" = p."project_id"
-WHERE embeddings."owner" = $1
-AND embeddings."project_id" = e."project_id"
-AND p."project_handle" = $2
-AND embeddings."text_id" = $3;
+DELETE FROM embeddings e
+USING projects p
+WHERE e."owner" = $1
+  AND e."project_id" = p."project_id"
+  AND p."project_handle" = $2
+  AND e."text_id" = $3;
 
 -- name: RetrieveEmbeddings :one
-SELECT embeddings.*, projects."project_handle", llmservices."llmservice_handle"
+SELECT embeddings.*, projects."project_handle", llm_services."llm_service_handle"
 FROM embeddings
-JOIN llmservices
-ON embeddings."llmservice_id" = llmservices."llmservice_id"
+JOIN llm_services
+ON embeddings."llm_service_id" = llm_services."llm_service_id"
 JOIN projects
 ON embeddings."project_id" = projects."project_id"
 WHERE embeddings."owner" = $1
@@ -244,10 +225,10 @@ AND embeddings."text_id" = $3
 LIMIT 1;
 
 -- name: GetEmbeddingsByProject :many
-SELECT embeddings.*, projects."project_handle", llmservices."llmservice_handle"
+SELECT embeddings.*, projects."project_handle", llm_services."llm_service_handle"
 FROM embeddings
-JOIN llmservices
-ON llmservices."llmservice_id" = embeddings."llmservice_id"
+JOIN llm_services
+ON llm_services."llm_service_id" = embeddings."llm_service_id"
 JOIN projects
 ON projects."project_id" = embeddings."project_id"
 WHERE embeddings."owner" = $1
@@ -255,32 +236,31 @@ AND projects."project_handle" = $2
 ORDER BY embeddings."text_id" ASC LIMIT $3 OFFSET $4;
 
 
--- name: UpsertAPI :one
+-- name: UpsertAPIStandard :one
 INSERT
 INTO api_standards (
-  "api_standard_handle", "description", "key_method", "key_field", "vector_size", "created_at", "updated_at"
+  "api_standard_handle", "description", "key_method", "key_field", "created_at", "updated_at"
 ) VALUES (
-  $1, $2, $3, $4, $5, NOW(), NOW()
+  $1, $2, $3, $4, NOW(), NOW()
 )
 ON CONFLICT ("api_standard_handle") DO UPDATE SET
   "description" = $2,
   "key_method" = $3,
   "key_field" = $4,
-  "vector_size" = $5,
   "updated_at" = NOW()
 RETURNING "api_standard_handle";
 
--- name: DeleteAPI :exec
+-- name: DeleteAPIStandard :exec
 DELETE
 FROM api_standards
 WHERE "api_standard_handle" = $1;
 
--- name: RetrieveAPI :one
+-- name: RetrieveAPIStandard :one
 SELECT *
 FROM api_standards
 WHERE "api_standard_handle" = $1 LIMIT 1;
 
--- name: GetAPIs :many
+-- name: GetAPIStandards :many
 SELECT *
 FROM api_standards
 ORDER BY "api_standard_handle" ASC LIMIT $1 OFFSET $2;
@@ -288,18 +268,47 @@ ORDER BY "api_standard_handle" ASC LIMIT $1 OFFSET $2;
 
 
 -- name: GetSimilarsByVector :many
-SELECT embeddings."id", embeddings."text_id", llmservices."owner", llmservices."llmservice_handle"
+SELECT embeddings."embeddings_id", embeddings."text_id", llm_services."owner", llm_services."llm_service_handle"
 FROM embeddings
-JOIN llmservices
-ON embeddings."llmservice_id" = llmservices."llmservice_id"
-ORDER BY "embedding" <=> $1
+JOIN llm_services
+ON embeddings."llm_service_id" = llm_services."llm_service_id"
+ORDER BY "vector" <=> $1
 LIMIT $2 OFFSET $3;
 
 -- name: GetSimilarsByID :many
-SELECT e2."id", e2."text_id", 1 - (e1.embedding <=> e2.embedding) AS cosine_similarity
+SELECT e2."embeddings_id", e2."text_id", 1 - (e1.vector <=> e2.vector) AS cosine_similarity
 FROM embeddings e1
 CROSS JOIN embeddings e2
 WHERE e1."text_id" = $1
-  AND e2."id" != e1."id"
-ORDER BY e1.embedding <=> e2.embedding
+  AND e2."embeddings_id" != e1."embeddings_id"
+ORDER BY e1.vector <=> e2.vector
 LIMIT $2 OFFSET $3;
+
+-- name: ResetAllSerials :exec
+DO $$
+DECLARE
+    seq_name text;
+BEGIN
+    FOR seq_name IN
+      SELECT sequence_name
+      FROM information_schema.sequences
+      WHERE sequence_schema = 'public' AND sequence_name LIKE '%_seq'
+    LOOP
+        EXECUTE format('ALTER SEQUENCE public.%I RESTART WITH 1', seq_name);
+    END LOOP;
+END $$;
+
+-- name: DeleteAllRecords :exec
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN
+        SELECT table_name 
+        FROM information_schema.tables 
+        WHERE table_schema = 'public'
+          AND table_name NOT IN ('key_methods', 'vdb_roles')
+    LOOP
+        EXECUTE format('DELETE FROM %I;', r.table_name);
+    END LOOP;
+END $$;

@@ -1,0 +1,6 @@
+{
+  "api_standard_handle": "cohere",
+  "description": "Cohere Embed API, Version 2, as documented in https://docs.cohere.com/reference/embed",
+  "key_method": "auth_bearer",
+  "key_field": "Authorization"
+}

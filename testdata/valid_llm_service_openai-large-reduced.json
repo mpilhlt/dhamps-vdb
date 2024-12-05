@@ -1,0 +1,9 @@
+{
+  "llm_service_handle": "openai-reduced",
+  "endpoint": "https://api.openai.com/v1/embeddings",
+	"description": "My OpenAI reduced text-embedding-3-large service",
+  "api_key": "0123456789",
+  "api_standard": "openai",
+  "model": "text-embedding-3-large",
+  "dimensions": 1024
+}

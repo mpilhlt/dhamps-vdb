@@ -10,24 +10,23 @@ import (
 )
 
 type ApiStandard struct {
-	ApiStandardHandle string           `db:"api_standard_handle" json:"api_standard_handle"`
+	APIStandardHandle string           `db:"api_standard_handle" json:"api_standard_handle"`
 	Description       pgtype.Text      `db:"description" json:"description"`
 	KeyMethod         string           `db:"key_method" json:"key_method"`
 	KeyField          pgtype.Text      `db:"key_field" json:"key_field"`
-	VectorSize        int32            `db:"vector_size" json:"vector_size"`
 	CreatedAt         pgtype.Timestamp `db:"created_at" json:"created_at"`
 	UpdatedAt         pgtype.Timestamp `db:"updated_at" json:"updated_at"`
 }
 
 type Embedding struct {
-	ID           int32                  `db:"id" json:"id"`
+	EmbeddingsID int32                  `db:"embeddings_id" json:"embeddings_id"`
+	TextID       pgtype.Text            `db:"text_id" json:"text_id"`
 	Owner        string                 `db:"owner" json:"owner"`
 	ProjectID    int32                  `db:"project_id" json:"project_id"`
-	TextID       pgtype.Text            `db:"text_id" json:"text_id"`
-	Embedding    pgvector_go.HalfVector `db:"embedding" json:"embedding"`
-	EmbeddingDim int32                  `db:"embedding_dim" json:"embedding_dim"`
-	LLMServiceID int32                  `db:"llmservice_id" json:"llmservice_id"`
+	LLMServiceID int32                  `db:"llm_service_id" json:"llm_service_id"`
 	Text         pgtype.Text            `db:"text" json:"text"`
+	Vector       pgvector_go.HalfVector `db:"vector" json:"vector"`
+	VectorDim    int32                  `db:"vector_dim" json:"vector_dim"`
 	CreatedAt    pgtype.Timestamp       `db:"created_at" json:"created_at"`
 	UpdatedAt    pgtype.Timestamp       `db:"updated_at" json:"updated_at"`
 }
@@ -36,14 +35,16 @@ type KeyMethod struct {
 	KeyMethod string `db:"key_method" json:"key_method"`
 }
 
-type Llmservice struct {
-	LLMServiceID     int32            `db:"llmservice_id" json:"llmservice_id"`
-	LLMServiceHandle string           `db:"llmservice_handle" json:"llmservice_handle"`
+type LlmService struct {
+	LLMServiceID     int32            `db:"llm_service_id" json:"llm_service_id"`
+	LLMServiceHandle string           `db:"llm_service_handle" json:"llm_service_handle"`
 	Owner            string           `db:"owner" json:"owner"`
-	Description      pgtype.Text      `db:"description" json:"description"`
 	Endpoint         string           `db:"endpoint" json:"endpoint"`
+	Description      pgtype.Text      `db:"description" json:"description"`
 	ApiKey           pgtype.Text      `db:"api_key" json:"api_key"`
 	ApiStandard      string           `db:"api_standard" json:"api_standard"`
+	Model            string           `db:"model" json:"model"`
+	Dimensions       int32            `db:"dimensions" json:"dimensions"`
 	CreatedAt        pgtype.Timestamp `db:"created_at" json:"created_at"`
 	UpdatedAt        pgtype.Timestamp `db:"updated_at" json:"updated_at"`
 }
@@ -58,9 +59,9 @@ type Project struct {
 	UpdatedAt      pgtype.Timestamp `db:"updated_at" json:"updated_at"`
 }
 
-type ProjectsLlmservice struct {
+type ProjectsLlmService struct {
 	ProjectID    int32            `db:"project_id" json:"project_id"`
-	LLMServiceID int32            `db:"llmservice_id" json:"llmservice_id"`
+	LLMServiceID int32            `db:"llm_service_id" json:"llm_service_id"`
 	CreatedAt    pgtype.Timestamp `db:"created_at" json:"created_at"`
 	UpdatedAt    pgtype.Timestamp `db:"updated_at" json:"updated_at"`
 }
@@ -74,9 +75,9 @@ type User struct {
 	UpdatedAt  pgtype.Timestamp `db:"updated_at" json:"updated_at"`
 }
 
-type UsersLlmservice struct {
+type UsersLlmService struct {
 	UserHandle   string           `db:"user_handle" json:"user_handle"`
-	LLMServiceID int32            `db:"llmservice_id" json:"llmservice_id"`
+	LLMServiceID int32            `db:"llm_service_id" json:"llm_service_id"`
 	Role         string           `db:"role" json:"role"`
 	CreatedAt    pgtype.Timestamp `db:"created_at" json:"created_at"`
 	UpdatedAt    pgtype.Timestamp `db:"updated_at" json:"updated_at"`

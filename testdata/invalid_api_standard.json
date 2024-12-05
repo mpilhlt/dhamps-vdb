@@ -1,0 +1,5 @@
+{
+  "api_standard_handle": "error1",
+  "description": "Erroneous definition of an APi standard",
+  "keX_method": "auth_bearer"
+}

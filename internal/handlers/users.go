@@ -60,7 +60,7 @@ func putUserFunc(ctx context.Context, input *models.PutUserRequest) (*models.Upl
 		}
 		hash := sha256.Sum256([]byte(APIKey))
 		storeKey = hex.EncodeToString(hash[:])
-		fmt.Printf("        Created user %s: API key %s (store hash: %s)\n", input.UserHandle, APIKey, storeKey)
+		// fmt.Printf("        Created user %s: API key %s (store hash: %s)\n", input.UserHandle, APIKey, storeKey)
 	}
 	user := database.UpsertUserParams{
 		UserHandle: input.UserHandle,
@@ -105,7 +105,11 @@ func getUsersFunc(ctx context.Context, input *models.GetUsersRequest) (*models.G
 	queries := database.New(pool)
 	allUsers, err := queries.GetUsers(ctx, database.GetUsersParams{Limit: int32(input.Limit), Offset: int32(input.Offset)})
 	if err != nil {
-		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get list of users. %v", err))
+		if err.Error() == "no rows in result set" {
+			return nil, huma.Error404NotFound("no users found.")
+		} else {
+			return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get list of users. %v", err))
+		}
 	}
 	if len(allUsers) == 0 {
 		return nil, huma.Error404NotFound("no users found.")
@@ -132,8 +136,15 @@ func getUserFunc(ctx context.Context, input *models.GetUserRequest) (*models.Get
 	queries := database.New(pool)
 	u, err := queries.RetrieveUser(ctx, input.UserHandle)
 	if err != nil {
-		// return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get user data for user %s. %v", input.User, err))
-		return nil, huma.Error404NotFound(fmt.Sprintf("user %s not found. %v", input.UserHandle, err))
+		if err.Error() == "no rows in result set" {
+			return nil, huma.Error404NotFound(fmt.Sprintf("user %s not found", input.UserHandle))
+		} else {
+			return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get user data for user %s. %v", input.UserHandle, err))
+			// return nil, huma.Error404NotFound(fmt.Sprintf("user %s not found. %v", input.UserHandle, err))
+		}
+	}
+	if u.UserHandle != input.UserHandle {
+		return nil, huma.Error404NotFound(fmt.Sprintf("user %s not found", input.UserHandle))
 	}
 
 	// Build the response
@@ -160,16 +171,12 @@ func deleteUserFunc(ctx context.Context, input *models.DeleteUserRequest) (*mode
 	}
 
 	// Check if user exists
-	queries := database.New(pool)
-	_, err = queries.RetrieveUser(ctx, input.UserHandle)
-	if err != nil {
-		if err.Error() == "no rows in result set" {
-			return nil, huma.Error404NotFound(fmt.Sprintf("user %s not found", input.UserHandle))
-		}
-		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to check if user %s exists before deleting. %v", input.UserHandle, err))
+	if _, err = getUserFunc(ctx, &models.GetUserRequest{UserHandle: input.UserHandle}); err != nil {
+		return nil, err
 	}
 
 	// Run the query
+	queries := database.New(pool)
 	err = queries.DeleteUser(ctx, input.UserHandle)
 	if err != nil {
 		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to delete user %s. %v", input.UserHandle, err))

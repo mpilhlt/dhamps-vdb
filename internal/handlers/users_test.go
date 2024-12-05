@@ -25,6 +25,9 @@ func TestUserFunc(t *testing.T) {
 	err, shutDownServer := startTestServer(t, pool, mockKeyGen)
 	assert.NoError(t, err)
 
+	fmt.Printf("\nRunning users tests ...\n\n")
+
+	// Define test cases
 	tt := []struct {
 		name         string
 		method       string
@@ -41,7 +44,7 @@ func TestUserFunc(t *testing.T) {
 			bodyPath:     "../../testdata/valid_user.json",
 			apiKey:       options.AdminKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/HandleAPIStruct.json\",\n  \"user_handle\": \"alice\",\n  \"api_key\": \"12345678901234567890123456789012\"\n}\n",
-			expectStatus: 201,
+			expectStatus: http.StatusCreated,
 		},
 		{
 			name:         "Valid get user",
@@ -50,7 +53,7 @@ func TestUserFunc(t *testing.T) {
 			bodyPath:     "",
 			apiKey:       options.AdminKey,
 			expectBody:   "{\n  \"user_handle\": \"alice\",\n  \"name\": \"Alice Doe\",\n  \"email\": \"alice@foo.bar\",\n  \"apiKey\": \"e1b85b27d6bcb05846c18e6a48f118e89f0c0587140de9fb3359f8370d0dba08\"\n}\n",
-			expectStatus: 200,
+			expectStatus: http.StatusOK,
 		},
 		{
 			name:         "Put user, invalid API key",
@@ -59,7 +62,7 @@ func TestUserFunc(t *testing.T) {
 			bodyPath:     "../../testdata/valid_user.json",
 			apiKey:       "not-the-admin-key",
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Unauthorized\",\n  \"status\": 401,\n  \"detail\": \"Authentication failed. Perhaps a missing or incorrect API key?\"\n}\n",
-			expectStatus: 401,
+			expectStatus: http.StatusUnauthorized,
 		},
 		{
 			name:         "Put user, no API key",
@@ -68,7 +71,7 @@ func TestUserFunc(t *testing.T) {
 			bodyPath:     "../../testdata/valid_user.json",
 			apiKey:       "",
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Unauthorized\",\n  \"status\": 401,\n  \"detail\": \"Authentication failed. Perhaps a missing or incorrect API key?\"\n}\n",
-			expectStatus: 401,
+			expectStatus: http.StatusUnauthorized,
 		},
 		{
 			name:         "Put user, invalid json",
@@ -77,7 +80,7 @@ func TestUserFunc(t *testing.T) {
 			bodyPath:     "../../testdata/invalid_user.json",
 			apiKey:       options.AdminKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Unprocessable Entity\",\n  \"status\": 422,\n  \"detail\": \"validation failed\",\n  \"errors\": [\n    {\n      \"message\": \"expected required property email to be present\",\n      \"location\": \"body\",\n      \"value\": {\n        \"name\": \"John Doe\",\n        \"user_handle\": \"john\"\n      }\n    }\n  ]\n}\n",
-			expectStatus: 422,
+			expectStatus: http.StatusUnprocessableEntity,
 		},
 		{
 			name:         "Put user, valid json but invalid user handle",
@@ -86,7 +89,7 @@ func TestUserFunc(t *testing.T) {
 			bodyPath:     "../../testdata/valid_user.json",
 			apiKey:       options.AdminKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Bad Request\",\n  \"status\": 400,\n  \"detail\": \"user handle in URL (bob) does not match user handle in body (alice).\"\n}\n",
-			expectStatus: 400,
+			expectStatus: http.StatusBadRequest,
 		},
 		{
 			name:         "Post existing user, everything valid",
@@ -95,7 +98,7 @@ func TestUserFunc(t *testing.T) {
 			bodyPath:     "../../testdata/valid_user.json",
 			apiKey:       options.AdminKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/HandleAPIStruct.json\",\n  \"user_handle\": \"alice\",\n  \"api_key\": \"not changed\"\n}\n",
-			expectStatus: 201,
+			expectStatus: http.StatusCreated,
 		},
 		{
 			name:         "Post user, invalid API key",
@@ -104,7 +107,7 @@ func TestUserFunc(t *testing.T) {
 			bodyPath:     "../../testdata/valid_user.json",
 			apiKey:       "not-the-admin-key",
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Unauthorized\",\n  \"status\": 401,\n  \"detail\": \"Authentication failed. Perhaps a missing or incorrect API key?\"\n}\n",
-			expectStatus: 401,
+			expectStatus: http.StatusUnauthorized,
 		},
 		{
 			name:         "Post user, no API key",
@@ -113,7 +116,7 @@ func TestUserFunc(t *testing.T) {
 			bodyPath:     "../../testdata/valid_user.json",
 			apiKey:       "",
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Unauthorized\",\n  \"status\": 401,\n  \"detail\": \"Authentication failed. Perhaps a missing or incorrect API key?\"\n}\n",
-			expectStatus: 401,
+			expectStatus: http.StatusUnauthorized,
 		},
 		{
 			name:         "Post user, invalid json",
@@ -122,7 +125,7 @@ func TestUserFunc(t *testing.T) {
 			bodyPath:     "../../testdata/invalid_user.json",
 			apiKey:       options.AdminKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Unprocessable Entity\",\n  \"status\": 422,\n  \"detail\": \"validation failed\",\n  \"errors\": [\n    {\n      \"message\": \"expected required property email to be present\",\n      \"location\": \"body\",\n      \"value\": {\n        \"name\": \"John Doe\",\n        \"user_handle\": \"john\"\n      }\n    }\n  ]\n}\n",
-			expectStatus: 422,
+			expectStatus: http.StatusUnprocessableEntity,
 		},
 		{
 			name:         "Valid get all users",
@@ -131,7 +134,7 @@ func TestUserFunc(t *testing.T) {
 			bodyPath:     "",
 			apiKey:       options.AdminKey,
 			expectBody:   "[\n  \"alice\"\n]\n",
-			expectStatus: 200,
+			expectStatus: http.StatusOK,
 		},
 		{
 			name:         "Get nonexistent user",
@@ -139,8 +142,8 @@ func TestUserFunc(t *testing.T) {
 			requestPath:  "/users/alfons",
 			bodyPath:     "",
 			apiKey:       options.AdminKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Not Found\",\n  \"status\": 404,\n  \"detail\": \"user alfons not found. no rows in result set\"\n}\n",
-			expectStatus: 404,
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Not Found\",\n  \"status\": 404,\n  \"detail\": \"user alfons not found\"\n}\n",
+			expectStatus: http.StatusNotFound,
 		},
 		{
 			name:         "Get invalid path",
@@ -149,7 +152,7 @@ func TestUserFunc(t *testing.T) {
 			bodyPath:     "",
 			apiKey:       options.AdminKey,
 			expectBody:   "",
-			expectStatus: 404,
+			expectStatus: http.StatusNotFound,
 		},
 		{
 			name:         "Delete user, valid path",
@@ -158,7 +161,7 @@ func TestUserFunc(t *testing.T) {
 			bodyPath:     "",
 			apiKey:       options.AdminKey,
 			expectBody:   "",
-			expectStatus: 204,
+			expectStatus: http.StatusNoContent,
 		},
 		{
 			name:         "Delete nonexistent user",
@@ -167,7 +170,7 @@ func TestUserFunc(t *testing.T) {
 			bodyPath:     "",
 			apiKey:       options.AdminKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Not Found\",\n  \"status\": 404,\n  \"detail\": \"user alfons not found\"\n}\n",
-			expectStatus: 404,
+			expectStatus: http.StatusNotFound,
 		},
 	}
 
@@ -230,33 +233,19 @@ func TestUserFunc(t *testing.T) {
 	// Cleanup removes items created by the put function test
 	// ('/users/alice' and '/users/bob' in case this has erroneously been created)
 	t.Cleanup(func() {
-		tt := []struct {
-			name        string
-			requestPath string
-		}{
-			{
-				name:        "clean up alice",
-				requestPath: "/users/alice",
-			},
-			{
-				name:        "clean up bob",
-				requestPath: "/users/bob",
-			},
-		}
+		fmt.Print("\n\nRunning cleanup ...\n\n")
 
-		for _, v := range tt {
-			fmt.Printf("Running cleanup: %s\n", v.name)
-			requestURL := fmt.Sprintf("http://%s:%d%s", options.Host, options.Port, v.requestPath)
-			req, err := http.NewRequest(http.MethodDelete, requestURL, nil)
-			assert.NoError(t, err)
-			req.Header.Set("Authorization", "Bearer "+options.AdminKey)
-			_, err = http.DefaultClient.Do(req)
-			if err != nil && err.Error() != "no rows in result set" {
-				t.Fatalf("Error sending request: %v\n", err)
-			}
-			assert.NoError(t, err)
+		requestURL := fmt.Sprintf("http://%s:%d/admin/reset-db", options.Host, options.Port)
+		req, err := http.NewRequest(http.MethodGet, requestURL, nil)
+		assert.NoError(t, err)
+		req.Header.Set("Authorization", "Bearer "+options.AdminKey)
+		_, err = http.DefaultClient.Do(req)
+		if err != nil && err.Error() != "no rows in result set" {
+			t.Fatalf("Error sending request: %v\n", err)
 		}
-		fmt.Print("Shutting down server\n")
+		assert.NoError(t, err)
+
+		fmt.Print("Shutting down server\n\n")
 		shutDownServer()
 	})
 
