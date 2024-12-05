@@ -69,7 +69,7 @@ func postAPIStandardFunc(ctx context.Context, input *models.PostAPIStandardReque
 	return response, nil
 }
 
-// Get all registered  APi standards
+// Get all registered  API standards
 func getAPIStandardsFunc(ctx context.Context, input *models.GetAPIStandardsRequest) (*models.GetAPIStandardsResponse, error) {
 	// Get the database connection pool from the context
 	pool, err := GetDBPool(ctx)

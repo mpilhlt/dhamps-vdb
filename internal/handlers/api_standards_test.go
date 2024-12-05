@@ -17,11 +17,6 @@ func TestAPIStandardFunc(t *testing.T) {
 	// Get the database connection pool from package variable
 	pool := connPool
 
-	// Create a mock key generator
-	// mockKeyGen := new(MockKeyGen)
-	// Set up expectations for the mock key generator
-	// mockKeyGen.On("RandomKey", 32).Return("12345678901234567890123456789012", nil)
-
 	// Start the server
 	err, shutDownServer := startTestServer(t, pool, handlers.StandardKeyGen{})
 	assert.NoError(t, err)
@@ -44,7 +39,7 @@ func TestAPIStandardFunc(t *testing.T) {
 			requestPath:  "/api-standards/error1",
 			bodyPath:     "../../testdata/invalid_api_standard.json",
 			apiKey:       options.AdminKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Unprocessable Entity\",\n  \"status\": 422,\n  \"detail\": \"validation failed\",\n  \"errors\": [\n    {\n      \"message\": \"expected required property key_method to be present\",\n      \"location\": \"body\",\n      \"value\": {\n        \"api_standard_handle\": \"error1\",\n        \"description\": \"Erroneous definition of an APi standard\",\n        \"keX_method\": \"auth_bearer\"\n      }\n    },\n    {\n      \"message\": \"expected required property key_field to be present\",\n      \"location\": \"body\",\n      \"value\": {\n        \"api_standard_handle\": \"error1\",\n        \"description\": \"Erroneous definition of an APi standard\",\n        \"keX_method\": \"auth_bearer\"\n      }\n    },\n    {\n      \"message\": \"unexpected property\",\n      \"location\": \"body.keX_method\",\n      \"value\": {\n        \"api_standard_handle\": \"error1\",\n        \"description\": \"Erroneous definition of an APi standard\",\n        \"keX_method\": \"auth_bearer\"\n      }\n    }\n  ]\n}\n",
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Unprocessable Entity\",\n  \"status\": 422,\n  \"detail\": \"validation failed\",\n  \"errors\": [\n    {\n      \"message\": \"expected required property key_field to be present\",\n      \"location\": \"body\",\n      \"value\": {\n        \"api_standard_handle\": \"error1\",\n        \"description\": \"Erroneous definition of an APi standard\",\n        \"keX_method\": \"auth_bearer\"\n      }\n    },\n    {\n      \"message\": \"expected required property key_method to be present\",\n      \"location\": \"body\",\n      \"value\": {\n        \"api_standard_handle\": \"error1\",\n        \"description\": \"Erroneous definition of an APi standard\",\n        \"keX_method\": \"auth_bearer\"\n      }\n    },\n    {\n      \"message\": \"unexpected property\",\n      \"location\": \"body.keX_method\",\n      \"value\": {\n        \"api_standard_handle\": \"error1\",\n        \"description\": \"Erroneous definition of an APi standard\",\n        \"keX_method\": \"auth_bearer\"\n      }\n    }\n  ]\n}\n",
 			expectStatus: http.StatusUnprocessableEntity,
 		},
 		{
@@ -161,11 +156,7 @@ func TestAPIStandardFunc(t *testing.T) {
 		})
 	}
 
-	// Verify that the expectations regarding the mock key generation were met
-	// mockKeyGen.AssertExpectations(t)
-
 	// Cleanup removes items created by the put function test
-	// ('/api-standards/openai' and some that should have been refused but may have been erroneously created)
 	t.Cleanup(func() {
 		fmt.Print("\n\nRunning cleanup ...\n\n")
 
