@@ -51,7 +51,7 @@ func RegisterAdminRoutes(pool *pgxpool.Pool, api huma.API) error {
 	resetDbOp := huma.Operation{
 		OperationID:   "resetDb",
 		Method:        http.MethodGet,
-		Path:          "/admin/reset-db",
+		Path:          "/v1/admin/reset-db",
 		DefaultStatus: http.StatusNoContent,
 		Summary:       "Remove all records from database and reset serials/counters",
 		Security: []map[string][]string{

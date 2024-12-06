@@ -203,7 +203,7 @@ func RegisterLLMServicesRoutes(pool *pgxpool.Pool, api huma.API) error {
 	postLLMServiceOp := huma.Operation{
 		OperationID:   "postLLMService",
 		Method:        http.MethodPost,
-		Path:          "/llm-services/{user_handle}",
+		Path:          "/v1/llm-services/{user_handle}",
 		DefaultStatus: http.StatusCreated,
 		Summary:       "Create llm service",
 		Security: []map[string][]string{
@@ -215,7 +215,7 @@ func RegisterLLMServicesRoutes(pool *pgxpool.Pool, api huma.API) error {
 	putLLMServiceOp := huma.Operation{
 		OperationID:   "putLLMService",
 		Method:        http.MethodPut,
-		Path:          "/llm-services/{user_handle}/{llm_service_handle}",
+		Path:          "/v1/llm-services/{user_handle}/{llm_service_handle}",
 		DefaultStatus: http.StatusCreated,
 		Summary:       "Create or update llm service",
 		Security: []map[string][]string{
@@ -227,7 +227,7 @@ func RegisterLLMServicesRoutes(pool *pgxpool.Pool, api huma.API) error {
 	getUserLLMServicesOp := huma.Operation{
 		OperationID: "getUserLLMServices",
 		Method:      http.MethodGet,
-		Path:        "/llm-services/{user_handle}",
+		Path:        "/v1/llm-services/{user_handle}",
 		Summary:     "Get all llm services for a user",
 		Security: []map[string][]string{
 			{"adminAuth": []string{"admin"}},
@@ -239,7 +239,7 @@ func RegisterLLMServicesRoutes(pool *pgxpool.Pool, api huma.API) error {
 	getLLMServiceOp := huma.Operation{
 		OperationID: "getLLMService",
 		Method:      http.MethodGet,
-		Path:        "/llm-services/{user_handle}/{llm_service_handle}",
+		Path:        "/v1/llm-services/{user_handle}/{llm_service_handle}",
 		Summary:     "Get a specific llm service for a user",
 		Security: []map[string][]string{
 			{"adminAuth": []string{"admin"}},
@@ -251,7 +251,7 @@ func RegisterLLMServicesRoutes(pool *pgxpool.Pool, api huma.API) error {
 	deleteLLMServiceOp := huma.Operation{
 		OperationID:   "deleteLLMService",
 		Method:        http.MethodDelete,
-		Path:          "/llm-services/{user_handle}/{llm_service_handle}",
+		Path:          "/v1/llm-services/{user_handle}/{llm_service_handle}",
 		DefaultStatus: http.StatusNoContent,
 		Summary:       "Delete a user's llm_service and all embeddings associated to it",
 		Security: []map[string][]string{

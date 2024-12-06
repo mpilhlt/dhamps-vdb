@@ -25,7 +25,7 @@ type ProjectSubmission struct {
 // The response structs must be structs with fields for the output headers and body of the operation, if any.
 
 // Put/post project
-// PUT Path: "/projects/{user_handle}/{project_handle}"
+// PUT Path: "/v1/projects/{user_handle}/{project_handle}"
 
 type PutProjectRequest struct {
 	UserHandle    string `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
@@ -33,7 +33,7 @@ type PutProjectRequest struct {
 	Body          ProjectSubmission
 }
 
-// POST Path: "/projects/{user}"
+// POST Path: "/v1/projects/{user}"
 
 type PostProjectRequest struct {
 	UserHandle string `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
@@ -49,7 +49,7 @@ type UploadProjectResponse struct {
 }
 
 // Get all projects by user
-// Path: "/projects/{user_handle}"
+// Path: "/v1/projects/{user_handle}"
 
 type GetProjectsRequest struct {
 	UserHandle string `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
@@ -66,7 +66,7 @@ type GetProjectsResponse struct {
 }
 
 // Get single project
-// Path: "/projects/{user_handle}/{project_handle}"
+// Path: "/v1/projects/{user_handle}/{project_handle}"
 
 type GetProjectRequest struct {
 	UserHandle    string `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
@@ -79,7 +79,7 @@ type GetProjectResponse struct {
 }
 
 // Delete project
-// Path: "/projects/{user_handle}/{project_handle}"
+// Path: "/v1/projects/{user_handle}/{project_handle}"
 
 type DeleteProjectRequest struct {
 	UserHandle    string `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`

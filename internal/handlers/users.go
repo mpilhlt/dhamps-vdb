@@ -231,7 +231,7 @@ func RegisterUsersRoutes(pool *pgxpool.Pool, keyGen RandomKeyGenerator, api huma
 	putUserOp := huma.Operation{
 		OperationID:   "putUser",
 		Method:        http.MethodPut,
-		Path:          "/users/{user_handle}",
+		Path:          "/v1/users/{user_handle}",
 		DefaultStatus: http.StatusCreated,
 		Summary:       "Create or update a user",
 		Security: []map[string][]string{
@@ -245,7 +245,7 @@ func RegisterUsersRoutes(pool *pgxpool.Pool, keyGen RandomKeyGenerator, api huma
 	postUserOp := huma.Operation{
 		OperationID:   "postUser",
 		Method:        http.MethodPost,
-		Path:          "/users",
+		Path:          "/v1/users",
 		DefaultStatus: http.StatusCreated,
 		Summary:       "Create a user",
 		Security: []map[string][]string{
@@ -256,7 +256,7 @@ func RegisterUsersRoutes(pool *pgxpool.Pool, keyGen RandomKeyGenerator, api huma
 	getUsersOp := huma.Operation{
 		OperationID: "getUsers",
 		Method:      http.MethodGet,
-		Path:        "/users",
+		Path:        "/v1/users",
 		Summary:     "Get information about all users",
 		Security: []map[string][]string{
 			{"adminAuth": []string{"admin"}},
@@ -266,7 +266,7 @@ func RegisterUsersRoutes(pool *pgxpool.Pool, keyGen RandomKeyGenerator, api huma
 	getUserOp := huma.Operation{
 		OperationID: "getUser",
 		Method:      http.MethodGet,
-		Path:        "/users/{user_handle}",
+		Path:        "/v1/users/{user_handle}",
 		Summary:     "Get information about a specific user",
 		Security: []map[string][]string{
 			{"adminAuth": []string{"admin"}},
@@ -277,7 +277,7 @@ func RegisterUsersRoutes(pool *pgxpool.Pool, keyGen RandomKeyGenerator, api huma
 	deleteUserOp := huma.Operation{
 		OperationID:   "deleteUser",
 		Method:        http.MethodDelete,
-		Path:          "/users/{user_handle}",
+		Path:          "/v1/users/{user_handle}",
 		DefaultStatus: http.StatusNoContent,
 		Summary:       "Delete a specific user",
 		Security: []map[string][]string{

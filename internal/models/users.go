@@ -33,14 +33,14 @@ type ProjectMemberships []ProjectMembership
 // The response structs must be structs with fields for the output headers and body of the operation, if any.
 
 // Put/post user
-// PUT Path: "/users/{user_handle}"
+// PUT Path: "/v1/users/{user_handle}"
 
 type PutUserRequest struct {
 	UserHandle string `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
 	Body       User   `json:"user" doc:"User to create or update"`
 }
 
-// POST Path: "/users"
+// POST Path: "/v1/users"
 
 type PostUserRequest struct {
 	Body User `json:"user" doc:"User to create or update"`
@@ -57,7 +57,7 @@ type HandleAPIStruct struct {
 }
 
 // Get all users
-// Path: "/users"
+// Path: "/v1/users"
 
 type GetUsersRequest struct {
 	Limit  int `json:"limit,omitempty" query:"limit" minimum:"1" maximum:"200" example:"10" default:"10" doc:"Maximum number of users to return"`

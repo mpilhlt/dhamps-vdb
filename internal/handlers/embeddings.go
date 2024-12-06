@@ -308,7 +308,7 @@ func RegisterEmbeddingsRoutes(pool *pgxpool.Pool, api huma.API) error {
 	postProjEmbeddingsOp := huma.Operation{
 		OperationID:   "postEmbeddings",
 		Method:        http.MethodPost,
-		Path:          "/embeddings/{user_handle}/{project_handle}",
+		Path:          "/v1/embeddings/{user_handle}/{project_handle}",
 		DefaultStatus: http.StatusCreated,
 		Summary:       "Create embeddings for a project",
 		Security: []map[string][]string{
@@ -320,7 +320,7 @@ func RegisterEmbeddingsRoutes(pool *pgxpool.Pool, api huma.API) error {
 	getProjEmbeddingsOp := huma.Operation{
 		OperationID: "getEmbeddings",
 		Method:      http.MethodGet,
-		Path:        "/embeddings/{user_handle}/{project_handle}",
+		Path:        "/v1/embeddings/{user_handle}/{project_handle}",
 		Summary:     "Get all embeddings for a project",
 		Security: []map[string][]string{
 			{"adminAuth": []string{"admin"}},
@@ -332,7 +332,7 @@ func RegisterEmbeddingsRoutes(pool *pgxpool.Pool, api huma.API) error {
 	deleteProjEmbeddingsOp := huma.Operation{
 		OperationID:   "deleteEmbeddings",
 		Method:        http.MethodDelete,
-		Path:          "/embeddings/{user_handle}/{project_handle}",
+		Path:          "/v1/embeddings/{user_handle}/{project_handle}",
 		DefaultStatus: http.StatusNoContent,
 		Summary:       "Delete all embeddings for a project",
 		Security: []map[string][]string{
@@ -344,7 +344,7 @@ func RegisterEmbeddingsRoutes(pool *pgxpool.Pool, api huma.API) error {
 	getDocEmbeddingsOp := huma.Operation{
 		OperationID: "getDocEmbeddings",
 		Method:      http.MethodGet,
-		Path:        "/embeddings/{user_handle}/{project_handle}/{text_id}",
+		Path:        "/v1/embeddings/{user_handle}/{project_handle}/{text_id}",
 		Summary:     "Get embeddings for a specific document",
 		Security: []map[string][]string{
 			{"adminAuth": []string{"admin"}},
@@ -356,7 +356,7 @@ func RegisterEmbeddingsRoutes(pool *pgxpool.Pool, api huma.API) error {
 	deleteDocEmbeddingsOp := huma.Operation{
 		OperationID:   "deleteDocEmbeddings",
 		Method:        http.MethodDelete,
-		Path:          "/embeddings/{user_handle}/{project_handle}/{text_id}",
+		Path:          "/v1/embeddings/{user_handle}/{project_handle}/{text_id}",
 		DefaultStatus: http.StatusNoContent,
 		Summary:       "Delete embeddings for a specific document",
 		Security: []map[string][]string{

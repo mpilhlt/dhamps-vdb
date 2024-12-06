@@ -40,7 +40,7 @@ func TestUserFunc(t *testing.T) {
 		{
 			name:         "Put user, everyting valid",
 			method:       http.MethodPut,
-			requestPath:  "/users/alice",
+			requestPath:  "/v1/users/alice",
 			bodyPath:     "../../testdata/valid_user.json",
 			apiKey:       options.AdminKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/HandleAPIStruct.json\",\n  \"user_handle\": \"alice\",\n  \"api_key\": \"12345678901234567890123456789012\"\n}\n",
@@ -49,7 +49,7 @@ func TestUserFunc(t *testing.T) {
 		{
 			name:         "Valid get user",
 			method:       http.MethodGet,
-			requestPath:  "/users/alice",
+			requestPath:  "/v1/users/alice",
 			bodyPath:     "",
 			apiKey:       options.AdminKey,
 			expectBody:   "{\n  \"user_handle\": \"alice\",\n  \"name\": \"Alice Doe\",\n  \"email\": \"alice@foo.bar\",\n  \"apiKey\": \"e1b85b27d6bcb05846c18e6a48f118e89f0c0587140de9fb3359f8370d0dba08\"\n}\n",
@@ -58,7 +58,7 @@ func TestUserFunc(t *testing.T) {
 		{
 			name:         "Put user, invalid API key",
 			method:       http.MethodPut,
-			requestPath:  "/users/alice",
+			requestPath:  "/v1/users/alice",
 			bodyPath:     "../../testdata/valid_user.json",
 			apiKey:       "not-the-admin-key",
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Unauthorized\",\n  \"status\": 401,\n  \"detail\": \"Authentication failed. Perhaps a missing or incorrect API key?\"\n}\n",
@@ -67,7 +67,7 @@ func TestUserFunc(t *testing.T) {
 		{
 			name:         "Put user, no API key",
 			method:       http.MethodPut,
-			requestPath:  "/users/alice",
+			requestPath:  "/v1/users/alice",
 			bodyPath:     "../../testdata/valid_user.json",
 			apiKey:       "",
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Unauthorized\",\n  \"status\": 401,\n  \"detail\": \"Authentication failed. Perhaps a missing or incorrect API key?\"\n}\n",
@@ -76,7 +76,7 @@ func TestUserFunc(t *testing.T) {
 		{
 			name:         "Put user, invalid json",
 			method:       http.MethodPut,
-			requestPath:  "/users/john",
+			requestPath:  "/v1/users/john",
 			bodyPath:     "../../testdata/invalid_user.json",
 			apiKey:       options.AdminKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Unprocessable Entity\",\n  \"status\": 422,\n  \"detail\": \"validation failed\",\n  \"errors\": [\n    {\n      \"message\": \"expected required property email to be present\",\n      \"location\": \"body\",\n      \"value\": {\n        \"name\": \"John Doe\",\n        \"user_handle\": \"john\"\n      }\n    }\n  ]\n}\n",
@@ -85,7 +85,7 @@ func TestUserFunc(t *testing.T) {
 		{
 			name:         "Put user, valid json but invalid user handle",
 			method:       http.MethodPut,
-			requestPath:  "/users/bob",
+			requestPath:  "/v1/users/bob",
 			bodyPath:     "../../testdata/valid_user.json",
 			apiKey:       options.AdminKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Bad Request\",\n  \"status\": 400,\n  \"detail\": \"user handle in URL (bob) does not match user handle in body (alice).\"\n}\n",
@@ -94,7 +94,7 @@ func TestUserFunc(t *testing.T) {
 		{
 			name:         "Post existing user, everything valid",
 			method:       http.MethodPost,
-			requestPath:  "/users",
+			requestPath:  "/v1/users",
 			bodyPath:     "../../testdata/valid_user.json",
 			apiKey:       options.AdminKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/HandleAPIStruct.json\",\n  \"user_handle\": \"alice\",\n  \"api_key\": \"not changed\"\n}\n",
@@ -103,7 +103,7 @@ func TestUserFunc(t *testing.T) {
 		{
 			name:         "Post user, invalid API key",
 			method:       http.MethodPost,
-			requestPath:  "/users",
+			requestPath:  "/v1/users",
 			bodyPath:     "../../testdata/valid_user.json",
 			apiKey:       "not-the-admin-key",
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Unauthorized\",\n  \"status\": 401,\n  \"detail\": \"Authentication failed. Perhaps a missing or incorrect API key?\"\n}\n",
@@ -112,7 +112,7 @@ func TestUserFunc(t *testing.T) {
 		{
 			name:         "Post user, no API key",
 			method:       http.MethodPost,
-			requestPath:  "/users",
+			requestPath:  "/v1/users",
 			bodyPath:     "../../testdata/valid_user.json",
 			apiKey:       "",
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Unauthorized\",\n  \"status\": 401,\n  \"detail\": \"Authentication failed. Perhaps a missing or incorrect API key?\"\n}\n",
@@ -121,7 +121,7 @@ func TestUserFunc(t *testing.T) {
 		{
 			name:         "Post user, invalid json",
 			method:       http.MethodPost,
-			requestPath:  "/users",
+			requestPath:  "/v1/users",
 			bodyPath:     "../../testdata/invalid_user.json",
 			apiKey:       options.AdminKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Unprocessable Entity\",\n  \"status\": 422,\n  \"detail\": \"validation failed\",\n  \"errors\": [\n    {\n      \"message\": \"expected required property email to be present\",\n      \"location\": \"body\",\n      \"value\": {\n        \"name\": \"John Doe\",\n        \"user_handle\": \"john\"\n      }\n    }\n  ]\n}\n",
@@ -130,7 +130,7 @@ func TestUserFunc(t *testing.T) {
 		{
 			name:         "Valid get all users",
 			method:       http.MethodGet,
-			requestPath:  "/users",
+			requestPath:  "/v1/users",
 			bodyPath:     "",
 			apiKey:       options.AdminKey,
 			expectBody:   "[\n  \"alice\"\n]\n",
@@ -139,7 +139,7 @@ func TestUserFunc(t *testing.T) {
 		{
 			name:         "Get nonexistent user",
 			method:       http.MethodGet,
-			requestPath:  "/users/alfons",
+			requestPath:  "/v1/users/alfons",
 			bodyPath:     "",
 			apiKey:       options.AdminKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Not Found\",\n  \"status\": 404,\n  \"detail\": \"user alfons not found\"\n}\n",
@@ -148,7 +148,7 @@ func TestUserFunc(t *testing.T) {
 		{
 			name:         "Get invalid path",
 			method:       http.MethodGet,
-			requestPath:  "/uxers/alfons",
+			requestPath:  "/v1/uxers/alfons",
 			bodyPath:     "",
 			apiKey:       options.AdminKey,
 			expectBody:   "",
@@ -157,7 +157,7 @@ func TestUserFunc(t *testing.T) {
 		{
 			name:         "Delete user, valid path",
 			method:       http.MethodDelete,
-			requestPath:  "/users/alice",
+			requestPath:  "/v1/users/alice",
 			bodyPath:     "",
 			apiKey:       options.AdminKey,
 			expectBody:   "",
@@ -166,7 +166,7 @@ func TestUserFunc(t *testing.T) {
 		{
 			name:         "Delete nonexistent user",
 			method:       http.MethodDelete,
-			requestPath:  "/users/alfons",
+			requestPath:  "/v1/users/alfons",
 			bodyPath:     "",
 			apiKey:       options.AdminKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Not Found\",\n  \"status\": 404,\n  \"detail\": \"user alfons not found\"\n}\n",
@@ -235,7 +235,7 @@ func TestUserFunc(t *testing.T) {
 	t.Cleanup(func() {
 		fmt.Print("\n\nRunning cleanup ...\n\n")
 
-		requestURL := fmt.Sprintf("http://%s:%d/admin/reset-db", options.Host, options.Port)
+		requestURL := fmt.Sprintf("http://%s:%d/v1/admin/reset-db", options.Host, options.Port)
 		req, err := http.NewRequest(http.MethodGet, requestURL, nil)
 		assert.NoError(t, err)
 		req.Header.Set("Authorization", "Bearer "+options.AdminKey)

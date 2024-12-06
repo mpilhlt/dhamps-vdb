@@ -248,7 +248,7 @@ func RegisterProjectsRoutes(pool *pgxpool.Pool, api huma.API) error {
 	putProjectOp := huma.Operation{
 		OperationID:   "putProject",
 		Method:        http.MethodPut,
-		Path:          "/projects/{user_handle}/{project_handle}",
+		Path:          "/v1/projects/{user_handle}/{project_handle}",
 		DefaultStatus: http.StatusCreated,
 		Summary:       "Create or update a project",
 		Security: []map[string][]string{
@@ -260,7 +260,7 @@ func RegisterProjectsRoutes(pool *pgxpool.Pool, api huma.API) error {
 	postProjectOp := huma.Operation{
 		OperationID:   "postProject",
 		Method:        http.MethodPost,
-		Path:          "/projects/{user_handle}",
+		Path:          "/v1/projects/{user_handle}",
 		DefaultStatus: http.StatusCreated,
 		Summary:       "Create or update a project",
 		Security: []map[string][]string{
@@ -272,7 +272,7 @@ func RegisterProjectsRoutes(pool *pgxpool.Pool, api huma.API) error {
 	getProjectsOp := huma.Operation{
 		OperationID: "getProjects",
 		Method:      http.MethodGet,
-		Path:        "/projects/{user_handle}",
+		Path:        "/v1/projects/{user_handle}",
 		Summary:     "Get all projects for a specific user",
 		Security: []map[string][]string{
 			{"adminAuth": []string{"admin"}},
@@ -283,7 +283,7 @@ func RegisterProjectsRoutes(pool *pgxpool.Pool, api huma.API) error {
 	getProjectOp := huma.Operation{
 		OperationID: "getProject",
 		Method:      http.MethodGet,
-		Path:        "/projects/{user_handle}/{project_handle}",
+		Path:        "/v1/projects/{user_handle}/{project_handle}",
 		Summary:     "Get a specific project",
 		Security: []map[string][]string{
 			{"adminAuth": []string{"admin"}},
@@ -295,7 +295,7 @@ func RegisterProjectsRoutes(pool *pgxpool.Pool, api huma.API) error {
 	deleteProjectOp := huma.Operation{
 		OperationID:   "deleteProject",
 		Method:        http.MethodDelete,
-		Path:          "/projects/{user_handle}/{project_handle}",
+		Path:          "/v1/projects/{user_handle}/{project_handle}",
 		DefaultStatus: http.StatusNoContent,
 		Summary:       "Delete a specific project",
 		Security: []map[string][]string{

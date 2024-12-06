@@ -25,7 +25,7 @@ type LLMService struct {
 // The response structs must be structs with fields for the output headers and body of the operation, if any.
 
 // Put/post llm-service
-// PUT Path: "/llm-services/{user_handle}/{llm_service_handle}"
+// PUT Path: "/v1/llm-services/{user_handle}/{llm_service_handle}"
 
 type PutLLMRequest struct {
 	UserHandle       string     `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
@@ -33,7 +33,7 @@ type PutLLMRequest struct {
 	Body             LLMService `json:"llm_service" doc:"LLM service to create or update"`
 }
 
-// POST Path: "/llm-services/{user_handle}"
+// POST Path: "/v1/llm-services/{user_handle}"
 
 type PostLLMRequest struct {
 	UserHandle string     `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
@@ -49,7 +49,7 @@ type UploadLLMResponse struct {
 }
 
 // Get all LLM services by user
-// Path: "/llm-services/{user_handle}"
+// Path: "/v1/llm-services/{user_handle}"
 
 type GetUserLLMsRequest struct {
 	UserHandle string `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
@@ -65,7 +65,7 @@ type GetUserLLMsResponse struct {
 }
 
 // Get single LLM service
-// Path: "/llm-services/{user_handle}/{llm_service_handle}"
+// Path: "/v1/llm-services/{user_handle}/{llm_service_handle}"
 
 type GetLLMRequest struct {
 	UserHandle       string `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
@@ -80,7 +80,7 @@ type GetLLMResponse struct {
 }
 
 // Delete LLM service
-// Path: "/llm-services/{user_handle}/{llm_service_handle}"
+// Path: "/v1/llm-services/{user_handle}/{llm_service_handle}"
 
 type DeleteLLMRequest struct {
 	UserHandle       string `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`

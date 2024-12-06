@@ -17,14 +17,14 @@ type APIStandard struct {
 // The response structs must be structs with fields for the output headers and body of the operation, if any.
 
 // Put/post api_standard
-// PUT Path: "/api-standards/{api_standard_handle}"
+// PUT Path: "/v1/api-standards/{api_standard_handle}"
 
 type PutAPIStandardRequest struct {
 	APIStandardHandle string      `json:"api_standard_handle" path:"api_standard_handle" maxLength:"20" minLength:"3" example:"openai-v1" doc:"Handle for the API standard"`
 	Body              APIStandard `json:"api_standard" doc:"API standard to create or update"`
 }
 
-// POST Path: "/api-standards"
+// POST Path: "/v1/api-standards"
 
 type PostAPIStandardRequest struct {
 	Body APIStandard `json:"api_standard" doc:"API standard to create or update"`
@@ -38,7 +38,7 @@ type UploadAPIStandardResponse struct {
 }
 
 // Get all registered API standards
-// Path: "/api-standards"
+// Path: "/v1/api-standards"
 
 type GetAPIStandardsRequest struct {
 	Limit  int `json:"limit,omitempty" query:"limit" minimum:"1" maximum:"200" example:"10" default:"20" doc:"Maximum number of embeddings to return"`
@@ -53,7 +53,7 @@ type GetAPIStandardsResponse struct {
 }
 
 // Get single API standard
-// Path: "/api-standards/{api_standard_handle}"
+// Path: "/v1/api-standards/{api_standard_handle}"
 
 type GetAPIStandardRequest struct {
 	APIStandardHandle string `json:"api_standard_handle" path:"api_standard_handle" maxLength:"20" minLength:"3" example:"openai-v1" doc:"API standard handle"`
@@ -65,7 +65,7 @@ type GetAPIStandardResponse struct {
 }
 
 // Delete API standard
-// Path: "/api-standards/{api_standard_handle}"
+// Path: "/v1/api-standards/{api_standard_handle}"
 
 type DeleteAPIStandardRequest struct {
 	APIStandardHandle string `json:"api_standard_handle" path:"api_standard_handle" maxLength:"20" minLength:"3" example:"openai-v1" doc:"API standard handle"`

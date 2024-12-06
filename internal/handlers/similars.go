@@ -60,7 +60,7 @@ func RegisterSimilarRoutes(pool *pgxpool.Pool, api huma.API) error {
 	getSimilarOp := huma.Operation{
 		OperationID: "getSimilar",
 		Method:      http.MethodGet,
-		Path:        "/similars/{user_handle}/{project_handle}/{text_id}",
+		Path:        "/v1/similars/{user_handle}/{project_handle}/{text_id}",
 		Summary:     "Retrieve similar items for a particular document",
 		Security: []map[string][]string{
 			{"adminAuth": []string{"admin"}},
@@ -72,7 +72,7 @@ func RegisterSimilarRoutes(pool *pgxpool.Pool, api huma.API) error {
 	postSimilarOp := huma.Operation{
 		OperationID: "postSimilar",
 		Method:      http.MethodPost,
-		Path:        "/similars/{user_handle}/{project_handle}",
+		Path:        "/v1/similars/{user_handle}/{project_handle}",
 		Summary:     "Retrieve similar items for a query document",
 		Security: []map[string][]string{
 			{"adminAuth": []string{"admin"}},

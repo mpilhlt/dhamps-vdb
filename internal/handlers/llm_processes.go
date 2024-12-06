@@ -21,7 +21,7 @@ func RegisterLLMProcessRoutes(api huma.API) {
 	postLLMProcessOp := huma.Operation{
 		OperationID: "postLLMProcess",
 		Method:      http.MethodPost,
-		Path:        "/llm-process/{user_handle}",
+		Path:        "/v1/llm-process/{user_handle}",
 		Summary:     "Process text with LLM service",
 		Security: []map[string][]string{
 			{"adminAuth": []string{"admin"}},

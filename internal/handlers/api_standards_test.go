@@ -36,7 +36,7 @@ func TestAPIStandardFunc(t *testing.T) {
 		{
 			name:         "Put invalid API standard",
 			method:       http.MethodPut,
-			requestPath:  "/api-standards/error1",
+			requestPath:  "/v1/api-standards/error1",
 			bodyPath:     "../../testdata/invalid_api_standard.json",
 			apiKey:       options.AdminKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Unprocessable Entity\",\n  \"status\": 422,\n  \"detail\": \"validation failed\",\n  \"errors\": [\n    {\n      \"message\": \"expected required property key_field to be present\",\n      \"location\": \"body\",\n      \"value\": {\n        \"api_standard_handle\": \"error1\",\n        \"description\": \"Erroneous definition of an APi standard\",\n        \"keX_method\": \"auth_bearer\"\n      }\n    },\n    {\n      \"message\": \"expected required property key_method to be present\",\n      \"location\": \"body\",\n      \"value\": {\n        \"api_standard_handle\": \"error1\",\n        \"description\": \"Erroneous definition of an APi standard\",\n        \"keX_method\": \"auth_bearer\"\n      }\n    },\n    {\n      \"message\": \"unexpected property\",\n      \"location\": \"body.keX_method\",\n      \"value\": {\n        \"api_standard_handle\": \"error1\",\n        \"description\": \"Erroneous definition of an APi standard\",\n        \"keX_method\": \"auth_bearer\"\n      }\n    }\n  ]\n}\n",
@@ -45,7 +45,7 @@ func TestAPIStandardFunc(t *testing.T) {
 		{
 			name:         "Put valid API standard, wrong path",
 			method:       http.MethodPut,
-			requestPath:  "/api-standards/wrongpath",
+			requestPath:  "/v1/api-standards/wrongpath",
 			bodyPath:     "../../testdata/valid_api_standard_openai_v1.json",
 			apiKey:       options.AdminKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Bad Request\",\n  \"status\": 400,\n  \"detail\": \"API standard handle in URL (wrongpath) does not match handle in body (openai).\"\n}\n",
@@ -54,7 +54,7 @@ func TestAPIStandardFunc(t *testing.T) {
 		{
 			name:         "Valid Put API standard",
 			method:       http.MethodPut,
-			requestPath:  "/api-standards/openai",
+			requestPath:  "/v1/api-standards/openai",
 			bodyPath:     "../../testdata/valid_api_standard_openai_v1.json",
 			apiKey:       options.AdminKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/UploadAPIStandardResponseBody.json\",\n  \"api_standard_handle\": \"openai\"\n}\n",
@@ -63,7 +63,7 @@ func TestAPIStandardFunc(t *testing.T) {
 		{
 			name:         "get all API standards",
 			method:       http.MethodGet,
-			requestPath:  "/api-standards",
+			requestPath:  "/v1/api-standards",
 			apiKey:       "",
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/GetAPIStandardsResponseBody.json\",\n  \"api_standards\": [\n    {\n      \"api_standard_handle\": \"openai\",\n      \"description\": \"OpenAI Embeddings API, Version 1, as documented in https://platform.openai.com/docs/api-reference/embeddings\",\n      \"key_method\": \"auth_bearer\",\n      \"key_field\": \"Authorization\"\n    }\n  ]\n}\n",
 			expectStatus: http.StatusOK,
@@ -71,7 +71,7 @@ func TestAPIStandardFunc(t *testing.T) {
 		{
 			name:         "get single API standard",
 			method:       http.MethodGet,
-			requestPath:  "/api-standards/openai",
+			requestPath:  "/v1/api-standards/openai",
 			apiKey:       "",
 			expectBody:   "{\n  \"api_standard_handle\": \"openai\",\n  \"description\": \"OpenAI Embeddings API, Version 1, as documented in https://platform.openai.com/docs/api-reference/embeddings\",\n  \"key_method\": \"auth_bearer\",\n  \"key_field\": \"Authorization\"\n}\n",
 			expectStatus: http.StatusOK,
@@ -79,21 +79,21 @@ func TestAPIStandardFunc(t *testing.T) {
 		{
 			name:         "Delete nonexistent path",
 			method:       http.MethodDelete,
-			requestPath:  "/api-standards/wrongpath",
+			requestPath:  "/v1/api-standards/wrongpath",
 			apiKey:       options.AdminKey,
 			expectStatus: http.StatusNotFound,
 		},
 		{
 			name:         "delete API standard",
 			method:       http.MethodDelete,
-			requestPath:  "/api-standards/openai",
+			requestPath:  "/v1/api-standards/openai",
 			apiKey:       options.AdminKey,
 			expectStatus: http.StatusNoContent,
 		},
 		{
 			name:         "post valid API standard",
 			method:       http.MethodPut,
-			requestPath:  "/api-standards/openai",
+			requestPath:  "/v1/api-standards/openai",
 			bodyPath:     "../../testdata/valid_api_standard_openai_v1.json",
 			apiKey:       options.AdminKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/UploadAPIStandardResponseBody.json\",\n  \"api_standard_handle\": \"openai\"\n}\n",
@@ -160,7 +160,7 @@ func TestAPIStandardFunc(t *testing.T) {
 	t.Cleanup(func() {
 		fmt.Print("\n\nRunning cleanup ...\n\n")
 
-		requestURL := fmt.Sprintf("http://%s:%d/admin/reset-db", options.Host, options.Port)
+		requestURL := fmt.Sprintf("http://%s:%d/v1/admin/reset-db", options.Host, options.Port)
 		req, err := http.NewRequest(http.MethodGet, requestURL, nil)
 		assert.NoError(t, err)
 		req.Header.Set("Authorization", "Bearer "+options.AdminKey)

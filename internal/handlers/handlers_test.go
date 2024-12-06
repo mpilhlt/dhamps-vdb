@@ -256,7 +256,7 @@ func (m *MockKeyGen) RandomKey(len int) (string, error) {
 // it accepts a JSON string encoding the user object as input
 func createUser(t *testing.T, userJSON string) (string, error) {
 	fmt.Print("    Creating user (\"alice\") for testing ...\n")
-	requestURL := fmt.Sprintf("http://%s:%d/users/alice", options.Host, options.Port)
+	requestURL := fmt.Sprintf("http://%s:%d/v1/users/alice", options.Host, options.Port)
 	requestBody := bytes.NewReader([]byte(userJSON))
 	req, err := http.NewRequest(http.MethodPut, requestURL, requestBody)
 	assert.NoError(t, err)
@@ -292,7 +292,7 @@ func createProject(t *testing.T, projectJSON string, user string, apiKey string)
 	assert.NoError(t, err)
 	fmt.Printf("(\"%s/%s\") for testing ...\n", user, jsonInput.Handle)
 
-	requestURL := fmt.Sprintf("http://%s:%d/projects/%s/%s", options.Host, options.Port, user, jsonInput.Handle)
+	requestURL := fmt.Sprintf("http://%s:%d/v1/projects/%s/%s", options.Host, options.Port, user, jsonInput.Handle)
 	requestBody := bytes.NewReader([]byte(projectJSON))
 	req, err := http.NewRequest(http.MethodPut, requestURL, requestBody)
 	req.Header.Set("Authorization", "Bearer "+apiKey)
@@ -337,7 +337,7 @@ func createAPIStandard(t *testing.T, apiStandardJSON string, apiKey string) (str
 	assert.NoError(t, err)
 	fmt.Printf("(\"%s\") for testing ...\n", jsonInput.APIStandardHandle)
 
-	requestURL := fmt.Sprintf("http://%s:%d/api-standards/%s", options.Host, options.Port, jsonInput.APIStandardHandle)
+	requestURL := fmt.Sprintf("http://%s:%d/v1/api-standards/%s", options.Host, options.Port, jsonInput.APIStandardHandle)
 	requestBody := bytes.NewReader([]byte(apiStandardJSON))
 	req, err := http.NewRequest(http.MethodPut, requestURL, requestBody)
 	req.Header.Set("Authorization", "Bearer "+apiKey)
@@ -379,7 +379,7 @@ func createLLMService(t *testing.T, llmServiceJSON string, user, apiKey string) 
 	assert.NoError(t, err)
 	fmt.Printf("(\"%s\") for testing ...\n", jsonInput.LLMServiceHandle)
 
-	requestURL := fmt.Sprintf("http://%s:%d/llm-services/%s/%s", options.Host, options.Port, user, jsonInput.LLMServiceHandle)
+	requestURL := fmt.Sprintf("http://%s:%d/v1/llm-services/%s/%s", options.Host, options.Port, user, jsonInput.LLMServiceHandle)
 	requestBody := bytes.NewReader([]byte(llmServiceJSON))
 	req, err := http.NewRequest(http.MethodPut, requestURL, requestBody)
 	req.Header.Set("Authorization", "Bearer "+apiKey)

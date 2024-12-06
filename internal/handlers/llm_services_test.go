@@ -54,7 +54,7 @@ func TestLLMServicesFunc(t *testing.T) {
 		{
 			name:         "Put llm-service, invalid json",
 			method:       http.MethodPut,
-			requestPath:  "/llm-services/alice/openai-large",
+			requestPath:  "/v1/llm-services/alice/openai-large",
 			bodyPath:     "../../testdata/invalid_llm_service.json",
 			apiKey:       aliceAPIKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Unprocessable Entity\",\n  \"status\": 422,\n  \"detail\": \"validation failed\",\n  \"errors\": [\n    {\n      \"message\": \"expected required property model to be present\",\n      \"location\": \"body\",\n      \"value\": {\n        \"api_keX\": \"0123456789\",\n        \"api_standard\": \"openai\",\n        \"description\": \"My OpenAI reduced text-embedding-3-large service\",\n        \"dimensions\": 1024,\n        \"endpoint\": \"https://api.openai.com/v1/embeddings\",\n        \"llm_service_handle\": \"openai-error\"\n      }\n    },\n    {\n      \"message\": \"unexpected property\",\n      \"location\": \"body.api_keX\",\n      \"value\": {\n        \"api_keX\": \"0123456789\",\n        \"api_standard\": \"openai\",\n        \"description\": \"My OpenAI reduced text-embedding-3-large service\",\n        \"dimensions\": 1024,\n        \"endpoint\": \"https://api.openai.com/v1/embeddings\",\n        \"llm_service_handle\": \"openai-error\"\n      }\n    }\n  ]\n}\n",
@@ -63,7 +63,7 @@ func TestLLMServicesFunc(t *testing.T) {
 		{
 			name:         "Put llm-service, wrong path",
 			method:       http.MethodPut,
-			requestPath:  "/llm-services/alice/nonexistent",
+			requestPath:  "/v1/llm-services/alice/nonexistent",
 			bodyPath:     "../../testdata/valid_llm_service_openai-large-full.json",
 			apiKey:       aliceAPIKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Bad Request\",\n  \"status\": 400,\n  \"detail\": \"llm-service handle in URL (\\\"nonexistent\\\") does not match llm-service handle in body (\\\"openai-large\\\")\"\n}\n",
@@ -72,7 +72,7 @@ func TestLLMServicesFunc(t *testing.T) {
 		{
 			name:         "Valid put llm-service",
 			method:       http.MethodPut,
-			requestPath:  "/llm-services/alice/openai-large",
+			requestPath:  "/v1/llm-services/alice/openai-large",
 			bodyPath:     "../../testdata/valid_llm_service_openai-large-full.json",
 			apiKey:       aliceAPIKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/UploadLLMResponseBody.json\",\n  \"llm_service_handle\": \"openai-large\",\n  \"llm_service_id\": 1\n}\n",
@@ -81,7 +81,7 @@ func TestLLMServicesFunc(t *testing.T) {
 		{
 			name:         "Post llm-service, invalid json",
 			method:       http.MethodPost,
-			requestPath:  "/llm-services/alice",
+			requestPath:  "/v1/llm-services/alice",
 			bodyPath:     "../../testdata/invalid_llm_service.json",
 			apiKey:       aliceAPIKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Unprocessable Entity\",\n  \"status\": 422,\n  \"detail\": \"validation failed\",\n  \"errors\": [\n    {\n      \"message\": \"expected required property model to be present\",\n      \"location\": \"body\",\n      \"value\": {\n        \"api_keX\": \"0123456789\",\n        \"api_standard\": \"openai\",\n        \"description\": \"My OpenAI reduced text-embedding-3-large service\",\n        \"dimensions\": 1024,\n        \"endpoint\": \"https://api.openai.com/v1/embeddings\",\n        \"llm_service_handle\": \"openai-error\"\n      }\n    },\n    {\n      \"message\": \"unexpected property\",\n      \"location\": \"body.api_keX\",\n      \"value\": {\n        \"api_keX\": \"0123456789\",\n        \"api_standard\": \"openai\",\n        \"description\": \"My OpenAI reduced text-embedding-3-large service\",\n        \"dimensions\": 1024,\n        \"endpoint\": \"https://api.openai.com/v1/embeddings\",\n        \"llm_service_handle\": \"openai-error\"\n      }\n    }\n  ]\n}\n",
@@ -90,7 +90,7 @@ func TestLLMServicesFunc(t *testing.T) {
 		{
 			name:         "Valid post llm-service",
 			method:       http.MethodPost,
-			requestPath:  "/llm-services/alice",
+			requestPath:  "/v1/llm-services/alice",
 			bodyPath:     "../../testdata/valid_llm_service_openai-large-full.json",
 			apiKey:       aliceAPIKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/UploadLLMResponseBody.json\",\n  \"llm_service_handle\": \"openai-large\",\n  \"llm_service_id\": 1\n}\n",
@@ -99,7 +99,7 @@ func TestLLMServicesFunc(t *testing.T) {
 		{
 			name:         "Get all llm-services, admin's api key",
 			method:       http.MethodGet,
-			requestPath:  "/llm-services/alice",
+			requestPath:  "/v1/llm-services/alice",
 			bodyPath:     "",
 			apiKey:       options.AdminKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/GetUserLLMsResponseBody.json\",\n  \"llm_service\": [\n    {\n      \"llm_service_id\": 1,\n      \"llm_service_handle\": \"openai-large\",\n      \"endpoint\": \"https://api.openai.com/v1/embeddings\",\n      \"description\": \"My OpenAI full text-embedding-3-large service\",\n      \"api_key\": \"0123456789\",\n      \"api_standard\": \"openai\",\n      \"model\": \"text-embedding-3-large\",\n      \"dimensions\": 3072\n    }\n  ]\n}\n",
@@ -108,7 +108,7 @@ func TestLLMServicesFunc(t *testing.T) {
 		{
 			name:         "Get all llm-services, alice's api key",
 			method:       http.MethodGet,
-			requestPath:  "/llm-services/alice",
+			requestPath:  "/v1/llm-services/alice",
 			bodyPath:     "",
 			apiKey:       aliceAPIKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/GetUserLLMsResponseBody.json\",\n  \"llm_service\": [\n    {\n      \"llm_service_id\": 1,\n      \"llm_service_handle\": \"openai-large\",\n      \"endpoint\": \"https://api.openai.com/v1/embeddings\",\n      \"description\": \"My OpenAI full text-embedding-3-large service\",\n      \"api_key\": \"0123456789\",\n      \"api_standard\": \"openai\",\n      \"model\": \"text-embedding-3-large\",\n      \"dimensions\": 3072\n    }\n  ]\n}\n",
@@ -117,7 +117,7 @@ func TestLLMServicesFunc(t *testing.T) {
 		{
 			name:         "Get all llm-services, unauthorized",
 			method:       http.MethodGet,
-			requestPath:  "/llm-services/alice",
+			requestPath:  "/v1/llm-services/alice",
 			bodyPath:     "",
 			apiKey:       "",
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Unauthorized\",\n  \"status\": 401,\n  \"detail\": \"Authentication failed. Perhaps a missing or incorrect API key?\"\n}\n",
@@ -126,7 +126,7 @@ func TestLLMServicesFunc(t *testing.T) {
 		{
 			name:         "Get all llm-services, nonexistent user",
 			method:       http.MethodGet,
-			requestPath:  "/llm-services/john",
+			requestPath:  "/v1/llm-services/john",
 			bodyPath:     "",
 			apiKey:       options.AdminKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Not Found\",\n  \"status\": 404,\n  \"detail\": \"user john not found\"\n}\n",
@@ -135,7 +135,7 @@ func TestLLMServicesFunc(t *testing.T) {
 		{
 			name:         "Get nonexistent llm-service",
 			method:       http.MethodGet,
-			requestPath:  "/llm-services/alice/nonexistent",
+			requestPath:  "/v1/llm-services/alice/nonexistent",
 			bodyPath:     "",
 			apiKey:       aliceAPIKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Not Found\",\n  \"status\": 404,\n  \"detail\": \"llm service nonexistent for user alice not found\"\n}\n",
@@ -144,7 +144,7 @@ func TestLLMServicesFunc(t *testing.T) {
 		{
 			name:         "Get single llm-service, nonexistent path",
 			method:       http.MethodGet,
-			requestPath:  "/llm-services/alice/nonexistant",
+			requestPath:  "/v1/llm-services/alice/nonexistant",
 			bodyPath:     "",
 			apiKey:       aliceAPIKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Not Found\",\n  \"status\": 404,\n  \"detail\": \"llm service nonexistant for user alice not found\"\n}\n",
@@ -153,7 +153,7 @@ func TestLLMServicesFunc(t *testing.T) {
 		{
 			name:         "Valid get single llm-service",
 			method:       http.MethodGet,
-			requestPath:  "/llm-services/alice/openai-large",
+			requestPath:  "/v1/llm-services/alice/openai-large",
 			bodyPath:     "",
 			apiKey:       aliceAPIKey,
 			expectBody:   "{\n  \"llm_service_id\": 1,\n  \"llm_service_handle\": \"openai-large\",\n  \"endpoint\": \"https://api.openai.com/v1/embeddings\",\n  \"description\": \"My OpenAI full text-embedding-3-large service\",\n  \"api_key\": \"0123456789\",\n  \"api_standard\": \"openai\",\n  \"model\": \"text-embedding-3-large\",\n  \"dimensions\": 3072\n}\n",
@@ -162,7 +162,7 @@ func TestLLMServicesFunc(t *testing.T) {
 		{
 			name:         "Delete nonexistent llm-service",
 			method:       http.MethodDelete,
-			requestPath:  "/llm-services/alice/nonexistent",
+			requestPath:  "/v1/llm-services/alice/nonexistent",
 			bodyPath:     "",
 			apiKey:       aliceAPIKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Not Found\",\n  \"status\": 404,\n  \"detail\": \"llm service nonexistent for user alice not found\"\n}\n",
@@ -171,7 +171,7 @@ func TestLLMServicesFunc(t *testing.T) {
 		{
 			name:         "Delete llm-service, invalid user",
 			method:       http.MethodDelete,
-			requestPath:  "/llm-services/john/test1",
+			requestPath:  "/v1/llm-services/john/test1",
 			bodyPath:     "",
 			apiKey:       options.AdminKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Not Found\",\n  \"status\": 404,\n  \"detail\": \"user john not found\"\n}\n",
@@ -180,7 +180,7 @@ func TestLLMServicesFunc(t *testing.T) {
 		{
 			name:         "Delete llm-service, unauthorized",
 			method:       http.MethodDelete,
-			requestPath:  "/llm-services/alice/openai-large",
+			requestPath:  "/v1/llm-services/alice/openai-large",
 			bodyPath:     "",
 			apiKey:       "",
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Unauthorized\",\n  \"status\": 401,\n  \"detail\": \"Authentication failed. Perhaps a missing or incorrect API key?\"\n}\n",
@@ -189,7 +189,7 @@ func TestLLMServicesFunc(t *testing.T) {
 		{
 			name:         "Valid delete llm-service",
 			method:       http.MethodDelete,
-			requestPath:  "/llm-services/alice/openai-large",
+			requestPath:  "/v1/llm-services/alice/openai-large",
 			bodyPath:     "",
 			apiKey:       aliceAPIKey,
 			expectBody:   "",
@@ -257,7 +257,7 @@ func TestLLMServicesFunc(t *testing.T) {
 	t.Cleanup(func() {
 		fmt.Print("\n\nRunning cleanup ...\n\n")
 
-		requestURL := fmt.Sprintf("http://%s:%d/admin/reset-db", options.Host, options.Port)
+		requestURL := fmt.Sprintf("http://%s:%d/v1/admin/reset-db", options.Host, options.Port)
 		req, err := http.NewRequest(http.MethodGet, requestURL, nil)
 		assert.NoError(t, err)
 		req.Header.Set("Authorization", "Bearer "+options.AdminKey)

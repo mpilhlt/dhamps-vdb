@@ -180,7 +180,7 @@ func RegisterAPIStandardsRoutes(pool *pgxpool.Pool, api huma.API) error {
 	putAPIStandardOp := huma.Operation{
 		OperationID:   "putAPIStandard",
 		Method:        http.MethodPut,
-		Path:          "/api-standards/{api_standard_handle}",
+		Path:          "/v1/api-standards/{api_standard_handle}",
 		DefaultStatus: http.StatusCreated,
 		Summary:       "Create or update an API standard",
 		Security: []map[string][]string{
@@ -194,7 +194,7 @@ func RegisterAPIStandardsRoutes(pool *pgxpool.Pool, api huma.API) error {
 	postAPIStandardOp := huma.Operation{
 		OperationID:   "postAPIStandard",
 		Method:        http.MethodPost,
-		Path:          "/api-standards",
+		Path:          "/v1/api-standards",
 		DefaultStatus: http.StatusCreated,
 		Summary:       "Create an API standard",
 		Security: []map[string][]string{
@@ -205,7 +205,7 @@ func RegisterAPIStandardsRoutes(pool *pgxpool.Pool, api huma.API) error {
 	getAPIStandardsOp := huma.Operation{
 		OperationID: "getAPIStandards",
 		Method:      http.MethodGet,
-		Path:        "/api-standards",
+		Path:        "/v1/api-standards",
 		Summary:     "Get information about all API standards",
 		Security:    []map[string][]string{},
 		Tags:        []string{"public", "api-standards"},
@@ -213,7 +213,7 @@ func RegisterAPIStandardsRoutes(pool *pgxpool.Pool, api huma.API) error {
 	getAPIStandardOp := huma.Operation{
 		OperationID: "getAPIStandard",
 		Method:      http.MethodGet,
-		Path:        "/api-standards/{api_standard_handle}",
+		Path:        "/v1/api-standards/{api_standard_handle}",
 		Summary:     "Get information about a specific API standard",
 		Security:    []map[string][]string{},
 		Tags:        []string{"public", "api-standards"},
@@ -221,7 +221,7 @@ func RegisterAPIStandardsRoutes(pool *pgxpool.Pool, api huma.API) error {
 	deleteAPIStandardOp := huma.Operation{
 		OperationID:   "deleteAPIStandard",
 		Method:        http.MethodDelete,
-		Path:          "/api-standards/{api_standard_handle}",
+		Path:          "/v1/api-standards/{api_standard_handle}",
 		DefaultStatus: http.StatusNoContent,
 		Summary:       "Delete a specific API standard",
 		Security: []map[string][]string{

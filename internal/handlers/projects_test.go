@@ -47,7 +47,7 @@ func TestProjectsFunc(t *testing.T) {
 		{
 			name:         "Valid get all projects, no projects present, admin's api key",
 			method:       http.MethodGet,
-			requestPath:  "/projects/alice",
+			requestPath:  "/v1/projects/alice",
 			bodyPath:     "",
 			apiKey:       options.AdminKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/GetProjectsResponseBody.json\",\n  \"projects\": []\n}\n",
@@ -56,7 +56,7 @@ func TestProjectsFunc(t *testing.T) {
 		{
 			name:         "Valid get all projects, no projects present, alice's api key",
 			method:       http.MethodGet,
-			requestPath:  "/projects/alice",
+			requestPath:  "/v1/projects/alice",
 			bodyPath:     "",
 			apiKey:       aliceAPIKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/GetProjectsResponseBody.json\",\n  \"projects\": []\n}\n",
@@ -65,7 +65,7 @@ func TestProjectsFunc(t *testing.T) {
 		{
 			name:         "Valid put project",
 			method:       http.MethodPut,
-			requestPath:  "/projects/alice/test1",
+			requestPath:  "/v1/projects/alice/test1",
 			bodyPath:     "../../testdata/valid_project.json",
 			apiKey:       aliceAPIKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/UploadProjectResponseBody.json\",\n  \"project_handle\": \"test1\",\n  \"project_id\": 1\n}\n",
@@ -74,7 +74,7 @@ func TestProjectsFunc(t *testing.T) {
 		{
 			name:         "Put project, invalid json",
 			method:       http.MethodPut,
-			requestPath:  "/projects/alice/test2",
+			requestPath:  "/v1/projects/alice/test2",
 			bodyPath:     "../../testdata/invalid_project.json",
 			apiKey:       aliceAPIKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Unprocessable Entity\",\n  \"status\": 422,\n  \"detail\": \"validation failed\",\n  \"errors\": [\n    {\n      \"message\": \"expected required property project_handle to be present\",\n      \"location\": \"body\",\n      \"value\": {\n        \"description\": \"This is a test project\",\n        \"foo\": \"test1\"\n      }\n    },\n    {\n      \"message\": \"unexpected property\",\n      \"location\": \"body.foo\",\n      \"value\": {\n        \"description\": \"This is a test project\",\n        \"foo\": \"test1\"\n      }\n    }\n  ]\n}\n",
@@ -83,7 +83,7 @@ func TestProjectsFunc(t *testing.T) {
 		{
 			name:         "Put project, valid json but invalid project handle",
 			method:       http.MethodPut,
-			requestPath:  "/projects/alice/test3",
+			requestPath:  "/v1/projects/alice/test3",
 			bodyPath:     "../../testdata/valid_project.json",
 			apiKey:       aliceAPIKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Bad Request\",\n  \"status\": 400,\n  \"detail\": \"project handle in URL (test3) does not match project handle in body (test1)\"\n}\n",
@@ -92,7 +92,7 @@ func TestProjectsFunc(t *testing.T) {
 		{
 			name:         "Valid post project",
 			method:       http.MethodPost,
-			requestPath:  "/projects/alice",
+			requestPath:  "/v1/projects/alice",
 			bodyPath:     "../../testdata/valid_project.json",
 			apiKey:       aliceAPIKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/UploadProjectResponseBody.json\",\n  \"project_handle\": \"test1\",\n  \"project_id\": 1\n}\n",
@@ -101,7 +101,7 @@ func TestProjectsFunc(t *testing.T) {
 		{
 			name:         "Post project, invalid json",
 			method:       http.MethodPost,
-			requestPath:  "/projects/alice",
+			requestPath:  "/v1/projects/alice",
 			bodyPath:     "../../testdata/invalid_project.json",
 			apiKey:       aliceAPIKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Unprocessable Entity\",\n  \"status\": 422,\n  \"detail\": \"validation failed\",\n  \"errors\": [\n    {\n      \"message\": \"expected required property project_handle to be present\",\n      \"location\": \"body\",\n      \"value\": {\n        \"description\": \"This is a test project\",\n        \"foo\": \"test1\"\n      }\n    },\n    {\n      \"message\": \"unexpected property\",\n      \"location\": \"body.foo\",\n      \"value\": {\n        \"description\": \"This is a test project\",\n        \"foo\": \"test1\"\n      }\n    }\n  ]\n}\n",
@@ -110,7 +110,7 @@ func TestProjectsFunc(t *testing.T) {
 		{
 			name:         "Valid get project",
 			method:       http.MethodGet,
-			requestPath:  "/projects/alice/test1",
+			requestPath:  "/v1/projects/alice/test1",
 			bodyPath:     "",
 			apiKey:       aliceAPIKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/Project.json\",\n  \"project_id\": 1,\n  \"project_handle\": \"test1\",\n  \"description\": \"This is a test project\",\n  \"authorizedReaders\": [\n    \"alice\"\n  ]\n}\n",
@@ -119,7 +119,7 @@ func TestProjectsFunc(t *testing.T) {
 		{
 			name:         "Valid get all projects",
 			method:       http.MethodGet,
-			requestPath:  "/projects/alice",
+			requestPath:  "/v1/projects/alice",
 			bodyPath:     "",
 			apiKey:       aliceAPIKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/GetProjectsResponseBody.json\",\n  \"projects\": [\n    {\n      \"project_id\": 1,\n      \"project_handle\": \"test1\",\n      \"description\": \"This is a test project\",\n      \"authorizedReaders\": [\n        \"alice\"\n      ]\n    }\n  ]\n}\n",
@@ -128,7 +128,7 @@ func TestProjectsFunc(t *testing.T) {
 		{
 			name:         "Get all projects, invalid user",
 			method:       http.MethodGet,
-			requestPath:  "/projects/john",
+			requestPath:  "/v1/projects/john",
 			bodyPath:     "",
 			apiKey:       aliceAPIKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Unauthorized\",\n  \"status\": 401,\n  \"detail\": \"Authentication failed. Perhaps a missing or incorrect API key?\"\n}\n",
@@ -137,7 +137,7 @@ func TestProjectsFunc(t *testing.T) {
 		{
 			name:         "Get nonexistent project",
 			method:       http.MethodGet,
-			requestPath:  "/projects/alice/test2",
+			requestPath:  "/v1/projects/alice/test2",
 			bodyPath:     "",
 			apiKey:       aliceAPIKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Not Found\",\n  \"status\": 404,\n  \"detail\": \"user alice's project test2 not found\"\n}\n",
@@ -146,7 +146,7 @@ func TestProjectsFunc(t *testing.T) {
 		{
 			name:         "Delete nonexistent project",
 			method:       http.MethodDelete,
-			requestPath:  "/projects/alice/test2",
+			requestPath:  "/v1/projects/alice/test2",
 			bodyPath:     "",
 			apiKey:       aliceAPIKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Not Found\",\n  \"status\": 404,\n  \"detail\": \"user alice's project test2 not found\"\n}\n",
@@ -155,7 +155,7 @@ func TestProjectsFunc(t *testing.T) {
 		{
 			name:         "Delete project, invalid user",
 			method:       http.MethodDelete,
-			requestPath:  "/projects/john/test1",
+			requestPath:  "/v1/projects/john/test1",
 			bodyPath:     "",
 			apiKey:       aliceAPIKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Unauthorized\",\n  \"status\": 401,\n  \"detail\": \"Authentication failed. Perhaps a missing or incorrect API key?\"\n}\n",
@@ -164,7 +164,7 @@ func TestProjectsFunc(t *testing.T) {
 		{
 			name:         "Valid delete project",
 			method:       http.MethodDelete,
-			requestPath:  "/projects/alice/test1",
+			requestPath:  "/v1/projects/alice/test1",
 			bodyPath:     "",
 			apiKey:       aliceAPIKey,
 			expectBody:   "",
@@ -233,7 +233,7 @@ func TestProjectsFunc(t *testing.T) {
 	t.Cleanup(func() {
 		fmt.Print("\n\nRunning cleanup ...\n\n")
 
-		requestURL := fmt.Sprintf("http://%s:%d/admin/reset-db", options.Host, options.Port)
+		requestURL := fmt.Sprintf("http://%s:%d/v1/admin/reset-db", options.Host, options.Port)
 		req, err := http.NewRequest(http.MethodGet, requestURL, nil)
 		assert.NoError(t, err)
 		req.Header.Set("Authorization", "Bearer "+options.AdminKey)

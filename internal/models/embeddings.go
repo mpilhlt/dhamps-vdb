@@ -54,7 +54,7 @@ func (es EmbeddingssDatabase) GetIDs() []string {
 // The response structs must be structs with fields for the output headers and body of the operation, if any.
 
 // Put/post project embeddings
-// PUT Path: "/embeddings/{user_handle}/{project_handle}/{text_id}"
+// PUT Path: "/v1/embeddings/{user_handle}/{project_handle}/{text_id}"
 
 type PutProjEmbeddingsRequest struct {
 	TextID        string `json:"text_id" path:"id" maxLength:"300" minLength:"3" example:"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0017%3Afrontmatter.1.1%0A" doc:"Document identifier"`
@@ -63,7 +63,7 @@ type PutProjEmbeddingsRequest struct {
 	Body          EmbeddingsInput
 }
 
-// POST Path: "/embeddings/{user_handle}/{project_handle}"
+// POST Path: "/v1/embeddings/{user_handle}/{project_handle}"
 
 type PostProjEmbeddingsRequest struct {
 	UserHandle    string `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
@@ -81,7 +81,7 @@ type UploadProjEmbeddingsResponse struct {
 }
 
 // Get project embeddings
-// Path: "/embeddings/{user_handle}/{project_handle}"
+// Path: "/v1/embeddings/{user_handle}/{project_handle}"
 
 type GetProjEmbeddingsRequest struct {
 	UserHandle    string `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
@@ -98,7 +98,7 @@ type GetProjEmbeddingsResponse struct {
 }
 
 // Delete project embeddings
-// Path: "/embeddings/{user_handle}/{project_handle}"
+// Path: "/v1/embeddings/{user_handle}/{project_handle}"
 
 type DeleteProjEmbeddingsRequest struct {
 	UserHandle    string `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
@@ -110,7 +110,7 @@ type DeleteProjEmbeddingsResponse struct {
 }
 
 // Get document embeddings
-// Path: "/embeddings/{user_handle}/{project_handle}/{text_id}"
+// Path: "/v1/embeddings/{user_handle}/{project_handle}/{text_id}"
 
 type GetDocEmbeddingsRequest struct {
 	UserHandle    string `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
@@ -124,7 +124,7 @@ type GetDocEmbeddingsResponse struct {
 }
 
 // Delete document embeddings
-// Path: "/embeddings/{user_handle}/{project_handle}/{text_id}"
+// Path: "/v1/embeddings/{user_handle}/{project_handle}/{text_id}"
 
 type DeleteDocEmbeddingsRequest struct {
 	UserHandle    string `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
