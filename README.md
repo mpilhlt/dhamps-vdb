@@ -77,6 +77,20 @@ dhamps-vdb/
 
 The application checks and migrates the database schema to the appropriate version if possible. It presupposes however, that a suitable database and user (with appropriate privileges) have been created.
 
+### Run tests
+
+Actual (mostly integration) tests are run like this:
+
+```bash
+$> systemctl --user start podman.socket
+$> export DOCKER_HOST=unix://$XDG_RUNTIME_DIR/podman/podman.sock
+$> go test -v ./...
+```
+
+These tests do not contact any separately installed/launched backend, and instead have a container managed by the testing itself (via [testcontainers](https://testcontainers.com/guides/getting-started-with-testcontainers-for-go/)).
+
+### Run with local container
+
 A local container with a pg_vector-enabled postgresql can be run like this:
 
 ```bash
@@ -108,35 +122,27 @@ For testing (i.e. without compiling and deploying), you can go to the main direc
 $> go run main.go --port=8880 --db-port=8888 --db-user=my_user --db-password=my-password --db-name=my_vectors
 ```
 
-Actual (mostly integration) tests are run like this:
-
-```bash
-$> systemctl --user start podman.socket
-$> export DOCKER_HOST=unix://$XDG_RUNTIME_DIR/podman/podman.sock
-$> go test -v ./...
-```
-
 ## Roadmap
 
 - [√] Tests
 - [√] Catch post to existing resources
 - [√] User authentication & restrictions on some API calls
-- [ ] When testing, check cleanup by adding a new query/function to see if all tables are empty
+- [√] When testing, check cleanup by adding a new query/function to see if all tables are empty
+- [ ] handle **metadata**
+  - [ ] Validation with metadata schema
+- [ ] Implement and make consequent use of **max_idle** (5), **max_concurr** (5), **timeouts**, and **cancellations**
+- [ ] Use **transactions** (most importantly, when an action requires several queries, e.g. projects being added and then linked to several read-authorized users)
+- [ ] **Dockerization**
+- [ ] **Rate limiting** (redis, sliding window, implement headers)
+- [ ] **Concurrency** (leaky bucket)
+- [ ] **Batch mode**
 - [ ] Check if pagination is supported consistently
 - [ ] Check if input is validated consistently
 - [ ] API versioning
 - [ ] **Link or unlink** users/LLMs as standalone operations
 - [ ] **Transfer** of projects from one owner to another as new operation
-- [ ] handle more **metadata**
-  - [ ] Validation with metadata schema
-- [ ] Implement and make consequent use of **max_idle** (5), **max_concurr** (5), **timeouts**, and **cancellations**
-- [ ] Use **transactions** (most importantly, when an action requires several queries, e.g. projects being added and then linked to several read-authorized users)
 - [ ] better **options** handling (<https://huma.rocks/features/cli/>)
 - [ ] proper **logging** with `--verbose` and `--quiet` modes
-- [ ] **Dockerization**
-- [ ] **Rate limiting** (redis, sliding window, implement headers)
-- [ ] **Concurrency** (leaky bucket)
-- [ ] **Batch mode**
 - [ ] Caching
 - [ ] HTML UI?
 - [ ] LLM handling

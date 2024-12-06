@@ -36,11 +36,14 @@ func putLLMFunc(ctx context.Context, input *models.PutLLMRequest) (*models.Uploa
 	// Run the query
 	queries := database.New(pool)
 	llm, err := queries.UpsertLLM(ctx, database.UpsertLLMParams{
-		Owner:            input.UserHandle,
 		LLMServiceHandle: input.LLMServiceHandle,
+		Owner:            input.UserHandle,
 		Endpoint:         input.Body.Endpoint,
+		Description:      pgtype.Text{String: input.Body.Description, Valid: true},
 		ApiKey:           pgtype.Text{String: input.Body.APIKey, Valid: true},
 		ApiStandard:      input.Body.ApiStandard,
+		Model:            input.Body.Model,
+		Dimensions:       int32(input.Body.Dimensions),
 	})
 	if err != nil {
 		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to upload llm service. %v", err))
@@ -54,6 +57,7 @@ func putLLMFunc(ctx context.Context, input *models.PutLLMRequest) (*models.Uploa
 	// Build response
 	response := &models.UploadLLMResponse{}
 	response.Body.LLMServiceHandle = llm.LLMServiceHandle
+	response.Body.LLMServiceID = int(llm.LLMServiceID)
 
 	return response, nil
 }
@@ -95,12 +99,16 @@ func getLLMFunc(ctx context.Context, input *models.GetLLMRequest) (*models.GetLL
 	// Build response
 	ls := models.LLMService{
 		LLMServiceHandle: llm.LLMServiceHandle,
+		LLMServiceID:     int(llm.LLMServiceID),
 		Endpoint:         llm.Endpoint,
+		Description:      llm.Description.String,
 		APIKey:           llm.ApiKey.String,
 		ApiStandard:      llm.ApiStandard,
+		Model:            llm.Model,
+		Dimensions:       int32(llm.Dimensions),
 	}
 	response := &models.GetLLMResponse{}
-	response.Body.LLMService = ls
+	response.Body = ls
 
 	return response, nil
 }
@@ -123,25 +131,29 @@ func getUserLLMsFunc(ctx context.Context, input *models.GetUserLLMsRequest) (*mo
 
 	// Run the query
 	queries := database.New(pool)
-	llm, err := queries.GetLLMsByUser(ctx, database.GetLLMsByUserParams{Owner: input.UserHandle, Limit: int32(input.Limit), Offset: int32(input.Offset)})
+	llms, err := queries.GetLLMsByUser(ctx, database.GetLLMsByUserParams{UserHandle: input.UserHandle, Limit: int32(input.Limit), Offset: int32(input.Offset)})
 	if err != nil {
 		if err.Error() == "no rows in result set" {
 			return nil, huma.Error404NotFound(fmt.Sprintf("no llm services for %s found", input.UserHandle))
 		}
 		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to retrieve llm services. %v", err))
 	}
-	if len(llm) == 0 {
+	if len(llms) == 0 {
 		return nil, huma.Error404NotFound(fmt.Sprintf("no llm services for %s found", input.UserHandle))
 	}
 
 	// Build response
 	ls := []models.LLMService{}
-	for _, l := range llm {
+	for _, llm := range llms {
 		ls = append(ls, models.LLMService{
-			LLMServiceHandle: l.LLMServiceHandle,
-			Endpoint:         l.Endpoint,
-			APIKey:           l.ApiKey.String,
-			ApiStandard:      l.ApiStandard,
+			LLMServiceHandle: llm.LLMServiceHandle,
+			LLMServiceID:     int(llm.LLMServiceID),
+			Endpoint:         llm.Endpoint,
+			Description:      llm.Description.String,
+			APIKey:           llm.ApiKey.String,
+			ApiStandard:      llm.ApiStandard,
+			Model:            llm.Model,
+			Dimensions:       int32(llm.Dimensions),
 		})
 	}
 	response := &models.GetUserLLMsResponse{}

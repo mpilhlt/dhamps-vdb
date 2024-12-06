@@ -113,7 +113,7 @@ func TestProjectsFunc(t *testing.T) {
 			requestPath:  "/projects/alice/test1",
 			bodyPath:     "",
 			apiKey:       aliceAPIKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/GetProjectResponseBody.json\",\n  \"project\": {\n    \"project_id\": 1,\n    \"project_handle\": \"test1\",\n    \"description\": \"This is a test project\",\n    \"authorizedReaders\": [\n      \"alice\"\n    ]\n  }\n}\n",
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/Project.json\",\n  \"project_id\": 1,\n  \"project_handle\": \"test1\",\n  \"description\": \"This is a test project\",\n  \"authorizedReaders\": [\n    \"alice\"\n  ]\n}\n",
 			expectStatus: http.StatusOK,
 		},
 		{

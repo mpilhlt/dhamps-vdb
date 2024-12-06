@@ -91,7 +91,7 @@ func postUserFunc(ctx context.Context, input *models.PostUserRequest) (*models.U
 	return u, nil
 }
 
-// Get all users
+// Get all users (handles only)
 func getUsersFunc(ctx context.Context, input *models.GetUsersRequest) (*models.GetUsersResponse, error) {
 	// Get the database connection pool from the context
 	pool, err := GetDBPool(ctx)
@@ -147,12 +147,50 @@ func getUserFunc(ctx context.Context, input *models.GetUserRequest) (*models.Get
 		return nil, huma.Error404NotFound(fmt.Sprintf("user %s not found", input.UserHandle))
 	}
 
+	// Get projects the user is a member of
+	projects := models.ProjectMemberships{}
+	ps, err := queries.GetProjectsByUser(ctx, database.GetProjectsByUserParams{UserHandle: input.UserHandle})
+	if err != nil {
+		if err.Error() == "no rows in result set" {
+			fmt.Printf("Warning: No LLM Services registered for user %s.", input.UserHandle)
+		} else {
+			fmt.Printf("Warning: Unable to get list of LLM Services for user %s. %v", input.UserHandle, err)
+		}
+	}
+	for _, project := range ps {
+		projects = append(projects, models.ProjectMembership{
+			ProjectHandle: project.ProjectHandle,
+			ProjectOwner:  project.Owner,
+			Role:          project.Role,
+		})
+	}
+
+	// Get LLM services the user is a member of
+	llmservices := models.LLMMemberships{}
+	ls, err := queries.GetLLMsByUser(ctx, database.GetLLMsByUserParams{UserHandle: input.UserHandle})
+	if err != nil {
+		if err.Error() == "no rows in result set" {
+			fmt.Printf("Warning: No projects registered for user %s.", input.UserHandle)
+		} else {
+			fmt.Printf("Warning: Unable to get list of projects for user %s. %v", input.UserHandle, err)
+		}
+	}
+	for _, llmservice := range ls {
+		llmservices = append(llmservices, models.LLMMembership{
+			LLMServiceHandle: llmservice.LLMServiceHandle,
+			LLMServiceOwner:  llmservice.Owner,
+			Role:             llmservice.Role,
+		})
+	}
+
 	// Build the response
 	returnUser := &models.User{
-		UserHandle: u.UserHandle,
-		Name:       u.Name.String,
-		Email:      u.Email,
-		APIKey:     u.VdbApiKey,
+		UserHandle:  u.UserHandle,
+		Name:        u.Name.String,
+		Email:       u.Email,
+		APIKey:      u.VdbApiKey,
+		Projects:    projects,
+		LLMServices: llmservices,
 	}
 	response := &models.GetUserResponse{}
 	response.Body = *returnUser

@@ -75,9 +75,7 @@ type GetProjectRequest struct {
 
 type GetProjectResponse struct {
 	Header []http.Header `json:"header,omitempty" doc:"Response headers"`
-	Body   struct {
-		Project Project `json:"project" doc:"Project information"`
-	}
+	Body   Project       `json:"project" doc:"Project information"`
 }
 
 // Delete project

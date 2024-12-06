@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -35,10 +36,10 @@ func getUserProj(ctx context.Context, user, project string) (string, string, int
 		}
 		return "", "", 0, huma.Error500InternalServerError(fmt.Sprintf("unable to get %s's project %s. %v", user, project, err))
 	}
-	if p.Body.Project.ProjectHandle != project {
+	if p.Body.ProjectHandle != project {
 		return "", "", 0, huma.Error404NotFound(fmt.Sprintf("%s's project %s not found", user, project))
 	}
-	return u.Body.UserHandle, p.Body.Project.ProjectHandle, int32(p.Body.Project.ProjectID), nil
+	return u.Body.UserHandle, p.Body.ProjectHandle, int32(p.Body.ProjectID), nil
 }
 
 // Create a new embeddings
@@ -48,6 +49,13 @@ func postProjEmbeddingsFunc(ctx context.Context, input *models.PostProjEmbedding
 	if err != nil {
 		return nil, err
 	}
+
+	// Check if llm service exists
+	llm, err := getLLMFunc(ctx, &models.GetLLMRequest{UserHandle: input.UserHandle, LLMServiceHandle: input.Body.Embeddings[0].LLMServiceHandle})
+	if err != nil {
+		return nil, err
+	}
+	llmid := int32(llm.Body.LLMServiceID)
 
 	// Get the database connection pool from the context
 	pool, err := GetDBPool(ctx)
@@ -64,12 +72,11 @@ func postProjEmbeddingsFunc(ctx context.Context, input *models.PostProjEmbedding
 			TextID:       pgtype.Text{String: embedding.TextID, Valid: true},
 			Owner:        input.UserHandle,
 			ProjectID:    pid,
-			LLMServiceID: embedding.LLMServiceID,
+			LLMServiceID: llmid,
 			Text:         pgtype.Text{String: embedding.Text, Valid: true},
 			Vector:       pgvector.NewHalfVector(embedding.Vector),
 			VectorDim:    embedding.VectorDim,
-			// TODO: add metadata handling
-			// Metadata: embedding.Metadata,
+			Metadata:     embedding.Metadata,
 		}
 		// Run the queries (upload embeddings)
 		result, err := queries.UpsertEmbeddings(ctx, params)
@@ -113,29 +120,35 @@ func getProjEmbeddingsFunc(ctx context.Context, input *models.GetProjEmbeddingsR
 
 	// Run the query
 	queries := database.New(pool)
-	embeddings, err := queries.GetEmbeddingsByProject(ctx, params)
+	embeddingss, err := queries.GetEmbeddingsByProject(ctx, params)
 	if err != nil {
 		if err.Error() == "no rows in result set" {
 			return nil, huma.Error404NotFound(fmt.Sprintf("no embeddings found for user %s, project %s.", input.UserHandle, input.ProjectHandle))
 		}
 		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get embeddings for user %s, project %s. %v", input.UserHandle, input.ProjectHandle, err))
 	}
-	if len(embeddings) == 0 {
+	if len(embeddingss) == 0 {
 		return nil, huma.Error404NotFound(fmt.Sprintf("no embeddings found for user %s, project %s.", input.UserHandle, input.ProjectHandle))
 	}
 
 	// Build the response
-	e := []models.Embeddings{}
-	for _, embedding := range embeddings {
-		e = append(e, models.Embeddings{
-			TextID:        embedding.TextID.String,
-			UserHandle:    embedding.Owner,
-			ProjectHandle: embedding.ProjectHandle,
-			ProjectID:     int(embedding.ProjectID),
-			Vector:        embedding.Vector.Slice(),
-			VectorDim:     embedding.VectorDim,
-			LLMServiceID:  embedding.LLMServiceID,
-			Text:          embedding.Text.String,
+	e := []models.EmbeddingsDatabase{}
+	for _, embeddings := range embeddingss {
+		md := map[string]interface{}{}
+		err = json.Unmarshal(embeddings.Metadata, &md)
+		if err != nil {
+			return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to unmarshal metadata for user %s, project %s, id %s. Metadata: %s. %v", input.UserHandle, input.ProjectHandle, embeddings.TextID.String, string(embeddings.Metadata), err))
+		}
+		e = append(e, models.EmbeddingsDatabase{
+			TextID:           embeddings.TextID.String,
+			UserHandle:       embeddings.Owner,
+			ProjectHandle:    embeddings.ProjectHandle,
+			ProjectID:        int(embeddings.ProjectID),
+			LLMServiceHandle: embeddings.LLMServiceHandle,
+			Vector:           embeddings.Vector.Slice(),
+			VectorDim:        embeddings.VectorDim,
+			Text:             embeddings.Text.String,
+			Metadata:         md,
 		})
 	}
 	response := &models.GetProjEmbeddingsResponse{}
@@ -218,12 +231,21 @@ func getDocEmbeddingsFunc(ctx context.Context, input *models.GetDocEmbeddingsReq
 	}
 
 	// Build the response
-	e := models.Embeddings{
-		TextID:       embeddings.TextID.String,
-		Vector:       embeddings.Vector.Slice(),
-		VectorDim:    embeddings.VectorDim,
-		LLMServiceID: embeddings.LLMServiceID,
-		Text:         embeddings.Text.String,
+	md := map[string]interface{}{}
+	err = json.Unmarshal(embeddings.Metadata, &md)
+	if err != nil {
+		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to unmarshal metadata for user %s, project %s, id %s. Metadata: %s. %v", input.UserHandle, input.ProjectHandle, embeddings.TextID.String, string(embeddings.Metadata), err))
+	}
+	e := models.EmbeddingsDatabase{
+		TextID:           embeddings.TextID.String,
+		UserHandle:       embeddings.Owner,
+		ProjectHandle:    embeddings.ProjectHandle,
+		ProjectID:        int(embeddings.ProjectID),
+		LLMServiceHandle: embeddings.LLMServiceHandle,
+		Vector:           embeddings.Vector.Slice(),
+		VectorDim:        embeddings.VectorDim,
+		Text:             embeddings.Text.String,
+		Metadata:         md,
 	}
 	response := &models.GetDocEmbeddingsResponse{}
 	response.Body = e

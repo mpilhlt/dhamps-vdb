@@ -194,7 +194,7 @@ func getProjectFunc(ctx context.Context, input *models.GetProjectRequest) (*mode
 
 	// Build the response
 	response := &models.GetProjectResponse{}
-	response.Body.Project = models.Project{
+	response.Body = models.Project{
 		ProjectID:         int(p.ProjectID),
 		ProjectHandle:     p.ProjectHandle,
 		Description:       p.Description.String,

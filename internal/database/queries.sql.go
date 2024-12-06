@@ -180,7 +180,7 @@ func (q *Queries) GetAPIStandards(ctx context.Context, arg GetAPIStandardsParams
 }
 
 const getEmbeddingsByProject = `-- name: GetEmbeddingsByProject :many
-SELECT embeddings.embeddings_id, embeddings.text_id, embeddings.owner, embeddings.project_id, embeddings.llm_service_id, embeddings.text, embeddings.vector, embeddings.vector_dim, embeddings.created_at, embeddings.updated_at, projects."project_handle", llm_services."llm_service_handle"
+SELECT embeddings.embeddings_id, embeddings.text_id, embeddings.owner, embeddings.project_id, embeddings.llm_service_id, embeddings.text, embeddings.vector, embeddings.vector_dim, embeddings.metadata, embeddings.created_at, embeddings.updated_at, projects."project_handle", llm_services."llm_service_handle"
 FROM embeddings
 JOIN llm_services
 ON llm_services."llm_service_id" = embeddings."llm_service_id"
@@ -207,6 +207,7 @@ type GetEmbeddingsByProjectRow struct {
 	Text             pgtype.Text            `db:"text" json:"text"`
 	Vector           pgvector_go.HalfVector `db:"vector" json:"vector"`
 	VectorDim        int32                  `db:"vector_dim" json:"vector_dim"`
+	Metadata         []byte                 `db:"metadata" json:"metadata"`
 	CreatedAt        pgtype.Timestamp       `db:"created_at" json:"created_at"`
 	UpdatedAt        pgtype.Timestamp       `db:"updated_at" json:"updated_at"`
 	ProjectHandle    string                 `db:"project_handle" json:"project_handle"`
@@ -236,6 +237,7 @@ func (q *Queries) GetEmbeddingsByProject(ctx context.Context, arg GetEmbeddingsB
 			&i.Text,
 			&i.Vector,
 			&i.VectorDim,
+			&i.Metadata,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.ProjectHandle,
@@ -374,27 +376,44 @@ func (q *Queries) GetLLMsByProject(ctx context.Context, arg GetLLMsByProjectPara
 }
 
 const getLLMsByUser = `-- name: GetLLMsByUser :many
-SELECT llm_services.llm_service_id, llm_services.llm_service_handle, llm_services.owner, llm_services.endpoint, llm_services.description, llm_services.api_key, llm_services.api_standard, llm_services.model, llm_services.dimensions, llm_services.created_at, llm_services.updated_at
+SELECT llm_services.llm_service_id, llm_services.llm_service_handle, llm_services.owner, llm_services.endpoint, llm_services.description, llm_services.api_key, llm_services.api_standard, llm_services.model, llm_services.dimensions, llm_services.created_at, llm_services.updated_at, users_llm_services."role"
 FROM llm_services
-WHERE llm_services."owner" = $1
+JOIN users_llm_services
+ON llm_services."llm_service_id" = users_llm_services."llm_service_id"
+WHERE users_llm_services."user_handle" = $1
 ORDER BY llm_services."llm_service_handle" ASC LIMIT $2 OFFSET $3
 `
 
 type GetLLMsByUserParams struct {
-	Owner  string `db:"owner" json:"owner"`
-	Limit  int32  `db:"limit" json:"limit"`
-	Offset int32  `db:"offset" json:"offset"`
+	UserHandle string `db:"user_handle" json:"user_handle"`
+	Limit      int32  `db:"limit" json:"limit"`
+	Offset     int32  `db:"offset" json:"offset"`
 }
 
-func (q *Queries) GetLLMsByUser(ctx context.Context, arg GetLLMsByUserParams) ([]LlmService, error) {
-	rows, err := q.db.Query(ctx, getLLMsByUser, arg.Owner, arg.Limit, arg.Offset)
+type GetLLMsByUserRow struct {
+	LLMServiceID     int32            `db:"llm_service_id" json:"llm_service_id"`
+	LLMServiceHandle string           `db:"llm_service_handle" json:"llm_service_handle"`
+	Owner            string           `db:"owner" json:"owner"`
+	Endpoint         string           `db:"endpoint" json:"endpoint"`
+	Description      pgtype.Text      `db:"description" json:"description"`
+	ApiKey           pgtype.Text      `db:"api_key" json:"api_key"`
+	ApiStandard      string           `db:"api_standard" json:"api_standard"`
+	Model            string           `db:"model" json:"model"`
+	Dimensions       int32            `db:"dimensions" json:"dimensions"`
+	CreatedAt        pgtype.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt        pgtype.Timestamp `db:"updated_at" json:"updated_at"`
+	Role             string           `db:"role" json:"role"`
+}
+
+func (q *Queries) GetLLMsByUser(ctx context.Context, arg GetLLMsByUserParams) ([]GetLLMsByUserRow, error) {
+	rows, err := q.db.Query(ctx, getLLMsByUser, arg.UserHandle, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []LlmService
+	var items []GetLLMsByUserRow
 	for rows.Next() {
-		var i LlmService
+		var i GetLLMsByUserRow
 		if err := rows.Scan(
 			&i.LLMServiceID,
 			&i.LLMServiceHandle,
@@ -407,6 +426,7 @@ func (q *Queries) GetLLMsByUser(ctx context.Context, arg GetLLMsByUserParams) ([
 			&i.Dimensions,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Role,
 		); err != nil {
 			return nil, err
 		}
@@ -757,7 +777,7 @@ func (q *Queries) RetrieveAPIStandard(ctx context.Context, apiStandardHandle str
 }
 
 const retrieveEmbeddings = `-- name: RetrieveEmbeddings :one
-SELECT embeddings.embeddings_id, embeddings.text_id, embeddings.owner, embeddings.project_id, embeddings.llm_service_id, embeddings.text, embeddings.vector, embeddings.vector_dim, embeddings.created_at, embeddings.updated_at, projects."project_handle", llm_services."llm_service_handle"
+SELECT embeddings.embeddings_id, embeddings.text_id, embeddings.owner, embeddings.project_id, embeddings.llm_service_id, embeddings.text, embeddings.vector, embeddings.vector_dim, embeddings.metadata, embeddings.created_at, embeddings.updated_at, projects."project_handle", llm_services."llm_service_handle"
 FROM embeddings
 JOIN llm_services
 ON embeddings."llm_service_id" = llm_services."llm_service_id"
@@ -784,6 +804,7 @@ type RetrieveEmbeddingsRow struct {
 	Text             pgtype.Text            `db:"text" json:"text"`
 	Vector           pgvector_go.HalfVector `db:"vector" json:"vector"`
 	VectorDim        int32                  `db:"vector_dim" json:"vector_dim"`
+	Metadata         []byte                 `db:"metadata" json:"metadata"`
 	CreatedAt        pgtype.Timestamp       `db:"created_at" json:"created_at"`
 	UpdatedAt        pgtype.Timestamp       `db:"updated_at" json:"updated_at"`
 	ProjectHandle    string                 `db:"project_handle" json:"project_handle"`
@@ -802,6 +823,7 @@ func (q *Queries) RetrieveEmbeddings(ctx context.Context, arg RetrieveEmbeddings
 		&i.Text,
 		&i.Vector,
 		&i.VectorDim,
+		&i.Metadata,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ProjectHandle,
@@ -927,14 +949,15 @@ func (q *Queries) UpsertAPIStandard(ctx context.Context, arg UpsertAPIStandardPa
 const upsertEmbeddings = `-- name: UpsertEmbeddings :one
 INSERT
 INTO embeddings (
-  "text_id", "owner", "project_id", "llm_service_id", "text", "vector", "vector_dim", "created_at", "updated_at"
+  "text_id", "owner", "project_id", "llm_service_id", "text", "vector", "vector_dim", "metadata", "created_at", "updated_at"
 ) VALUES (
-  $1, $2, $3, $4, $5, $6, $7, NOW(), NOW()
+  $1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW()
 )
 ON CONFLICT ("text_id", "owner", "project_id", "llm_service_id") DO UPDATE SET
   "text" = $5,
   "vector" = $6,
   "vector_dim" = $7,
+  "metadata" = $8,
   "updated_at" = NOW()
 RETURNING "embeddings_id", "text_id", "owner", "project_id", "llm_service_id"
 `
@@ -947,6 +970,7 @@ type UpsertEmbeddingsParams struct {
 	Text         pgtype.Text            `db:"text" json:"text"`
 	Vector       pgvector_go.HalfVector `db:"vector" json:"vector"`
 	VectorDim    int32                  `db:"vector_dim" json:"vector_dim"`
+	Metadata     []byte                 `db:"metadata" json:"metadata"`
 }
 
 type UpsertEmbeddingsRow struct {
@@ -966,6 +990,7 @@ func (q *Queries) UpsertEmbeddings(ctx context.Context, arg UpsertEmbeddingsPara
 		arg.Text,
 		arg.Vector,
 		arg.VectorDim,
+		arg.Metadata,
 	)
 	var i UpsertEmbeddingsRow
 	err := row.Scan(

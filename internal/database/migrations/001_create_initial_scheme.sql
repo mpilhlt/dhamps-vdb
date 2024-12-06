@@ -118,8 +118,7 @@ CREATE TABLE IF NOT EXISTS embeddings(
   "text" TEXT,
   "vector" halfvec NOT NULL,
   "vector_dim" INTEGER NOT NULL,
-  -- TODO: add metadata handling
-  -- "metadata" jsonb,
+  "metadata" jsonb,
   "created_at" TIMESTAMP NOT NULL,
   "updated_at" TIMESTAMP NOT NULL,
   UNIQUE ("text_id", "owner", "project_id", "llm_service_id")

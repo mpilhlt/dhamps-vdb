@@ -4,12 +4,29 @@ import "net/http"
 
 // User represents a user account.
 type User struct {
-	UserHandle string    `json:"user_handle"      doc:"User handle" maxLength:"20"  minLength:"3" example:"jdoe"`
-	Name       string    `json:"name,omitempty"   doc:"User name"   maxLength:"50"                example:"Jane Doe"`
-	Email      string    `json:"email"            doc:"User email"  maxLength:"100" minLength:"5" example:"foo@bar.com"`
-	APIKey     string    `json:"apiKey,omitempty" doc:"User API key for dhamps-vdb API" maxLength:"64" minLength:"64" example:"1234567890123456789012345678901212345678901234567890123456789012"`
-	Projects   []Project `json:"projects,omitempty" doc:"Projects that the user is a member of"`
+	UserHandle  string             `json:"user_handle"      doc:"User handle" maxLength:"20"  minLength:"3" example:"jdoe"`
+	Name        string             `json:"name,omitempty"   doc:"User name"   maxLength:"50"                example:"Jane Doe"`
+	Email       string             `json:"email"            doc:"User email"  maxLength:"100" minLength:"5" example:"foo@bar.com"`
+	APIKey      string             `json:"apiKey,omitempty" doc:"User API key for dhamps-vdb API" maxLength:"64" minLength:"64" example:"1234567890123456789012345678901212345678901234567890123456789012"`
+	Projects    ProjectMemberships `json:"projects,omitempty" doc:"Projects that the user is a member of"`
+	LLMServices LLMMemberships     `json:"llm_services,omitempty" doc:"LLM services that the user is a member of"`
 }
+
+type LLMMembership struct {
+	LLMServiceHandle string `json:"llm_service" doc:"LLM service"`
+	LLMServiceOwner  string `json:"owner" doc:"Owner of the LLM service"`
+	Role             string `json:"role" doc:"Role of the user in the LLM service"`
+}
+
+type LLMMemberships []LLMMembership
+
+type ProjectMembership struct {
+	ProjectHandle string `json:"project" doc:"Project"`
+	ProjectOwner  string `json:"owner" doc:"Owner of the project"`
+	Role          string `json:"role" doc:"Role of the user in the project"`
+}
+
+type ProjectMemberships []ProjectMembership
 
 // Request and Response structs for the user administration API
 // The request structs must be structs with fields for the request path/query/header/cookie parameters and/or body.

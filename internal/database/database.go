@@ -22,7 +22,7 @@ func InitDB(options *models.Options) (*pgxpool.Pool, error) {
 		options.DBUser, options.DBPassword, options.DBHost, options.DBPort, options.DBName)
 
 	// Connect to the database, first without concurrency to check the schema version
-	ctx_cancel, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx_cancel, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	err := VerifySchema(ctx_cancel, url)
 	if err != nil {
@@ -32,26 +32,42 @@ func InitDB(options *models.Options) (*pgxpool.Pool, error) {
 
 	// For the actual application, connect to the db using a connection pool
 	ctx_bg := context.Background()
-	pool, err := pgxpool.New(ctx_bg, url)
+	// pool, err := pgxpool.New(ctx_bg, url)
+
+	cfg, err := pgxpool.ParseConfig(url)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse connection string: %w", err)
+	}
+
+	// Set application name for easier identification
+	cfg.ConnConfig.RuntimeParams["application_name"] = "DHaMPS-VDB"
+
+	// Configure logging
+	// cfg.ConnConfig.Logger = logrusadapter.NewLogger(logger)
+	// cfg.ConnConfig.LogLevel = pgxpool.LogLevelDebug
+
+	// Connect to the pool
+	pool, err := pgxpool.NewWithConfig(ctx_bg, cfg)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "EEE Unable to get connection pool from database: %v\n", err)
 		return nil, err
 	}
-	defer pool.Close()
 	fmt.Printf("    Successfully got connection pool from postgres database: %s@%s:%d/%s.\n", // alternatively, print conn.ConnInfo().DatabaseName
 		options.DBUser, options.DBHost, options.DBPort, options.DBName)
 
 	// Run test query (get all users)
-	conn, err := pool.Acquire(ctx_bg)
+	conn, err := pool.Acquire(ctx_cancel)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "EEE Unable to get connection from pool: %v\n", err)
 		return nil, err
 	}
-	err = testQuery(ctx_bg, conn)
+	defer conn.Release()
+	err = testQuery(ctx_cancel, conn)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "EEE Unable to run test query: %v\n", err)
 		return nil, err
 	}
+	// conn.Conn().Close(ctx_cancel)
 
 	// Done, everything has been set up. Return connection pool.
 	println("--- Database up and initialized.")
@@ -111,6 +127,8 @@ func testQuery(ctx context.Context, conn *pgxpool.Conn) error {
 		fmt.Fprintf(os.Stderr, "EEE Unable to get users: %v\n", err)
 		return err
 	}
-	println(users)
+	for _, u := range users {
+		fmt.Printf("    User: %v\n", u)
+	}
 	return nil
 }

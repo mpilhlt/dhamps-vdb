@@ -6,13 +6,14 @@ import (
 
 // LLMService is a service for managing LLM data.
 type LLMService struct {
+	LLMServiceID     int    `json:"llm_service_id,omitempty" doc:"Unique service identifier" example:"153"`
 	LLMServiceHandle string `json:"llm_service_handle" minLength:"3" maxLength:"20" example:"GPT-4 API" doc:"Service name"`
 	Endpoint         string `json:"endpoint" example:"https://api.openai.com/v1/embeddings" doc:"Service endpoint"`
 	Description      string `json:"description,omitempty" doc:"Service description"`
 	APIKey           string `json:"api_key,omitempty" example:"12345678901234567890123456789012" doc:"Authentication token for the service"`
-	ApiStandard      string `json:"api_standard" enum:"openai,ollama,custom" default:"openai" example:"openai" doc:"Standard of the API"`
-	LLModel          string `json:"model" example:"text-embedding-3-large" doc:"Model name"`
-	Dimensions       int    `json:"dimensions" example:"3072" doc:"Number of dimensions in the embeddings"`
+	ApiStandard      string `json:"api_standard" default:"openai" example:"openai" doc:"Standard of the API"`
+	Model            string `json:"model" example:"text-embedding-3-large" doc:"Model name"`
+	Dimensions       int32  `json:"dimensions" example:"3072" doc:"Number of dimensions in the embeddings"`
 	// ContextData      string `json:"contextData,omitempty" doc:"Context data that can be fed to the LLM service. Available in the request template as contextData variable."`
 	// SystemPrompt     string `json:"systemPrompt,omitempty" example:"Return the embeddings for the following text:" doc:"System prompt for requests to the service. Available in the request template as systemPrompt variable."`
 	// RequestTemplate  string `json:"requestTemplate,omitempty" doc:"Request template for the service. Can use input, contextData, and systemPrompt variables." example:"{\"input\": \"{{ input }}\", \"model\": \"text-embedding-3-small\"}"`
@@ -43,6 +44,7 @@ type UploadLLMResponse struct {
 	Header []http.Header `json:"header,omitempty" doc:"Response headers"`
 	Body   struct {
 		LLMServiceHandle string `json:"llm_service_handle" doc:"Handle of created or updated LLM service"`
+		LLMServiceID     int    `json:"llm_service_id" doc:"System identifier of created or updated LLM service"`
 	}
 }
 
@@ -74,9 +76,7 @@ type GetLLMRequest struct {
 
 type GetLLMResponse struct {
 	Header []http.Header `json:"header,omitempty" doc:"Response headers"`
-	Body   struct {
-		LLMService LLMService `json:"llm_service" doc:"LLM Service"`
-	}
+	Body   LLMService    `json:"llm_service" doc:"LLM Service"`
 }
 
 // Delete LLM service

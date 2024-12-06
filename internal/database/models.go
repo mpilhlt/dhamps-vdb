@@ -27,6 +27,7 @@ type Embedding struct {
 	Text         pgtype.Text            `db:"text" json:"text"`
 	Vector       pgvector_go.HalfVector `db:"vector" json:"vector"`
 	VectorDim    int32                  `db:"vector_dim" json:"vector_dim"`
+	Metadata     []byte                 `db:"metadata" json:"metadata"`
 	CreatedAt    pgtype.Timestamp       `db:"created_at" json:"created_at"`
 	UpdatedAt    pgtype.Timestamp       `db:"updated_at" json:"updated_at"`
 }

@@ -75,7 +75,7 @@ func TestLLMServicesFunc(t *testing.T) {
 			requestPath:  "/llm-services/alice/openai-large",
 			bodyPath:     "../../testdata/valid_llm_service_openai-large-full.json",
 			apiKey:       aliceAPIKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/UploadLLMResponseBody.json\",\n  \"llm_service_handle\": \"openai-large\"\n}\n",
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/UploadLLMResponseBody.json\",\n  \"llm_service_handle\": \"openai-large\",\n  \"llm_service_id\": 1\n}\n",
 			expectStatus: http.StatusCreated,
 		},
 		{
@@ -93,7 +93,7 @@ func TestLLMServicesFunc(t *testing.T) {
 			requestPath:  "/llm-services/alice",
 			bodyPath:     "../../testdata/valid_llm_service_openai-large-full.json",
 			apiKey:       aliceAPIKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/UploadLLMResponseBody.json\",\n  \"llm_service_handle\": \"openai-large\"\n}\n",
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/UploadLLMResponseBody.json\",\n  \"llm_service_handle\": \"openai-large\",\n  \"llm_service_id\": 1\n}\n",
 			expectStatus: http.StatusCreated,
 		},
 		{
@@ -102,7 +102,7 @@ func TestLLMServicesFunc(t *testing.T) {
 			requestPath:  "/llm-services/alice",
 			bodyPath:     "",
 			apiKey:       options.AdminKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/GetUserLLMsResponseBody.json\",\n  \"llm_service\": [\n    {\n      \"llm_service_handle\": \"openai-large\",\n      \"endpoint\": \"https://api.openai.com/v1/embeddings\",\n      \"api_key\": \"0123456789\",\n      \"api_standard\": \"openai\",\n      \"model\": \"\",\n      \"dimensions\": 0\n    }\n  ]\n}\n",
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/GetUserLLMsResponseBody.json\",\n  \"llm_service\": [\n    {\n      \"llm_service_id\": 1,\n      \"llm_service_handle\": \"openai-large\",\n      \"endpoint\": \"https://api.openai.com/v1/embeddings\",\n      \"description\": \"My OpenAI full text-embedding-3-large service\",\n      \"api_key\": \"0123456789\",\n      \"api_standard\": \"openai\",\n      \"model\": \"text-embedding-3-large\",\n      \"dimensions\": 3072\n    }\n  ]\n}\n",
 			expectStatus: http.StatusOK,
 		},
 		{
@@ -111,7 +111,7 @@ func TestLLMServicesFunc(t *testing.T) {
 			requestPath:  "/llm-services/alice",
 			bodyPath:     "",
 			apiKey:       aliceAPIKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/GetUserLLMsResponseBody.json\",\n  \"llm_service\": [\n    {\n      \"llm_service_handle\": \"openai-large\",\n      \"endpoint\": \"https://api.openai.com/v1/embeddings\",\n      \"api_key\": \"0123456789\",\n      \"api_standard\": \"openai\",\n      \"model\": \"\",\n      \"dimensions\": 0\n    }\n  ]\n}\n",
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/GetUserLLMsResponseBody.json\",\n  \"llm_service\": [\n    {\n      \"llm_service_id\": 1,\n      \"llm_service_handle\": \"openai-large\",\n      \"endpoint\": \"https://api.openai.com/v1/embeddings\",\n      \"description\": \"My OpenAI full text-embedding-3-large service\",\n      \"api_key\": \"0123456789\",\n      \"api_standard\": \"openai\",\n      \"model\": \"text-embedding-3-large\",\n      \"dimensions\": 3072\n    }\n  ]\n}\n",
 			expectStatus: http.StatusOK,
 		},
 		{
@@ -156,7 +156,7 @@ func TestLLMServicesFunc(t *testing.T) {
 			requestPath:  "/llm-services/alice/openai-large",
 			bodyPath:     "",
 			apiKey:       aliceAPIKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/GetLLMResponseBody.json\",\n  \"llm_service\": {\n    \"llm_service_handle\": \"openai-large\",\n    \"endpoint\": \"https://api.openai.com/v1/embeddings\",\n    \"api_key\": \"0123456789\",\n    \"api_standard\": \"openai\",\n    \"model\": \"\",\n    \"dimensions\": 0\n  }\n}\n",
+			expectBody:   "{\n  \"llm_service_id\": 1,\n  \"llm_service_handle\": \"openai-large\",\n  \"endpoint\": \"https://api.openai.com/v1/embeddings\",\n  \"description\": \"My OpenAI full text-embedding-3-large service\",\n  \"api_key\": \"0123456789\",\n  \"api_standard\": \"openai\",\n  \"model\": \"text-embedding-3-large\",\n  \"dimensions\": 3072\n}\n",
 			expectStatus: http.StatusOK,
 		},
 		{

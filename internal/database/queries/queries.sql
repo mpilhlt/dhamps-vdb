@@ -169,23 +169,25 @@ WHERE projects."owner" = $1
 ORDER BY llm_services."llm_service_handle" ASC LIMIT $3 OFFSET $4;
 
 -- name: GetLLMsByUser :many
-SELECT llm_services.*
+SELECT llm_services.*, users_llm_services."role"
 FROM llm_services
-WHERE llm_services."owner" = $1
+JOIN users_llm_services
+ON llm_services."llm_service_id" = users_llm_services."llm_service_id"
+WHERE users_llm_services."user_handle" = $1
 ORDER BY llm_services."llm_service_handle" ASC LIMIT $2 OFFSET $3;
-
 
 -- name: UpsertEmbeddings :one
 INSERT
 INTO embeddings (
-  "text_id", "owner", "project_id", "llm_service_id", "text", "vector", "vector_dim", "created_at", "updated_at"
+  "text_id", "owner", "project_id", "llm_service_id", "text", "vector", "vector_dim", "metadata", "created_at", "updated_at"
 ) VALUES (
-  $1, $2, $3, $4, $5, $6, $7, NOW(), NOW()
+  $1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW()
 )
 ON CONFLICT ("text_id", "owner", "project_id", "llm_service_id") DO UPDATE SET
   "text" = $5,
   "vector" = $6,
   "vector_dim" = $7,
+  "metadata" = $8,
   "updated_at" = NOW()
 RETURNING "embeddings_id", "text_id", "owner", "project_id", "llm_service_id";
 
@@ -283,6 +285,7 @@ WHERE e1."text_id" = $1
   AND e2."embeddings_id" != e1."embeddings_id"
 ORDER BY e1.vector <=> e2.vector
 LIMIT $2 OFFSET $3;
+
 
 -- name: ResetAllSerials :exec
 DO $$
