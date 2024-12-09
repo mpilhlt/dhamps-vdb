@@ -13,7 +13,7 @@ type User struct {
 }
 
 type LLMMembership struct {
-	LLMServiceHandle string `json:"llm_service" doc:"LLM service"`
+	LLMServiceHandle string `json:"llm_service_handle" doc:"LLM service"`
 	LLMServiceOwner  string `json:"owner" doc:"Owner of the LLM service"`
 	Role             string `json:"role" doc:"Role of the user in the LLM service"`
 }
@@ -21,7 +21,7 @@ type LLMMembership struct {
 type LLMMemberships []LLMMembership
 
 type ProjectMembership struct {
-	ProjectHandle string `json:"project" doc:"Project"`
+	ProjectHandle string `json:"project_handle" doc:"Project"`
 	ProjectOwner  string `json:"owner" doc:"Owner of the project"`
 	Role          string `json:"role" doc:"Role of the user in the project"`
 }

@@ -152,15 +152,15 @@ type GetAPIStandardsParams struct {
 	Offset int32 `db:"offset" json:"offset"`
 }
 
-func (q *Queries) GetAPIStandards(ctx context.Context, arg GetAPIStandardsParams) ([]ApiStandard, error) {
+func (q *Queries) GetAPIStandards(ctx context.Context, arg GetAPIStandardsParams) ([]APIStandard, error) {
 	rows, err := q.db.Query(ctx, getAPIStandards, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ApiStandard
+	var items []APIStandard
 	for rows.Next() {
-		var i ApiStandard
+		var i APIStandard
 		if err := rows.Scan(
 			&i.APIStandardHandle,
 			&i.Description,
@@ -289,7 +289,7 @@ type GetKeysByLinkedUsersParams struct {
 type GetKeysByLinkedUsersRow struct {
 	UserHandle string `db:"user_handle" json:"user_handle"`
 	Role       string `db:"role" json:"role"`
-	VdbApiKey  string `db:"vdb_api_key" json:"vdb_api_key"`
+	VdbAPIKey  string `db:"vdb_api_key" json:"vdb_api_key"`
 }
 
 // SELECT users."user_handle", users_projects."role", encode(users."vdb_api_key", 'hex') AS "vdb_api_key"
@@ -307,7 +307,7 @@ func (q *Queries) GetKeysByLinkedUsers(ctx context.Context, arg GetKeysByLinkedU
 	var items []GetKeysByLinkedUsersRow
 	for rows.Next() {
 		var i GetKeysByLinkedUsersRow
-		if err := rows.Scan(&i.UserHandle, &i.Role, &i.VdbApiKey); err != nil {
+		if err := rows.Scan(&i.UserHandle, &i.Role, &i.VdbAPIKey); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -358,8 +358,8 @@ func (q *Queries) GetLLMsByProject(ctx context.Context, arg GetLLMsByProjectPara
 			&i.Owner,
 			&i.Endpoint,
 			&i.Description,
-			&i.ApiKey,
-			&i.ApiStandard,
+			&i.APIKey,
+			&i.APIStandard,
 			&i.Model,
 			&i.Dimensions,
 			&i.CreatedAt,
@@ -396,8 +396,8 @@ type GetLLMsByUserRow struct {
 	Owner            string           `db:"owner" json:"owner"`
 	Endpoint         string           `db:"endpoint" json:"endpoint"`
 	Description      pgtype.Text      `db:"description" json:"description"`
-	ApiKey           pgtype.Text      `db:"api_key" json:"api_key"`
-	ApiStandard      string           `db:"api_standard" json:"api_standard"`
+	APIKey           pgtype.Text      `db:"api_key" json:"api_key"`
+	APIStandard      string           `db:"api_standard" json:"api_standard"`
 	Model            string           `db:"model" json:"model"`
 	Dimensions       int32            `db:"dimensions" json:"dimensions"`
 	CreatedAt        pgtype.Timestamp `db:"created_at" json:"created_at"`
@@ -420,8 +420,8 @@ func (q *Queries) GetLLMsByUser(ctx context.Context, arg GetLLMsByUserParams) ([
 			&i.Owner,
 			&i.Endpoint,
 			&i.Description,
-			&i.ApiKey,
-			&i.ApiStandard,
+			&i.APIKey,
+			&i.APIStandard,
 			&i.Model,
 			&i.Dimensions,
 			&i.CreatedAt,
@@ -436,6 +436,27 @@ func (q *Queries) GetLLMsByUser(ctx context.Context, arg GetLLMsByUserParams) ([
 		return nil, err
 	}
 	return items, nil
+}
+
+const getNumberOfEmbeddingsByProject = `-- name: GetNumberOfEmbeddingsByProject :one
+SELECT COUNT(*)
+FROM embeddings
+JOIN projects
+ON embeddings."project_id" = projects."project_id"
+WHERE embeddings."owner" = $1
+AND projects."project_handle" = $2
+`
+
+type GetNumberOfEmbeddingsByProjectParams struct {
+	Owner         string `db:"owner" json:"owner"`
+	ProjectHandle string `db:"project_handle" json:"project_handle"`
+}
+
+func (q *Queries) GetNumberOfEmbeddingsByProject(ctx context.Context, arg GetNumberOfEmbeddingsByProjectParams) (int64, error) {
+	row := q.db.QueryRow(ctx, getNumberOfEmbeddingsByProject, arg.Owner, arg.ProjectHandle)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
 }
 
 const getProjectsByUser = `-- name: GetProjectsByUser :many
@@ -494,40 +515,50 @@ func (q *Queries) GetProjectsByUser(ctx context.Context, arg GetProjectsByUserPa
 }
 
 const getSimilarsByID = `-- name: GetSimilarsByID :many
-SELECT e2."embeddings_id", e2."text_id", 1 - (e1.vector <=> e2.vector) AS cosine_similarity
+SELECT e2."text_id"
 FROM embeddings e1
 CROSS JOIN embeddings e2
-WHERE e1."text_id" = $1
-  AND e2."embeddings_id" != e1."embeddings_id"
+JOIN projects
+ON e1."project_id" = projects."project_id"
+WHERE e2."embeddings_id" != e1."embeddings_id"
+  AND e1."text_id" = $1
+  AND e1."owner" = $2
+  AND projects."project_handle" = $3
+  AND 1 - (e1.vector <=> e2.vector) >= $4::double precision
 ORDER BY e1.vector <=> e2.vector
-LIMIT $2 OFFSET $3
+LIMIT $5 OFFSET $6
 `
 
 type GetSimilarsByIDParams struct {
-	TextID pgtype.Text `db:"text_id" json:"text_id"`
-	Limit  int32       `db:"limit" json:"limit"`
-	Offset int32       `db:"offset" json:"offset"`
+	TextID        pgtype.Text `db:"text_id" json:"text_id"`
+	Owner         string      `db:"owner" json:"owner"`
+	ProjectHandle string      `db:"project_handle" json:"project_handle"`
+	Column4       float64     `db:"column_4" json:"column_4"`
+	Limit         int32       `db:"limit" json:"limit"`
+	Offset        int32       `db:"offset" json:"offset"`
 }
 
-type GetSimilarsByIDRow struct {
-	EmbeddingsID     int32       `db:"embeddings_id" json:"embeddings_id"`
-	TextID           pgtype.Text `db:"text_id" json:"text_id"`
-	CosineSimilarity int32       `db:"cosine_similarity" json:"cosine_similarity"`
-}
-
-func (q *Queries) GetSimilarsByID(ctx context.Context, arg GetSimilarsByIDParams) ([]GetSimilarsByIDRow, error) {
-	rows, err := q.db.Query(ctx, getSimilarsByID, arg.TextID, arg.Limit, arg.Offset)
+// 1 - (e1.vector <=> e2.vector) AS cosine_similarity
+func (q *Queries) GetSimilarsByID(ctx context.Context, arg GetSimilarsByIDParams) ([]pgtype.Text, error) {
+	rows, err := q.db.Query(ctx, getSimilarsByID,
+		arg.TextID,
+		arg.Owner,
+		arg.ProjectHandle,
+		arg.Column4,
+		arg.Limit,
+		arg.Offset,
+	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []GetSimilarsByIDRow
+	var items []pgtype.Text
 	for rows.Next() {
-		var i GetSimilarsByIDRow
-		if err := rows.Scan(&i.EmbeddingsID, &i.TextID, &i.CosineSimilarity); err != nil {
+		var text_id pgtype.Text
+		if err := rows.Scan(&text_id); err != nil {
 			return nil, err
 		}
-		items = append(items, i)
+		items = append(items, text_id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -762,9 +793,9 @@ FROM api_standards
 WHERE "api_standard_handle" = $1 LIMIT 1
 `
 
-func (q *Queries) RetrieveAPIStandard(ctx context.Context, apiStandardHandle string) (ApiStandard, error) {
+func (q *Queries) RetrieveAPIStandard(ctx context.Context, apiStandardHandle string) (APIStandard, error) {
 	row := q.db.QueryRow(ctx, retrieveAPIStandard, apiStandardHandle)
-	var i ApiStandard
+	var i APIStandard
 	err := row.Scan(
 		&i.APIStandardHandle,
 		&i.Description,
@@ -854,8 +885,8 @@ func (q *Queries) RetrieveLLM(ctx context.Context, arg RetrieveLLMParams) (LlmSe
 		&i.Owner,
 		&i.Endpoint,
 		&i.Description,
-		&i.ApiKey,
-		&i.ApiStandard,
+		&i.APIKey,
+		&i.APIStandard,
 		&i.Model,
 		&i.Dimensions,
 		&i.CreatedAt,
@@ -905,7 +936,7 @@ func (q *Queries) RetrieveUser(ctx context.Context, userHandle string) (User, er
 		&i.UserHandle,
 		&i.Name,
 		&i.Email,
-		&i.VdbApiKey,
+		&i.VdbAPIKey,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -1006,7 +1037,7 @@ func (q *Queries) UpsertEmbeddings(ctx context.Context, arg UpsertEmbeddingsPara
 const upsertLLM = `-- name: UpsertLLM :one
 INSERT
 INTO llm_services (
-  "llm_service_handle", "owner", "endpoint", "description", "api_key", "api_standard", "model", "dimensions", "created_at", "updated_at"
+  "owner", "llm_service_handle", "endpoint", "description", "api_key", "api_standard", "model", "dimensions", "created_at", "updated_at"
 ) VALUES (
   $1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW()
 )
@@ -1018,39 +1049,39 @@ ON CONFLICT ("owner", "llm_service_handle") DO UPDATE SET
   "model" = $7,
   "dimensions" = $8,
   "updated_at" = NOW()
-RETURNING "llm_service_id", "llm_service_handle", "owner"
+RETURNING "owner", "llm_service_handle", "llm_service_id"
 `
 
 type UpsertLLMParams struct {
-	LLMServiceHandle string      `db:"llm_service_handle" json:"llm_service_handle"`
 	Owner            string      `db:"owner" json:"owner"`
+	LLMServiceHandle string      `db:"llm_service_handle" json:"llm_service_handle"`
 	Endpoint         string      `db:"endpoint" json:"endpoint"`
 	Description      pgtype.Text `db:"description" json:"description"`
-	ApiKey           pgtype.Text `db:"api_key" json:"api_key"`
-	ApiStandard      string      `db:"api_standard" json:"api_standard"`
+	APIKey           pgtype.Text `db:"api_key" json:"api_key"`
+	APIStandard      string      `db:"api_standard" json:"api_standard"`
 	Model            string      `db:"model" json:"model"`
 	Dimensions       int32       `db:"dimensions" json:"dimensions"`
 }
 
 type UpsertLLMRow struct {
-	LLMServiceID     int32  `db:"llm_service_id" json:"llm_service_id"`
-	LLMServiceHandle string `db:"llm_service_handle" json:"llm_service_handle"`
 	Owner            string `db:"owner" json:"owner"`
+	LLMServiceHandle string `db:"llm_service_handle" json:"llm_service_handle"`
+	LLMServiceID     int32  `db:"llm_service_id" json:"llm_service_id"`
 }
 
 func (q *Queries) UpsertLLM(ctx context.Context, arg UpsertLLMParams) (UpsertLLMRow, error) {
 	row := q.db.QueryRow(ctx, upsertLLM,
-		arg.LLMServiceHandle,
 		arg.Owner,
+		arg.LLMServiceHandle,
 		arg.Endpoint,
 		arg.Description,
-		arg.ApiKey,
-		arg.ApiStandard,
+		arg.APIKey,
+		arg.APIStandard,
 		arg.Model,
 		arg.Dimensions,
 	)
 	var i UpsertLLMRow
-	err := row.Scan(&i.LLMServiceID, &i.LLMServiceHandle, &i.Owner)
+	err := row.Scan(&i.Owner, &i.LLMServiceHandle, &i.LLMServiceID)
 	return i, err
 }
 
@@ -1113,26 +1144,25 @@ type UpsertUserParams struct {
 	UserHandle string      `db:"user_handle" json:"user_handle"`
 	Name       pgtype.Text `db:"name" json:"name"`
 	Email      string      `db:"email" json:"email"`
-	VdbApiKey  string      `db:"vdb_api_key" json:"vdb_api_key"`
+	VdbAPIKey  string      `db:"vdb_api_key" json:"vdb_api_key"`
 }
 
 // Generate go code with: sqlc generate
 //
 //	$1, $2, $3, (decode(sqlc.arg(vdb_api_key)::bytea, 'hex')), NOW(), NOW()
-//	"vdb_api_key" = (decode(sqlc.arg(vdb_api_key)::bytea, 'hex')),
 func (q *Queries) UpsertUser(ctx context.Context, arg UpsertUserParams) (User, error) {
 	row := q.db.QueryRow(ctx, upsertUser,
 		arg.UserHandle,
 		arg.Name,
 		arg.Email,
-		arg.VdbApiKey,
+		arg.VdbAPIKey,
 	)
 	var i User
 	err := row.Scan(
 		&i.UserHandle,
 		&i.Name,
 		&i.Email,
-		&i.VdbApiKey,
+		&i.VdbAPIKey,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

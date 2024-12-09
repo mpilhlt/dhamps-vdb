@@ -47,10 +47,10 @@ func putUserFunc(ctx context.Context, input *models.PutUserRequest) (*models.Upl
 	APIKey := ""
 	if u.UserHandle == input.UserHandle {
 		// User exists, so don't create API key
-		storeKey = u.VdbApiKey
+		storeKey = u.VdbAPIKey
 		fmt.Printf("        User %s already exists, stored key hash is %s.\n", input.UserHandle, storeKey)
 		// fmt.Printf("        User %s already exists: %v.\n", input.UserHandle, u)
-		// fmt.Printf("        User %s. Stored key hash: '%s'.\n", input.UserHandle, u.VdbApiKey)
+		// fmt.Printf("        User %s. Stored key hash: '%s'.\n", input.UserHandle, u.VdbAPIKey)
 		APIKey = "not changed"
 	} else {
 		// User does not exist, so create a new API key
@@ -66,7 +66,7 @@ func putUserFunc(ctx context.Context, input *models.PutUserRequest) (*models.Upl
 		UserHandle: input.UserHandle,
 		Name:       pgtype.Text{String: input.Body.Name, Valid: true},
 		Email:      input.Body.Email,
-		VdbApiKey:  storeKey,
+		VdbAPIKey:  storeKey,
 	}
 
 	// Run the query
@@ -188,7 +188,7 @@ func getUserFunc(ctx context.Context, input *models.GetUserRequest) (*models.Get
 		UserHandle:  u.UserHandle,
 		Name:        u.Name.String,
 		Email:       u.Email,
-		APIKey:      u.VdbApiKey,
+		APIKey:      u.VdbAPIKey,
 		Projects:    projects,
 		LLMServices: llmservices,
 	}

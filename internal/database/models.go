@@ -9,7 +9,7 @@ import (
 	pgvector_go "github.com/pgvector/pgvector-go"
 )
 
-type ApiStandard struct {
+type APIStandard struct {
 	APIStandardHandle string           `db:"api_standard_handle" json:"api_standard_handle"`
 	Description       pgtype.Text      `db:"description" json:"description"`
 	KeyMethod         string           `db:"key_method" json:"key_method"`
@@ -42,8 +42,8 @@ type LlmService struct {
 	Owner            string           `db:"owner" json:"owner"`
 	Endpoint         string           `db:"endpoint" json:"endpoint"`
 	Description      pgtype.Text      `db:"description" json:"description"`
-	ApiKey           pgtype.Text      `db:"api_key" json:"api_key"`
-	ApiStandard      string           `db:"api_standard" json:"api_standard"`
+	APIKey           pgtype.Text      `db:"api_key" json:"api_key"`
+	APIStandard      string           `db:"api_standard" json:"api_standard"`
 	Model            string           `db:"model" json:"model"`
 	Dimensions       int32            `db:"dimensions" json:"dimensions"`
 	CreatedAt        pgtype.Timestamp `db:"created_at" json:"created_at"`
@@ -71,7 +71,7 @@ type User struct {
 	UserHandle string           `db:"user_handle" json:"user_handle"`
 	Name       pgtype.Text      `db:"name" json:"name"`
 	Email      string           `db:"email" json:"email"`
-	VdbApiKey  string           `db:"vdb_api_key" json:"vdb_api_key"`
+	VdbAPIKey  string           `db:"vdb_api_key" json:"vdb_api_key"`
 	CreatedAt  pgtype.Timestamp `db:"created_at" json:"created_at"`
 	UpdatedAt  pgtype.Timestamp `db:"updated_at" json:"updated_at"`
 }

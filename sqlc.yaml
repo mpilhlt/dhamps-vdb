@@ -27,8 +27,11 @@ sql:
           project_id: "ProjectID"
           text_id: "TextID"
           api_standard_handle: "APIStandardHandle"
+          api_standard: "APIStandard"
+          api_key: "APIKey"
+          vdb_api_key: "VdbAPIKey"
           # - column: "users.vdb_api_key"
           #   go_type:
           #     type: "[]byte"
         # rename:
-        #   decode: "VdbApiKey"
+        #   decode: "VdbAPIKey"

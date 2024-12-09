@@ -18,7 +18,7 @@ type EmbeddingsInput struct {
 	Metadata         json.RawMessage `json:"metadata,omitempty" doc:"Metadata (json) for the document. E.g. creation year, author name or text genre." example:"{\n  \"author\": \"Immanuel Kant\"\n}\n"`
 }
 
-type EmbeddingsDatabase struct {
+type Embeddings struct {
 	TextID           string                 `json:"text_id" doc:"Identifier for the document"`
 	UserHandle       string                 `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
 	ProjectHandle    string                 `json:"project_handle" path:"project_handle" maxLength:"20" minLength:"3" example:"my-gpt-4" doc:"Project handle"`
@@ -31,7 +31,7 @@ type EmbeddingsDatabase struct {
 }
 
 type EmbeddingssInput []EmbeddingsInput
-type EmbeddingssDatabase []EmbeddingsDatabase
+type Embeddingss []Embeddings
 
 func (es EmbeddingssInput) GetIDs() []string {
 	var ids []string
@@ -41,7 +41,7 @@ func (es EmbeddingssInput) GetIDs() []string {
 	return ids
 }
 
-func (es EmbeddingssDatabase) GetIDs() []string {
+func (es Embeddingss) GetIDs() []string {
 	var ids []string
 	for _, e := range es {
 		ids = append(ids, e.TextID)
@@ -93,7 +93,7 @@ type GetProjEmbeddingsRequest struct {
 type GetProjEmbeddingsResponse struct {
 	Header []http.Header `json:"header,omitempty" doc:"Response headers"`
 	Body   struct {
-		Embeddings EmbeddingssDatabase `json:"embeddings" doc:"List of document embeddings"`
+		Embeddings Embeddingss `json:"embeddings" doc:"List of document embeddings"`
 	}
 }
 
@@ -120,7 +120,7 @@ type GetDocEmbeddingsRequest struct {
 
 type GetDocEmbeddingsResponse struct {
 	Header []http.Header `json:"header,omitempty" doc:"Response headers"`
-	Body   EmbeddingsDatabase
+	Body   Embeddings
 }
 
 // Delete document embeddings

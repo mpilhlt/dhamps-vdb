@@ -113,7 +113,7 @@ func TestProjectsFunc(t *testing.T) {
 			requestPath:  "/v1/projects/alice/test1",
 			bodyPath:     "",
 			apiKey:       aliceAPIKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/Project.json\",\n  \"project_id\": 1,\n  \"project_handle\": \"test1\",\n  \"description\": \"This is a test project\",\n  \"authorizedReaders\": [\n    \"alice\"\n  ]\n}\n",
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/Project.json\",\n  \"project_id\": 1,\n  \"project_handle\": \"test1\",\n  \"owner\": \"alice\",\n  \"description\": \"This is a test project\",\n  \"authorizedReaders\": [\n    \"alice\"\n  ],\n  \"number_of_embeddings\": 0\n}\n",
 			expectStatus: http.StatusOK,
 		},
 		{
@@ -122,7 +122,7 @@ func TestProjectsFunc(t *testing.T) {
 			requestPath:  "/v1/projects/alice",
 			bodyPath:     "",
 			apiKey:       aliceAPIKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/GetProjectsResponseBody.json\",\n  \"projects\": [\n    {\n      \"project_id\": 1,\n      \"project_handle\": \"test1\",\n      \"description\": \"This is a test project\",\n      \"authorizedReaders\": [\n        \"alice\"\n      ]\n    }\n  ]\n}\n",
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/GetProjectsResponseBody.json\",\n  \"projects\": [\n    {\n      \"project_id\": 1,\n      \"project_handle\": \"test1\",\n      \"owner\": \"alice\",\n      \"description\": \"This is a test project\",\n      \"authorizedReaders\": [\n        \"alice\"\n      ],\n      \"number_of_embeddings\": 0\n    }\n  ]\n}\n",
 			expectStatus: http.StatusOK,
 		},
 		{

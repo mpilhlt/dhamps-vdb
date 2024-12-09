@@ -13,8 +13,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// TODO: Add LLMServices fields
-
 // Create a new project
 func putProjectFunc(ctx context.Context, input *models.PutProjectRequest) (*models.UploadProjectResponse, error) {
 	if input.ProjectHandle != input.Body.ProjectHandle {
@@ -120,6 +118,8 @@ func getProjectsFunc(ctx context.Context, input *models.GetProjectsRequest) (*mo
 
 	// Run the queries
 	queries := database.New(pool)
+
+	// Get the list of projects
 	p, err := queries.GetProjectsByUser(ctx, database.GetProjectsByUserParams{UserHandle: input.UserHandle, Limit: int32(input.Limit), Offset: int32(input.Offset)})
 	if err != nil {
 		if err.Error() == "no rows in result set" {
@@ -127,9 +127,11 @@ func getProjectsFunc(ctx context.Context, input *models.GetProjectsRequest) (*mo
 		}
 		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get projects for user %s. %v", input.UserHandle, err))
 	}
+
+	// Get the details for each project
 	projects := []models.Project{}
-	// Get the authorized reader accounts for each project
 	for _, project := range p {
+		// Get the authorized reader accounts for the project
 		readers := []string{}
 		rows, err := queries.GetUsersByProject(ctx, database.GetUsersByProjectParams{Owner: input.UserHandle, ProjectHandle: project.ProjectHandle, Limit: 999, Offset: 0})
 		if err != nil {
@@ -138,12 +140,50 @@ func getProjectsFunc(ctx context.Context, input *models.GetProjectsRequest) (*mo
 		for _, row := range rows {
 			readers = append(readers, row.UserHandle)
 		}
+
+		// Get the LLM Services for the project
+		llmservices := []models.LLMService{}
+		llmRows, err := queries.GetLLMsByProject(ctx, database.GetLLMsByProjectParams{Owner: input.UserHandle, ProjectHandle: project.ProjectHandle, Limit: 999, Offset: 0})
+		if err != nil {
+			if err.Error() == "no rows in result set" {
+				llmRows = []database.LlmService{}
+			} else {
+				return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get LLM Services for %s's project %s. %v", input.UserHandle, project.ProjectHandle, err))
+			}
+		}
+		for _, row := range llmRows {
+			llmservice := models.LLMService{
+				Owner:            row.Owner,
+				LLMServiceID:     int(row.LLMServiceID),
+				LLMServiceHandle: row.LLMServiceHandle,
+				Endpoint:         row.Endpoint,
+				Description:      row.Description.String,
+				APIStandard:      row.APIStandard,
+				Model:            row.Model,
+				Dimensions:       row.Dimensions,
+			}
+			llmservices = append(llmservices, llmservice)
+		}
+
+		// Get the (number of) embeddings for the project
+		count, err := queries.GetNumberOfEmbeddingsByProject(ctx, database.GetNumberOfEmbeddingsByProjectParams{Owner: input.UserHandle, ProjectHandle: project.ProjectHandle})
+		if err != nil {
+			if err.Error() == "no rows in result set" {
+				count = 0
+			} else {
+				return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get number of embeddings for %s's project %s. %v", input.UserHandle, project.ProjectHandle, err))
+			}
+		}
+
 		projects = append(projects, models.Project{
-			ProjectID:         int(project.ProjectID),
-			ProjectHandle:     project.ProjectHandle,
-			Description:       project.Description.String,
-			AuthorizedReaders: readers,
-			LLMServices:       nil,
+			ProjectID:          int(project.ProjectID),
+			ProjectHandle:      project.ProjectHandle,
+			Description:        project.Description.String,
+			MetadataScheme:     project.MetadataScheme.String,
+			NumberOfEmbeddings: int(count),
+			Owner:              project.Owner,
+			LLMServices:        llmservices,
+			AuthorizedReaders:  readers,
 		})
 	}
 
@@ -182,25 +222,62 @@ func getProjectFunc(ctx context.Context, input *models.GetProjectRequest) (*mode
 		}
 		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get project %s for user %s. %v", input.ProjectHandle, input.UserHandle, err))
 	}
+
 	// Get the authorized reader accounts for the project
 	readers := []string{}
-	rows, err := queries.GetUsersByProject(ctx, database.GetUsersByProjectParams{Owner: input.UserHandle, ProjectHandle: input.ProjectHandle, Limit: 999, Offset: 0})
+	userRows, err := queries.GetUsersByProject(ctx, database.GetUsersByProjectParams{Owner: input.UserHandle, ProjectHandle: input.ProjectHandle, Limit: 999, Offset: 0})
 	if err != nil {
 		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get authorized reader accounts for %s's project %s. %v", input.UserHandle, input.ProjectHandle, err))
 	}
-	for _, row := range rows {
+	for _, row := range userRows {
 		readers = append(readers, row.UserHandle)
+	}
+
+	// Get the LLM Services for the project
+	llmservices := []models.LLMService{}
+	llmRows, err := queries.GetLLMsByProject(ctx, database.GetLLMsByProjectParams{Owner: input.UserHandle, ProjectHandle: input.ProjectHandle, Limit: 999, Offset: 0})
+	if err != nil {
+		if err.Error() == "no rows in result set" {
+			llmRows = []database.LlmService{}
+		} else {
+			return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get LLM Services for %s's project %s. %v", input.UserHandle, input.ProjectHandle, err))
+		}
+	}
+	for _, row := range llmRows {
+		llmservice := models.LLMService{
+			Owner:            row.Owner,
+			LLMServiceID:     int(row.LLMServiceID),
+			LLMServiceHandle: row.LLMServiceHandle,
+			Endpoint:         row.Endpoint,
+			Description:      row.Description.String,
+			APIStandard:      row.APIStandard,
+			Model:            row.Model,
+			Dimensions:       row.Dimensions,
+		}
+		llmservices = append(llmservices, llmservice)
+	}
+
+	// Get the (number of) embeddings for the project
+	count, err := queries.GetNumberOfEmbeddingsByProject(ctx, database.GetNumberOfEmbeddingsByProjectParams{Owner: input.UserHandle, ProjectHandle: input.ProjectHandle})
+	if err != nil {
+		if err.Error() == "no rows in result set" {
+			count = 0
+		} else {
+			return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get number of embeddings for %s's project %s. %v", input.UserHandle, input.ProjectHandle, err))
+		}
 	}
 
 	// Build the response
 	response := &models.GetProjectResponse{}
 	response.Body = models.Project{
-		ProjectID:         int(p.ProjectID),
-		ProjectHandle:     p.ProjectHandle,
-		Description:       p.Description.String,
-		MetadataScheme:    p.MetadataScheme.String,
-		AuthorizedReaders: readers,
-		LLMServices:       nil,
+		ProjectID:          int(p.ProjectID),
+		ProjectHandle:      p.ProjectHandle,
+		Owner:              p.Owner,
+		Description:        p.Description.String,
+		MetadataScheme:     p.MetadataScheme.String,
+		AuthorizedReaders:  readers,
+		LLMServices:        llmservices,
+		NumberOfEmbeddings: int(count),
 	}
 
 	return response, nil

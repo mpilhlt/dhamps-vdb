@@ -370,6 +370,7 @@ func createLLMService(t *testing.T, llmServiceJSON string, user, apiKey string) 
 	fmt.Print("    Creating LLM service ")
 	jsonInput := &struct {
 		LLMServiceHandle string `json:"llm_service_handle" doc:"Handle of created or updated LLM service"`
+		Owner 					 string `json:"owner" doc:"User handle of the service owner"`
 		Description      string `json:"description" doc:"Description of the LLM service"`
 	}{}
 	err := json.Unmarshal([]byte(llmServiceJSON), jsonInput)
@@ -395,6 +396,7 @@ func createLLMService(t *testing.T, llmServiceJSON string, user, apiKey string) 
 
 	LLMServiceInfo := &struct {
 		LLMServiceHandle string `json:"llm_service_handle" doc:"Handle of created or updated LLM service"`
+		LLMServiceID     int    `json:"llm_service_id" doc:"System identifier of created or updated LLM service"`
 	}{}
 	err = json.Unmarshal(body, &LLMServiceInfo)
 	if err != nil {
@@ -402,7 +404,7 @@ func createLLMService(t *testing.T, llmServiceJSON string, user, apiKey string) 
 	}
 	assert.NoError(t, err)
 
-	fmt.Printf("        Successfully created LLM Service (handle \"%s\").\n", LLMServiceInfo.LLMServiceHandle)
+	fmt.Printf("        Successfully created LLM Service (handle \"%s\", id %d).\n", LLMServiceInfo.LLMServiceHandle, LLMServiceInfo.LLMServiceID)
 	return LLMServiceInfo.LLMServiceHandle, nil
 }
 

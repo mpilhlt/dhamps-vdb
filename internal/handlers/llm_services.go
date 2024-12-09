@@ -36,12 +36,12 @@ func putLLMFunc(ctx context.Context, input *models.PutLLMRequest) (*models.Uploa
 	// Run the query
 	queries := database.New(pool)
 	llm, err := queries.UpsertLLM(ctx, database.UpsertLLMParams{
-		LLMServiceHandle: input.LLMServiceHandle,
 		Owner:            input.UserHandle,
+		LLMServiceHandle: input.LLMServiceHandle,
 		Endpoint:         input.Body.Endpoint,
 		Description:      pgtype.Text{String: input.Body.Description, Valid: true},
-		ApiKey:           pgtype.Text{String: input.Body.APIKey, Valid: true},
-		ApiStandard:      input.Body.ApiStandard,
+		APIKey:           pgtype.Text{String: input.Body.APIKey, Valid: true},
+		APIStandard:      input.Body.APIStandard,
 		Model:            input.Body.Model,
 		Dimensions:       int32(input.Body.Dimensions),
 	})
@@ -56,6 +56,7 @@ func putLLMFunc(ctx context.Context, input *models.PutLLMRequest) (*models.Uploa
 
 	// Build response
 	response := &models.UploadLLMResponse{}
+	response.Body.Owner = llm.Owner
 	response.Body.LLMServiceHandle = llm.LLMServiceHandle
 	response.Body.LLMServiceID = int(llm.LLMServiceID)
 
@@ -98,12 +99,13 @@ func getLLMFunc(ctx context.Context, input *models.GetLLMRequest) (*models.GetLL
 
 	// Build response
 	ls := models.LLMService{
+		Owner:            llm.Owner,
 		LLMServiceHandle: llm.LLMServiceHandle,
 		LLMServiceID:     int(llm.LLMServiceID),
 		Endpoint:         llm.Endpoint,
 		Description:      llm.Description.String,
-		APIKey:           llm.ApiKey.String,
-		ApiStandard:      llm.ApiStandard,
+		APIKey:           llm.APIKey.String,
+		APIStandard:      llm.APIStandard,
 		Model:            llm.Model,
 		Dimensions:       int32(llm.Dimensions),
 	}
@@ -146,12 +148,13 @@ func getUserLLMsFunc(ctx context.Context, input *models.GetUserLLMsRequest) (*mo
 	ls := []models.LLMService{}
 	for _, llm := range llms {
 		ls = append(ls, models.LLMService{
+			Owner:            llm.Owner,
 			LLMServiceHandle: llm.LLMServiceHandle,
 			LLMServiceID:     int(llm.LLMServiceID),
 			Endpoint:         llm.Endpoint,
 			Description:      llm.Description.String,
-			APIKey:           llm.ApiKey.String,
-			ApiStandard:      llm.ApiStandard,
+			APIKey:           llm.APIKey.String,
+			APIStandard:      llm.APIStandard,
 			Model:            llm.Model,
 			Dimensions:       int32(llm.Dimensions),
 		})

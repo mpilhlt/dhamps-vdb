@@ -132,14 +132,14 @@ func getProjEmbeddingsFunc(ctx context.Context, input *models.GetProjEmbeddingsR
 	}
 
 	// Build the response
-	e := []models.EmbeddingsDatabase{}
+	e := []models.Embeddings{}
 	for _, embeddings := range embeddingss {
 		md := map[string]interface{}{}
 		err = json.Unmarshal(embeddings.Metadata, &md)
 		if err != nil {
 			return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to unmarshal metadata for user %s, project %s, id %s. Metadata: %s. %v", input.UserHandle, input.ProjectHandle, embeddings.TextID.String, string(embeddings.Metadata), err))
 		}
-		e = append(e, models.EmbeddingsDatabase{
+		e = append(e, models.Embeddings{
 			TextID:           embeddings.TextID.String,
 			UserHandle:       embeddings.Owner,
 			ProjectHandle:    embeddings.ProjectHandle,
@@ -236,7 +236,7 @@ func getDocEmbeddingsFunc(ctx context.Context, input *models.GetDocEmbeddingsReq
 	if err != nil {
 		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to unmarshal metadata for user %s, project %s, id %s. Metadata: %s. %v", input.UserHandle, input.ProjectHandle, embeddings.TextID.String, string(embeddings.Metadata), err))
 	}
-	e := models.EmbeddingsDatabase{
+	e := models.Embeddings{
 		TextID:           embeddings.TextID.String,
 		UserHandle:       embeddings.Owner,
 		ProjectHandle:    embeddings.ProjectHandle,

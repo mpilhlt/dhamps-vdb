@@ -11,7 +11,6 @@ INTO users (
 ON CONFLICT ("user_handle") DO UPDATE SET
   "name" = $2,
   "email" = $3,
---  "vdb_api_key" = (decode(sqlc.arg(vdb_api_key)::bytea, 'hex')),
   "vdb_api_key" = $4,
   "updated_at" = NOW()
 RETURNING *;
@@ -107,7 +106,7 @@ RETURNING *;
 -- name: UpsertLLM :one
 INSERT
 INTO llm_services (
-  "llm_service_handle", "owner", "endpoint", "description", "api_key", "api_standard", "model", "dimensions", "created_at", "updated_at"
+  "owner", "llm_service_handle", "endpoint", "description", "api_key", "api_standard", "model", "dimensions", "created_at", "updated_at"
 ) VALUES (
   $1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW()
 )
@@ -119,7 +118,7 @@ ON CONFLICT ("owner", "llm_service_handle") DO UPDATE SET
   "model" = $7,
   "dimensions" = $8,
   "updated_at" = NOW()
-RETURNING "llm_service_id", "llm_service_handle", "owner";
+RETURNING "owner", "llm_service_handle", "llm_service_id";
 
 -- name: DeleteLLM :exec
 DELETE
@@ -237,6 +236,14 @@ WHERE embeddings."owner" = $1
 AND projects."project_handle" = $2
 ORDER BY embeddings."text_id" ASC LIMIT $3 OFFSET $4;
 
+-- name: GetNumberOfEmbeddingsByProject :one
+SELECT COUNT(*)
+FROM embeddings
+JOIN projects
+ON embeddings."project_id" = projects."project_id"
+WHERE embeddings."owner" = $1
+AND projects."project_handle" = $2;
+
 
 -- name: UpsertAPIStandard :one
 INSERT
@@ -278,13 +285,20 @@ ORDER BY "vector" <=> $1
 LIMIT $2 OFFSET $3;
 
 -- name: GetSimilarsByID :many
-SELECT e2."embeddings_id", e2."text_id", 1 - (e1.vector <=> e2.vector) AS cosine_similarity
+SELECT e2."text_id"
+--  1 - (e1.vector <=> e2.vector) AS cosine_similarity
 FROM embeddings e1
 CROSS JOIN embeddings e2
-WHERE e1."text_id" = $1
-  AND e2."embeddings_id" != e1."embeddings_id"
+JOIN projects
+ON e1."project_id" = projects."project_id"
+WHERE e2."embeddings_id" != e1."embeddings_id"
+  AND e1."text_id" = $1
+  AND e1."owner" = $2
+  AND projects."project_handle" = $3
+  AND 1 - (e1.vector <=> e2.vector) >= $4::double precision
 ORDER BY e1.vector <=> e2.vector
-LIMIT $2 OFFSET $3;
+LIMIT $5 OFFSET $6;
+
 
 
 -- name: ResetAllSerials :exec

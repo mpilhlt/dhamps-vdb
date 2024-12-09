@@ -71,13 +71,16 @@ func AddRoutes(pool *pgxpool.Pool, keyGen RandomKeyGenerator, api huma.API) erro
 		fmt.Printf("    Unable to register Embeddings routes: %v\n", err)
 		return err
 	}
+	err = RegisterSimilarRoutes(pool, api)
+	if err != nil {
+		fmt.Printf("    Unable to register Similar routes: %v\n", err)
+		return err
+	}
 	err = RegisterAdminRoutes(pool, api)
 	if err != nil {
 		fmt.Printf("    Unable to register Admin routes: %v\n", err)
 		return err
 	}
-
-	// err = handlers.RegisterSimilarRoutes(pool, api)
 	// err = handlers.RegisterLLMProcessRoutes(pool, api)
 	return nil
 }

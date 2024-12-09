@@ -128,7 +128,8 @@ $> go run main.go --port=8880 --db-port=8888 --db-user=my_user --db-password=my-
 - [√] Catch post to existing resources
 - [√] User authentication & restrictions on some API calls
 - [√] When testing, check cleanup by adding a new query/function to see if all tables are empty
-- [ ] handle **metadata**
+- [√] API versioning
+- [√] handle **metadata**
   - [ ] Validation with metadata schema
 - [ ] Implement and make consequent use of **max_idle** (5), **max_concurr** (5), **timeouts**, and **cancellations**
 - [ ] Use **transactions** (most importantly, when an action requires several queries, e.g. projects being added and then linked to several read-authorized users)
@@ -138,7 +139,6 @@ $> go run main.go --port=8880 --db-port=8888 --db-user=my_user --db-password=my-
 - [ ] **Batch mode**
 - [ ] Check if pagination is supported consistently
 - [ ] Check if input is validated consistently
-- [ ] API versioning
 - [ ] **Link or unlink** users/LLMs as standalone operations
 - [ ] **Transfer** of projects from one owner to another as new operation
 - [ ] better **options** handling (<https://huma.rocks/features/cli/>)

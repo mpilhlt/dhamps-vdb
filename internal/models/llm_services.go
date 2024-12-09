@@ -5,13 +5,29 @@ import (
 )
 
 // LLMService is a service for managing LLM data.
-type LLMService struct {
+type LLMServiceInput struct {
 	LLMServiceID     int    `json:"llm_service_id,omitempty" doc:"Unique service identifier" example:"153"`
 	LLMServiceHandle string `json:"llm_service_handle" minLength:"3" maxLength:"20" example:"GPT-4 API" doc:"Service name"`
 	Endpoint         string `json:"endpoint" example:"https://api.openai.com/v1/embeddings" doc:"Service endpoint"`
 	Description      string `json:"description,omitempty" doc:"Service description"`
 	APIKey           string `json:"api_key,omitempty" example:"12345678901234567890123456789012" doc:"Authentication token for the service"`
-	ApiStandard      string `json:"api_standard" default:"openai" example:"openai" doc:"Standard of the API"`
+	APIStandard      string `json:"api_standard" default:"openai" example:"openai" doc:"Standard of the API"`
+	Model            string `json:"model" example:"text-embedding-3-large" doc:"Model name"`
+	Dimensions       int32  `json:"dimensions" example:"3072" doc:"Number of dimensions in the embeddings"`
+	// ContextData      string `json:"contextData,omitempty" doc:"Context data that can be fed to the LLM service. Available in the request template as contextData variable."`
+	// SystemPrompt     string `json:"systemPrompt,omitempty" example:"Return the embeddings for the following text:" doc:"System prompt for requests to the service. Available in the request template as systemPrompt variable."`
+	// RequestTemplate  string `json:"requestTemplate,omitempty" doc:"Request template for the service. Can use input, contextData, and systemPrompt variables." example:"{\"input\": \"{{ input }}\", \"model\": \"text-embedding-3-small\"}"`
+	// RespFieldName    string `json:"respFieldName,omitempty" default:"embedding" example:"embedding" doc:"Field name of the service response containing the embeddings. Supported is a top-level key of a json object."`
+}
+
+type LLMService struct {
+	LLMServiceID     int    `json:"llm_service_id,omitempty" doc:"Unique service identifier" example:"153"`
+	LLMServiceHandle string `json:"llm_service_handle" minLength:"3" maxLength:"20" example:"GPT-4 API" doc:"Service name"`
+	Owner            string `json:"owner" doc:"User handle of the service owner"`
+	Endpoint         string `json:"endpoint" example:"https://api.openai.com/v1/embeddings" doc:"Service endpoint"`
+	Description      string `json:"description,omitempty" doc:"Service description"`
+	APIKey           string `json:"api_key,omitempty" example:"12345678901234567890123456789012" doc:"Authentication token for the service"`
+	APIStandard      string `json:"api_standard" default:"openai" example:"openai" doc:"Standard of the API"`
 	Model            string `json:"model" example:"text-embedding-3-large" doc:"Model name"`
 	Dimensions       int32  `json:"dimensions" example:"3072" doc:"Number of dimensions in the embeddings"`
 	// ContextData      string `json:"contextData,omitempty" doc:"Context data that can be fed to the LLM service. Available in the request template as contextData variable."`
@@ -28,21 +44,22 @@ type LLMService struct {
 // PUT Path: "/v1/llm-services/{user_handle}/{llm_service_handle}"
 
 type PutLLMRequest struct {
-	UserHandle       string     `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
-	LLMServiceHandle string     `json:"llm_service_handle" path:"llm_service_handle" maxLength:"20" minLength:"3" example:"my-gpt-4" doc:"LLM service handle"`
-	Body             LLMService `json:"llm_service" doc:"LLM service to create or update"`
+	UserHandle       string          `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
+	LLMServiceHandle string          `json:"llm_service_handle" path:"llm_service_handle" maxLength:"20" minLength:"3" example:"my-gpt-4" doc:"LLM service handle"`
+	Body             LLMServiceInput `json:"llm_service" doc:"LLM service to create or update"`
 }
 
 // POST Path: "/v1/llm-services/{user_handle}"
 
 type PostLLMRequest struct {
-	UserHandle string     `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
-	Body       LLMService `json:"llm_service" doc:"LLM service to create or update"`
+	UserHandle string          `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
+	Body       LLMServiceInput `json:"llm_service" doc:"LLM service to create or update"`
 }
 
 type UploadLLMResponse struct {
 	Header []http.Header `json:"header,omitempty" doc:"Response headers"`
 	Body   struct {
+		Owner            string `json:"owner" doc:"User handle of the service owner"`
 		LLMServiceHandle string `json:"llm_service_handle" doc:"Handle of created or updated LLM service"`
 		LLMServiceID     int    `json:"llm_service_id" doc:"System identifier of created or updated LLM service"`
 	}

@@ -223,7 +223,7 @@ func APIKeyReaderAuth(api huma.API, pool *pgxpool.Pool, options *models.Options)
 			return
 		}
 		for _, authUser := range allowedUsers {
-			storedHash := authUser.VdbApiKey
+			storedHash := authUser.VdbAPIKey
 
 			if apiKeyIsValid(token, storedHash) {
 				fmt.Print("        Reader authentication successful\n")
