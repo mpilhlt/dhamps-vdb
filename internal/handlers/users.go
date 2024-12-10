@@ -282,6 +282,7 @@ func RegisterUsersRoutes(pool *pgxpool.Pool, keyGen RandomKeyGenerator, api huma
 		Summary:       "Delete a specific user",
 		Security: []map[string][]string{
 			{"adminAuth": []string{"admin"}},
+			{"ownerAuth": []string{"owner"}},
 		},
 		Tags: []string{"admin", "users"},
 	}

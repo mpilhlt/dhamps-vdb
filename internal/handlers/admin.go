@@ -48,10 +48,10 @@ func resetDbFunc(ctx context.Context, input *models.ResetDbRequest) (*models.Res
 // RegisterUsersRoutes registers all the admin routes with the API
 func RegisterAdminRoutes(pool *pgxpool.Pool, api huma.API) error {
 	// Define huma.Operations for each route
-	resetDbOp := huma.Operation{
-		OperationID:   "resetDb",
+	footgunOp := huma.Operation{
+		OperationID:   "footgun",
 		Method:        http.MethodGet,
-		Path:          "/v1/admin/reset-db",
+		Path:          "/v1/admin/footgun",
 		DefaultStatus: http.StatusNoContent,
 		Summary:       "Remove all records from database and reset serials/counters",
 		Security: []map[string][]string{
@@ -64,6 +64,6 @@ func RegisterAdminRoutes(pool *pgxpool.Pool, api huma.API) error {
 	}
 
 	// Register the routes with middleware
-	huma.Register(api, resetDbOp, addPoolToContext(pool, resetDbFunc))
+	huma.Register(api, footgunOp, addPoolToContext(pool, resetDbFunc))
 	return nil
 }

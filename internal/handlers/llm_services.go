@@ -260,7 +260,6 @@ func RegisterLLMServicesRoutes(pool *pgxpool.Pool, api huma.API) error {
 		Security: []map[string][]string{
 			{"adminAuth": []string{"admin"}},
 			{"ownerAuth": []string{"owner"}},
-			{"readerAuth": []string{"reader"}},
 		},
 		Tags: []string{"llm-services"},
 	}
