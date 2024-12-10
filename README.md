@@ -213,15 +213,15 @@ postgres=# CREATE EXTENSION IF NOT EXISTS vector;
 
 ## Roadmap
 
-- [√] Tests
-  - [√] When testing, check cleanup by adding a new query/function to see if all tables are empty
+- [x] Tests
+  - [x] When testing, check cleanup by adding a new query/function to see if all tables are empty
   - [ ] Make sure pagination is supported consistently
   - [ ] Make sure input is validated consistently
-- [√] Catch POST to existing resources
-- [√] User authentication & restrictions on some API calls
-- [√] API versioning
-- [√] better **options** handling (<https://huma.rocks/features/cli/>)
-- [√] handle **metadata**
+- [x] Catch POST to existing resources
+- [x] User authentication & restrictions on some API calls
+- [x] API versioning
+- [x] better **options** handling (<https://huma.rocks/features/cli/>)
+- [x] handle **metadata**
   - [ ] Validation with metadata schema
 - [ ] Implement and make consequent use of **max_idle** (5), **max_concurr** (5), **timeouts**, and **cancellations**
 - [ ] **Concurrency** (leaky bucket approach) and **Rate limiting** (redis, sliding window, implement headers)
