@@ -54,30 +54,30 @@ For a more detailed, and always up-to-date documentation of the endpoints, inclu
 | /admin/footgun | GET | Reset Database: Remove all records from database and reset serials/counters | admin |
 | /users | GET  | Get all users (list of handles) registered with the Db | admin |
 | /users | POST | Register a new user with the Db | admin |
-| /users/<username> | GET | Get information about user <username> | admin, <username> |
-| /users/<username> | PUT | Register a new user with the Db | admin |
-| /users/<username> | DELETE | Delete a user and all their projects/llm services from the Db | admin, <username> |
-| /projects/<username> | GET  | Get all projects (objects) for user <username> | admin, <username> |
-| /projects/<username> | POST | Register a new project for user <username> | admin, <username> |
-| /projects/<username>/<projectname> | GET | Get project information for <username>'s project <projectname> | admin, <username> |
-| /projects/<username>/<projectname> | PUT | Register a new project calles <projectname> for user <username> | admin, <username> |
-| /projects/<username>/<projectname> | DELETE | Delete <username>'s project <projectname> | admin, <username> |
-| /llm-services/<username> | GET  | Get all LLM services (objects) for user <username> | admin, <username> |
-| /llm-services/<username> | POST | Register a new LLM service for user <username> | admin, <username> |
-| /llm-services/<username>/<llm_servicename> | GET | Get information about LLM service <llm_servicename> of user <username> | admin, <username> |
-| /llm-services/<username>/<llm_servicename> | PUT | Register a new LLM service called <llm_servicename> for user <username> | admin, <username> |
-| /llm-services/<username>/<llm_servicename> | DELETE | Delete <username>'s LLM service <llm_servicename> | admin, <username> |
+| /users/\<username\> | GET | Get information about user \<username\> | admin, \<username\> |
+| /users/\<username\> | PUT | Register a new user with the Db | admin |
+| /users/\<username\> | DELETE | Delete a user and all their projects/llm services from the Db | admin, \<username\> |
+| /projects/\<username\> | GET  | Get all projects (objects) for user \<username\> | admin, \<username\> |
+| /projects/\<username\> | POST | Register a new project for user \<username\> | admin, \<username\> |
+| /projects/\<username\>/\<projectname\> | GET | Get project information for \<username\>'s project \<projectname\> | admin, \<username\> |
+| /projects/\<username\>/\<projectname\> | PUT | Register a new project calles \<projectname\> for user \<username\> | admin, \<username\> |
+| /projects/\<username\>/\<projectname\> | DELETE | Delete \<username\>'s project \<projectname\> | admin, \<username\> |
+| /llm-services/\<username\> | GET  | Get all LLM services (objects) for user \<username\> | admin, \<username\> |
+| /llm-services/\<username\> | POST | Register a new LLM service for user \<username\> | admin, \<username\> |
+| /llm-services/\<username\>/<llm_servicename> | GET | Get information about LLM service <llm_servicename> of user \<username\> | admin, \<username\> |
+| /llm-services/\<username\>/<llm_servicename> | PUT | Register a new LLM service called <llm_servicename> for user \<username\> | admin, \<username\> |
+| /llm-services/\<username\>/<llm_servicename> | DELETE | Delete \<username\>'s LLM service <llm_servicename> | admin, \<username\> |
 | /api-standards | GET  | Get all defined API standards* | public |
 | /api-standards | POST | Register a new API standard* | admin |
-| /api-standards/<standardname> | GET | Get information about API standard* <standardname> | public |
-| /api-standards/<standardname> | PUT | Register a new API standard* <standardname> | admin |
-| /api-standards/<standardname> | DELETE | Delete API standard* <standardname> | admin |
-| /embeddings/<username>/<projectname> | GET  | Get all embeddings for <username>'s project <projectname> (use `limit` and `offset` for paging) | admin, <username>, authorized readers |
-| /embeddings/<username>/<projectname> | POST | Register a new record with an embeddings vector for <username>'s project <projectname> | admin, <username> |
-| /embeddings/<username>/<projectname> | DELETE | Delete ***all*** embeddings for <username>'s project <projectname> | admin, <username> |
-| /embeddings/<username>/<projectname>/<identifier> | GET | Get embeddings and other information about text <identifier> from <username>'s project <projectname> | admin, <username>, authorized readers |
-| /embeddings/<username>/<projectname>/<identifier> | DELETE | Delete record <identifier> from <username>'s project <projectname> | admin, <username> |
-| /similars/<username>/<projectname>/<identifier> | GET | Get a list of identifiers for records that are similar to the text <identifier> in <username>'s project <projectname> | admin, <username>, authorized readers |
+| /api-standards/\<standardname\> | GET | Get information about API standard* \<standardname\> | public |
+| /api-standards/\<standardname\> | PUT | Register a new API standard* \<standardname\> | admin |
+| /api-standards/\<standardname\> | DELETE | Delete API standard* \<standardname\> | admin |
+| /embeddings/\<username\>/\<projectname\> | GET  | Get all embeddings for \<username\>'s project \<projectname\> (use `limit` and `offset` for paging) | admin, \<username\>, authorized readers |
+| /embeddings/\<username\>/\<projectname\> | POST | Register a new record with an embeddings vector for \<username\>'s project \<projectname\> | admin, \<username\> |
+| /embeddings/\<username\>/\<projectname\> | DELETE | Delete ***all*** embeddings for \<username\>'s project \<projectname\> | admin, \<username\> |
+| /embeddings/\<username\>/\<projectname\>/\<identifier\> | GET | Get embeddings and other information about text \<identifier\> from \<username\>'s project \<projectname\> | admin, \<username\>, authorized readers |
+| /embeddings/\<username\>/\<projectname\>/\<identifier\> | DELETE | Delete record \<identifier\> from \<username\>'s project \<projectname\> | admin, \<username\> |
+| /similars/\<username\>/\<projectname\>/\<identifier\> | GET | Get a list of identifiers for records that are similar to the text \<identifier\> in \<username\>'s project \<projectname\> | admin, \<username\>, authorized readers |
 
 \* API standards are definitions of how to access an LLM Service: API endpoints, authentication mechanism etc. They are referred to from LLM Service definitions. When LLM Processing will be attempted, this is what will be implemented. Examples are the Cohere Embed API, Version 2, as documented in <https://docs.cohere.com/reference/embed>, or the OpenAI Embeddings API, Version 1, as documented in <https://platform.openai.com/docs/api-reference/embeddings>. You can find these examples in the [valid_api_standard\*.json](./testdata/) files in the `testdata` directory.
 
