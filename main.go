@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/mpilhlt/dhamps-vdb/internal/auth"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2/adapters/humago"
 	"github.com/danielgtaylor/huma/v2/humacli"
+	"github.com/joho/godotenv"
 
 	huma "github.com/danielgtaylor/huma/v2"
 )
@@ -22,8 +24,49 @@ import (
 //       <https://huma.rocks/features/request-limits/>
 
 func main() {
+	// Load env variables
+	err := godotenv.Load()
+	if err != nil {
+		fmt.Println("No .env file found")
+	}
+
 	// Create a CLI app
 	cli := humacli.New(func(hooks humacli.Hooks, options *models.Options) {
+
+		// workarounds for env variables
+		if os.Getenv("SERVICE_DEBUG") != "" {
+			options.Debug = os.Getenv("SERVICE_DEBUG") == "true"
+		}
+		if os.Getenv("SERVICE_HOST") != "" {
+			options.Host = os.Getenv("SERVICE_HOST")
+		}
+		if os.Getenv("SERVICE_PORT") != "" {
+			port, err := strconv.Atoi(os.Getenv("SERVICE_PORT"))
+			if err == nil {
+				options.Port = port
+			}
+		}
+		if os.Getenv("SERVICE_DBHOST") != "" {
+			options.DBHost = os.Getenv("SERVICE_DBHOST")
+		}
+		if os.Getenv("SERVICE_DBPORT") != "" {
+			dbPort, err := strconv.Atoi(os.Getenv("SERVICE_DBPORT"))
+			if err == nil {
+				options.DBPort = dbPort
+			}
+		}
+		if os.Getenv("SERVICE_DBNAME") != "" {
+			options.DBName = os.Getenv("SERVICE_DBNAME")
+		}
+		if os.Getenv("SERVICE_DBUSER") != "" {
+			options.DBUser = os.Getenv("SERVICE_DBUSER")
+		}
+		if os.Getenv("SERVICE_DBPASSWORD") != "" {
+			options.DBPassword = os.Getenv("SERVICE_DBPASSWORD")
+		}
+		if os.Getenv("SERVICE_ADMINKEY") != "" {
+			options.AdminKey = os.Getenv("SERVICE_ADMINKEY")
+		}
 
 		println()
 		println("=== Starting DH@MPS Vector Database ...")
