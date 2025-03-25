@@ -245,3 +245,27 @@ func apiKeyIsValid(rawKey string, storedHash string) bool {
 	contentEqual := subtle.ConstantTimeCompare([]byte(storedHash), []byte(hashedKey)) == 1
 	return contentEqual
 }
+
+// CORSMiddleware handles CORS for the API
+func CORSMiddleware(api huma.API) func(ctx huma.Context, next func(huma.Context)) {
+	return func(ctx huma.Context, next func(huma.Context)) {
+		// Set CORS headers
+		for key, value := range map[string]string{
+			"Access-Control-Allow-Origin":  "*",
+			"Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH, UPDATE, QUERY",
+			"Access-Control-Allow-Headers": "Accept, Authorization, Content-Type, Content-Disposition, Origin, X-Requested-With",
+		} {
+			ctx.SetHeader(key, value)
+		}
+
+		// If this is a preflight OPTIONS request, return immediately with 200 OK
+		if ctx.Operation().Method == "OPTIONS" {
+			// fmt.Print("    OPTIONS request received, handled in CORS middleware.\n")
+			ctx.SetStatus(http.StatusOK)
+			return
+		}
+
+		// Otherwise, continue processing the request
+		next(ctx)
+	}
+}

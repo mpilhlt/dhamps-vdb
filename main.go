@@ -88,7 +88,21 @@ func main() {
 		config := huma.DefaultConfig("DHaMPS Vector Database API", "0.0.1")
 		config.Components.SecuritySchemes = auth.Config
 		router := http.NewServeMux()
+
+		// Register a global OPTIONS andler before creating the API
+		router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == "OPTIONS" {
+				// fmt.Print("    OPTIONS request received, handled in main function.\n")
+				w.Header().Set("Access-Control-Allow-Origin", "*")
+				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH, UPDATE, QUERY")
+				w.Header().Set("Access-Control-Allow-Headers", "Accept, Authorization, Content-Type, Content-Disposition, Origin, X-Requested-With")
+				w.WriteHeader(http.StatusOK)
+				return
+			}
+		})
+
 		api := humago.New(router, config)
+		api.UseMiddleware(auth.CORSMiddleware(api))
 		api.UseMiddleware(auth.APIKeyAdminAuth(api, options))
 		api.UseMiddleware(auth.APIKeyOwnerAuth(api, pool, options))
 		api.UseMiddleware(auth.APIKeyReaderAuth(api, pool, options))
