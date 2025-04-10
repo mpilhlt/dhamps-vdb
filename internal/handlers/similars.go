@@ -16,6 +16,14 @@ import (
 
 // Define handler functions for each route
 func getSimilarFunc(ctx context.Context, input *models.GetSimilarRequest) (*models.SimilarResponse, error) {
+	// Check if only one of input.MetadataField and input.MetadataValue are given
+	if input.MetadataPath != "" && input.MetadataValue == "" {
+		return nil, huma.Error400BadRequest("metadata_path is set but metadata_value is not")
+	}
+	if input.MetadataPath == "" && input.MetadataValue != "" {
+		return nil, huma.Error400BadRequest("metadata_value is set but metadata_path is not")
+	}
+
 	// Check if user exists
 	_, err := getUserFunc(ctx, &models.GetUserRequest{UserHandle: input.UserHandle})
 	if err != nil {
@@ -41,18 +49,35 @@ func getSimilarFunc(ctx context.Context, input *models.GetSimilarRequest) (*mode
 		return nil, err
 	}
 
-	// Run the query
+	// Run the query, either with or without metadata filter
 	queries := database.New(pool)
-	params := database.GetSimilarsByIDParams{
-		TextID:        pgtype.Text{String: url.QueryEscape(input.TextID), Valid: true},
-		Owner:         input.UserHandle,
-		ProjectHandle: input.ProjectHandle,
-		Column4:       input.Threshold,
-		Limit:         min(int32(input.Limit), int32(input.Count)),
-		Offset:        int32(input.Offset),
+	var sim []pgtype.Text
+
+	if input.MetadataPath == "" {
+		params := database.GetSimilarsByIDParams{
+			TextID:        pgtype.Text{String: url.QueryEscape(input.TextID), Valid: true},
+			Owner:         input.UserHandle,
+			ProjectHandle: input.ProjectHandle,
+			Column4:       input.Threshold,
+			Limit:         min(int32(input.Limit), int32(input.Count)),
+			Offset:        int32(input.Offset),
+		}
+		fmt.Printf("getting similar items for %v\n", params)
+		sim, err = queries.GetSimilarsByID(ctx, params)
+	} else {
+		params := database.GetSimilarsByIDWithFilterParams{
+			TextID:        pgtype.Text{String: url.QueryEscape(input.TextID), Valid: true},
+			Owner:         input.UserHandle,
+			ProjectHandle: input.ProjectHandle,
+			Column4:       input.Threshold,
+			Column5:       input.MetadataPath,
+			Column6:       input.MetadataValue,
+			Limit:         min(int32(input.Limit), int32(input.Count)),
+			Offset:        int32(input.Offset),
+		}
+		fmt.Printf("getting similar items for %v\n", params)
+		sim, err = queries.GetSimilarsByIDWithFilter(ctx, params)
 	}
-	fmt.Printf("getting similar items for %v\n", params)
-	sim, err := queries.GetSimilarsByID(ctx, params)
 	fmt.Printf("got this response from the database: %v\n", sim)
 	if err != nil {
 		if err.Error() == "no rows in result set" {

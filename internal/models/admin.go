@@ -7,7 +7,7 @@ import "net/http"
 // The response structs must be structs with fields for the output headers and body of the operation, if any.
 
 // Reset Database
-// GET Path: "/v1/admin/reset-db"
+// GET Path: "/v1/admin/footgun"
 
 type ResetDbRequest struct{}
 

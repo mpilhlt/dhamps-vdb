@@ -17,5 +17,43 @@
     "metadata": {
       "author": "Immanuel Kant"
     }
+  },
+  {
+    "text_id": "https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.2",
+    "user_handle": "alice",
+    "project_handle": "test1",
+    "project_id": 1,
+    "llm_service_handle": "openai-large",
+    "text": "This is a similar test document",
+    "vector": [
+        -2.085085e-02,
+        1.852216e-02,
+        5.327000e-02,
+        7.138438e-02,
+        2.000308e-02
+    ],
+    "vector_dim": 5,
+    "metadata": {
+      "author": "Immanuel Kant"
+    }
+  },
+  {
+    "text_id": "https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol2",
+    "user_handle": "alice",
+    "project_handle": "test1",
+    "project_id": 1,
+    "llm_service_handle": "openai-large",
+    "text": "This is a similar test document",
+    "vector": [
+        -2.085085e-02,
+        1.852216e-02,
+        5.327000e-02,
+        7.138438e-02,
+        2.000308e-02
+    ],
+    "vector_dim": 5,
+    "metadata": {
+      "author": "Immanuel Other"
+    }
   }]
 }

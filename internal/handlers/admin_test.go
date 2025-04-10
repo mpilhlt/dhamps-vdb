@@ -36,7 +36,7 @@ func TestAdminFunc(t *testing.T) {
 		{
 			name:         "Reset database, unauthorized",
 			method:       http.MethodGet,
-			requestPath:  "/v1/admin/reset-db",
+			requestPath:  "/v1/admin/footgun",
 			bodyPath:     "",
 			apiKey:       "",
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Unauthorized\",\n  \"status\": 401,\n  \"detail\": \"Authentication failed. Perhaps a missing or incorrect API key?\"\n}\n",
@@ -45,7 +45,7 @@ func TestAdminFunc(t *testing.T) {
 		{
 			name:         "Valid reset database",
 			method:       http.MethodGet,
-			requestPath:  "/v1/admin/reset-db",
+			requestPath:  "/v1/admin/footgun",
 			bodyPath:     "",
 			apiKey:       options.AdminKey,
 			expectBody:   "",

@@ -160,7 +160,7 @@ func TestAPIStandardFunc(t *testing.T) {
 	t.Cleanup(func() {
 		fmt.Print("\n\nRunning cleanup ...\n\n")
 
-		requestURL := fmt.Sprintf("http://%s:%d/v1/admin/reset-db", options.Host, options.Port)
+		requestURL := fmt.Sprintf("http://%s:%d/v1/admin/footgun", options.Host, options.Port)
 		req, err := http.NewRequest(http.MethodGet, requestURL, nil)
 		assert.NoError(t, err)
 		req.Header.Set("Authorization", "Bearer "+options.AdminKey)

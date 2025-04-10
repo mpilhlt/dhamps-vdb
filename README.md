@@ -28,22 +28,70 @@ In both cases, the service returns a list of text identifiers that you can then 
 
 ## Getting started
 
-For **compiling**, you should run `go get ./... ; sqlc generate --no-remote ; go build -o build/dhamps-vdb main.go` (or in place of the last command you can also run it directly with `go run main.go`).
-For testing (i.e. without compiling and deploying), you can go to the main directory of the git repository and launch the vdb app like this:
+### Compiling
 
-For **running**, you need an admin key and a couple of other variables. Have a look in [options.go](./internal/models/options.go) for the full list and documentation.
+For **compiling**, you should run `go get ./... ; sqlc generate --no-remote ; go build -o build/dhamps-vdb main.go` (or in place of the last command you can also run it directly with `go run main.go`).
+
+#### Run tests
+
+Actual (mostly integration) tests are run like this:
+
+```bash
+$> systemctl --user start podman.socket
+$> export DOCKER_HOST=unix://$XDG_RUNTIME_DIR/podman/podman.sock
+$> go test -v ./...
+```
+
+These tests do not contact any separately installed/launched backend, and instead have a container managed by the testing itself (via [testcontainers](https://testcontainers.com/guides/getting-started-with-testcontainers-for-go/)).
+
+### Running
+
+For **running**, you need to set an admin key and a couple of other variables. Have a look in [options.go](./internal/models/options.go) for the full list and documentation.
 
 You can specify them as command line options, with environment values or in an `.env` file. This last option is recommended because this way, the sensitive information will not be in the command history; but you have to take care of this file's security. For instance, it will/should not be synced to your versioning platform, it is thus listed in `.gitignore` by default.
 
-If you authenticate with this key, you can create users by `POST`ing to the `/v1/users` endpoint. (The response to user creation will communicate an API key for the new user. Keep it safe, it is not stored anywhere and cannot be recovered.) Then, either the admin or the user can create projects, llm services and finally post embeddings and get similar elements.
+If you authenticate with this key, you can create users by `POST`ing to the `/v1/users` endpoint. (The response to user creation will contain an API key for the new user. **Keep it safe, it is not stored anywhere and cannot be recovered.**) Then, either the admin or the user can create projects, llm services and finally post embeddings and get similar elements.
 
 When launching, the application checks and migrates the database schema to the appropriate version if possible. It presupposes however, that a suitable database and user (with appropriate privileges) have been created beforehand. SQL commands to prepare the database are listed below. For other ways of running, e.g. for tests or with a container instead of an external database, see below as well.
 
-### Authenticating
+#### Run with local container
 
-The API key is communicated in the `Authorization` header with a `Bearer` prefix, e.g. `Bearer 024v2013621509245f2e24`. Most operations can only be done by the (admin or the) owner of the resource in question. For projects and their embeddings, you can define other user accounts that should be authorized as readers, too. (But at the moment, the function for adding them is still missing.)
+A local container with a pg_vector-enabled postgresql can be run like this:
 
-## Endpoints
+```bash
+$> podman run -p 8888:5432 -e POSTGRES_PASSWORD=password pgvector/pgvector:0.7.4-pg16
+```
+
+But be aware that the filesystem is not persisted if you run it like this. That means that when you stop and remove the container, you will have to repeat the following database setup when you run it again later on. (And of course any data you may have saved inside the container is lost, too.)
+
+You can connect to it from a second terminal like so:
+
+```bash
+$> psql -p 8888 -h localhost -U postgres -d postgres
+```
+
+And then set up the database like this:
+
+```sql
+postgres=# CREATE DATABASE my_vectors;
+postgres=# CREATE USER my_user WITH PASSWORD 'my-password';
+postgres=# GRANT ALL PRIVILEGES ON DATABASE "my_vectors" to my_user;
+postgres=# \c my_vectors
+postgres=# GRANT ALL ON SCHEMA public TO my_user;
+postgres=# CREATE EXTENSION IF NOT EXISTS vector;
+```
+
+### Client Authentication
+
+Clients should communicate the API key in the `Authorization` header with a `Bearer` prefix, e.g. `Bearer 024v2013621509245f2e24`. Most operations can only be done by the (admin or the) owner of the resource in question. For projects and their embeddings, you can define other user accounts that should be authorized as readers, too. (But at the moment, the function for adding them is still missing.)
+
+## API documentation
+
+### API Versioning
+
+We are at `v1`. The first path component to all the endpoints (except for the OpenAPI file) is the version number, e.g. `POST https://<hostname>/v1/embeddings/<user>/<project>`.
+
+### Endpoints
 
 In the following table, the version number is skipped for readibility reasons. Nevertheless, it is the first component of all these endpoints.
 
@@ -80,10 +128,6 @@ For a more detailed, and always up-to-date documentation of the endpoints, inclu
 | /similars/\<username\>/\<projectname\>/\<identifier\> | GET | Get a list of identifiers for records that are similar to the text \<identifier\> in \<username\>'s project \<projectname\> | admin, \<username\>, authorized readers |
 
 \* API standards are definitions of how to access an LLM Service: API endpoints, authentication mechanism etc. They are referred to from LLM Service definitions. When LLM Processing will be attempted, this is what will be implemented. Examples are the Cohere Embed API, Version 2, as documented in <https://docs.cohere.com/reference/embed>, or the OpenAI Embeddings API, Version 1, as documented in <https://platform.openai.com/docs/api-reference/embeddings>. You can find these examples in the [valid_api_standard\*.json](./testdata/) files in the `testdata` directory.
-
-### API Versioning
-
-We are at `v1`. The first path component to all the endpoints (except for the OpenAPI file) is the version number, e.g. `POST https://<hostname>/v1/embeddings/<user>/<project>`.
 
 ## Code creation and structure
 
@@ -170,47 +214,6 @@ dhamps-vdb/
 └── web/                      // Web resources for the html response (in the future)
 ```
 
-## Running
-
-### Run tests
-
-Actual (mostly integration) tests are run like this:
-
-```bash
-$> systemctl --user start podman.socket
-$> export DOCKER_HOST=unix://$XDG_RUNTIME_DIR/podman/podman.sock
-$> go test -v ./...
-```
-
-These tests do not contact any separately installed/launched backend, and instead have a container managed by the testing itself (via [testcontainers](https://testcontainers.com/guides/getting-started-with-testcontainers-for-go/)).
-
-### Run with local container
-
-A local container with a pg_vector-enabled postgresql can be run like this:
-
-```bash
-$> podman run -p 8888:5432 -e POSTGRES_PASSWORD=password pgvector/pgvector:0.7.4-pg16
-```
-
-But be aware that the filesystem is not persisted if you run it like this. That means that when you stop and restart the container, you will have to re-setup the database as described below.
-
-You can connect to it from a second terminal like so:
-
-```bash
-$> psql -p 8888 -h localhost -U postgres -d postgres
-```
-
-And then set up the database like this:
-
-```sql
-postgres=# CREATE DATABASE my_vectors;
-postgres=# CREATE USER my_user WITH PASSWORD 'my-password';
-postgres=# GRANT ALL PRIVILEGES ON DATABASE "my_vectors" to my_user;
-postgres=# \c my_vectors
-postgres=# GRANT ALL ON SCHEMA public TO my_user;
-postgres=# CREATE EXTENSION IF NOT EXISTS vector;
-```
-
 ## Roadmap
 
 - [x] Tests
@@ -223,6 +226,7 @@ postgres=# CREATE EXTENSION IF NOT EXISTS vector;
 - [x] better **options** handling (<https://huma.rocks/features/cli/>)
 - [x] handle **metadata**
   - [ ] Validation with metadata schema
+- [ ] Allow to filter similar passages by metadata field (so as to exclude e.g. documents from the same author)
 - [ ] Implement and make consequent use of **max_idle** (5), **max_concurr** (5), **timeouts**, and **cancellations**
 - [ ] **Concurrency** (leaky bucket approach) and **Rate limiting** (redis, sliding window, implement headers)
 - [ ] Use **transactions** (most importantly, when an action requires several queries, e.g. projects being added and then linked to several read-authorized users)

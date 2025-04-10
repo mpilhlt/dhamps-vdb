@@ -366,11 +366,11 @@ func createAPIStandard(t *testing.T, apiStandardJSON string, apiKey string) (str
 
 // createLLMService creates an LLM service definition for testing and returns the handle and an error value
 // it accepts a JSON string encoding the LLM service object as input
-func createLLMService(t *testing.T, llmServiceJSON string, user, apiKey string) (string, error) {
+func createLLMService(t *testing.T, llmServiceJSON string, user string, apiKey string) (string, error) {
 	fmt.Print("    Creating LLM service ")
 	jsonInput := &struct {
 		LLMServiceHandle string `json:"llm_service_handle" doc:"Handle of created or updated LLM service"`
-		Owner 					 string `json:"owner" doc:"User handle of the service owner"`
+		Owner            string `json:"owner" doc:"User handle of the service owner"`
 		Description      string `json:"description" doc:"Description of the LLM service"`
 	}{}
 	err := json.Unmarshal([]byte(llmServiceJSON), jsonInput)
@@ -406,6 +406,37 @@ func createLLMService(t *testing.T, llmServiceJSON string, user, apiKey string) 
 
 	fmt.Printf("        Successfully created LLM Service (handle \"%s\", id %d).\n", LLMServiceInfo.LLMServiceHandle, LLMServiceInfo.LLMServiceID)
 	return LLMServiceInfo.LLMServiceHandle, nil
+}
+
+// createEmbeddings creates some embeddings entries for testing and returns an error value
+// it accepts a JSON string encording the embeddings db entries
+func createEmbeddings(t *testing.T, embeddings []byte, user string, llmService string, apiKey string) error {
+	fmt.Print("    Creating Embeddings for testing ...\n")
+
+	// Upload embeddings for similars testing
+	requestURL := fmt.Sprintf("http://%s:%d/v1/embeddings/alice/test1", options.Host, options.Port)
+	req, err := http.NewRequest(http.MethodPost, requestURL, bytes.NewReader(embeddings))
+	if err != nil {
+		fmt.Printf("Error creating request for uploading embeddings: %v\n", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("Content-Type", "application/json")
+	assert.NoError(t, err)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		fmt.Printf("Error sending request to upload embeddings: %v\n", err)
+	}
+	defer resp.Body.Close()
+	assert.NoError(t, err)
+
+	if resp.StatusCode != http.StatusCreated {
+		respBody, _ := io.ReadAll(resp.Body)
+		fmt.Printf("Expected status code %d, got %d. Response: %s\n", http.StatusCreated, resp.StatusCode, string(respBody))
+	}
+	assert.NoError(t, err)
+	fmt.Print("        Successfully created embeddings.\n")
+	return nil
 }
 
 // isJSON checks if a string is a valid JSON.

@@ -90,7 +90,7 @@ func TestEmbeddingsFunc(t *testing.T) {
 			requestPath:  "/v1/embeddings/alice/test1",
 			bodyPath:     "../../testdata/valid_embeddings.json",
 			apiKeyHeader: aliceAPIKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/UploadProjEmbeddingsResponseBody.json\",\n  \"ids\": [\n    \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.1.1.1.1\"\n  ]\n}\n",
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/UploadProjEmbeddingsResponseBody.json\",\n  \"ids\": [\n    \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.1.1.1.1\",\n    \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.2\",\n    \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol2\"\n  ]\n}\n",
 			expectStatus: http.StatusCreated,
 		},
 		{
@@ -117,7 +117,7 @@ func TestEmbeddingsFunc(t *testing.T) {
 			requestPath:  "/v1/embeddings/alice/test1",
 			bodyPath:     "",
 			apiKeyHeader: aliceAPIKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/GetProjEmbeddingsResponseBody.json\",\n  \"embeddings\": [\n    {\n      \"text_id\": \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.1.1.1.1\",\n      \"user_handle\": \"alice\",\n      \"project_handle\": \"test1\",\n      \"project_id\": 1,\n      \"llm_service_handle\": \"openai-large\",\n      \"text\": \"This is a test document\",\n      \"vector\": [\n        -0.020843506,\n        0.01852417,\n        0.05328369,\n        0.07141113,\n        0.020004272\n      ],\n      \"vector_dim\": 5,\n      \"metadata\": {\n        \"author\": \"Immanuel Kant\"\n      }\n    }\n  ]\n}\n",
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/GetProjEmbeddingsResponseBody.json\",\n  \"embeddings\": [\n    {\n      \"text_id\": \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.1.1.1.1\",\n      \"user_handle\": \"alice\",\n      \"project_handle\": \"test1\",\n      \"project_id\": 1,\n      \"llm_service_handle\": \"openai-large\",\n      \"text\": \"This is a test document\",\n      \"vector\": [\n        -0.020843506,\n        0.01852417,\n        0.05328369,\n        0.07141113,\n        0.020004272\n      ],\n      \"vector_dim\": 5,\n      \"metadata\": {\n        \"author\": \"Immanuel Kant\"\n      }\n    },\n    {\n      \"text_id\": \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.2\",\n      \"user_handle\": \"alice\",\n      \"project_handle\": \"test1\",\n      \"project_id\": 1,\n      \"llm_service_handle\": \"openai-large\",\n      \"text\": \"This is a similar test document\",\n      \"vector\": [\n        -0.020843506,\n        0.01852417,\n        0.05328369,\n        0.07141113,\n        0.020004272\n      ],\n      \"vector_dim\": 5,\n      \"metadata\": {\n        \"author\": \"Immanuel Kant\"\n      }\n    },\n    {\n      \"text_id\": \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol2\",\n      \"user_handle\": \"alice\",\n      \"project_handle\": \"test1\",\n      \"project_id\": 1,\n      \"llm_service_handle\": \"openai-large\",\n      \"text\": \"This is a similar test document\",\n      \"vector\": [\n        -0.020843506,\n        0.01852417,\n        0.05328369,\n        0.07141113,\n        0.020004272\n      ],\n      \"vector_dim\": 5,\n      \"metadata\": {\n        \"author\": \"Immanuel Other\"\n      }\n    }\n  ]\n}\n",
 			expectStatus: http.StatusOK,
 		},
 		{
@@ -162,7 +162,7 @@ func TestEmbeddingsFunc(t *testing.T) {
 			requestPath:  "/v1/embeddings/alice/test1",
 			bodyPath:     "../../testdata/valid_embeddings.json",
 			apiKeyHeader: aliceAPIKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/UploadProjEmbeddingsResponseBody.json\",\n  \"ids\": [\n    \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.1.1.1.1\"\n  ]\n}\n",
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/UploadProjEmbeddingsResponseBody.json\",\n  \"ids\": [\n    \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.1.1.1.1\",\n    \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.2\",\n    \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol2\"\n  ]\n}\n",
 			expectStatus: http.StatusCreated,
 		},
 		{
@@ -180,7 +180,7 @@ func TestEmbeddingsFunc(t *testing.T) {
 			requestPath:  "/v1/embeddings/alice/test1",
 			bodyPath:     "../../testdata/valid_embeddings.json",
 			apiKeyHeader: aliceAPIKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/UploadProjEmbeddingsResponseBody.json\",\n  \"ids\": [\n    \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.1.1.1.1\"\n  ]\n}\n",
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/UploadProjEmbeddingsResponseBody.json\",\n  \"ids\": [\n    \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.1.1.1.1\",\n    \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.2\",\n    \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol2\"\n  ]\n}\n",
 			expectStatus: http.StatusCreated,
 		},
 		{
@@ -198,7 +198,7 @@ func TestEmbeddingsFunc(t *testing.T) {
 			requestPath:  "/v1/embeddings/alice/test1",
 			bodyPath:     "../../testdata/valid_embeddings.json",
 			apiKeyHeader: aliceAPIKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/UploadProjEmbeddingsResponseBody.json\",\n  \"ids\": [\n    \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.1.1.1.1\"\n  ]\n}\n",
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/UploadProjEmbeddingsResponseBody.json\",\n  \"ids\": [\n    \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.1.1.1.1\",\n    \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.2\",\n    \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol2\"\n  ]\n}\n",
 			expectStatus: http.StatusCreated,
 		},
 		{
@@ -216,7 +216,7 @@ func TestEmbeddingsFunc(t *testing.T) {
 			requestPath:  "/v1/embeddings/alice/test1",
 			bodyPath:     "../../testdata/valid_embeddings.json",
 			apiKeyHeader: aliceAPIKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/UploadProjEmbeddingsResponseBody.json\",\n  \"ids\": [\n    \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.1.1.1.1\"\n  ]\n}\n",
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/UploadProjEmbeddingsResponseBody.json\",\n  \"ids\": [\n    \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.1.1.1.1\",\n    \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.2\",\n    \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol2\"\n  ]\n}\n",
 			expectStatus: http.StatusCreated,
 		},
 		{
@@ -234,7 +234,7 @@ func TestEmbeddingsFunc(t *testing.T) {
 			requestPath:  "/v1/embeddings/alice/test1",
 			bodyPath:     "../../testdata/valid_embeddings.json",
 			apiKeyHeader: aliceAPIKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/UploadProjEmbeddingsResponseBody.json\",\n  \"ids\": [\n    \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.1.1.1.1\"\n  ]\n}\n",
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/UploadProjEmbeddingsResponseBody.json\",\n  \"ids\": [\n    \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.1.1.1.1\",\n    \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.2\",\n    \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol2\"\n  ]\n}\n",
 			expectStatus: http.StatusCreated,
 		},
 		{
@@ -319,7 +319,7 @@ func TestEmbeddingsFunc(t *testing.T) {
 	t.Cleanup(func() {
 		fmt.Print("\n\nRunning cleanup ...\n\n")
 
-		requestURL := fmt.Sprintf("http://%s:%d/v1/admin/reset-db", options.Host, options.Port)
+		requestURL := fmt.Sprintf("http://%s:%d/v1/admin/footgun", options.Host, options.Port)
 		req, err := http.NewRequest(http.MethodGet, requestURL, nil)
 		assert.NoError(t, err)
 		req.Header.Set("Authorization", "Bearer "+options.AdminKey)
