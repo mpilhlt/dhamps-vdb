@@ -1,12 +1,10 @@
 # dhamps-vdb
 Vector Database for the DH at Max Planck Society initiative
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/mpilhlt/dhamps-vdb?style=flat-square)](https://goreportcard.com/report/github.com/mpilhlt/dhamps-vdb) [![Release](https://img.shields.io/github/v/release/mpilhlt/dhamps-vdb.svg?style=flat-square&include_prereleases)](https://github.com/mpilhlt/dhamps-vdb/releases/latest)
+
 <!--
-[![Go Report Card](https://goreportcard.com/badge/github.com/mpilhlt/dhamps-vdb?style=flat-square)](https://goreportcard.com/report/github.com/mpilhlt/dhamps-vdb)
-
 [![Go Reference](https://pkg.go.dev/badge/github.com/mpilhlt/dhamps-vdb.svg)](https://pkg.go.dev/github.com/mpilhlt/dhamps-vdb)
-
-[![Release](https://img.shields.io/github/release/golang-standards/project-layout.svg?style=flat-square)](https://github.com/golang-standards/project-layout/releases/latest)
 -->
 
 ## Introduction
@@ -226,15 +224,19 @@ dhamps-vdb/
 - [x] better **options** handling (<https://huma.rocks/features/cli/>)
 - [x] handle **metadata**
   - [ ] Validation with metadata schema
-- [ ] Allow to filter similar passages by metadata field (so as to exclude e.g. documents from the same author)
+- [x] Allow to filter similar passages by metadata field (so as to exclude e.g. documents from the same author)
+  - [ ] Add documentation (the GET query parameters are called `metadata_path` and `metadata_value` as in: `https://xy.org/vdb-api/v1/similars/sal/sal-openai-large/https%3A%2F%2Fid.myproject.net%2Ftexts%2FW0011%3A1.3.1.3.1?threshold=0.7&limit=5&metadata_path=author_id&metadata_value=A0083`)
 - [ ] Implement and make consequent use of **max_idle** (5), **max_concurr** (5), **timeouts**, and **cancellations**
 - [ ] **Concurrency** (leaky bucket approach) and **Rate limiting** (redis, sliding window, implement headers)
 - [ ] Use **transactions** (most importantly, when an action requires several queries, e.g. projects being added and then linked to several read-authorized users)
+- [ ] Use PATCH method to change existing resources
+- [ ] Add mechanism to allow anonymous/public reading access to embeddings
 - [ ] **Dockerization**
 - [ ] **Batch mode**
 - [ ] **Link or unlink** users/LLMs as standalone operations
 - [ ] **Transfer** of projects from one owner to another as new operation
-- [ ] proper **logging** with `--verbose` and `--quiet` modes
+- [ ] Fix automatically generated documentation
+- [ ] Proper **logging** with `--verbose` and `--quiet` modes
 - [ ] Caching
 - [ ] HTML UI?
 - [ ] LLM handling processing (receive text and send it to an llm service on the user's behalf, then store the results)

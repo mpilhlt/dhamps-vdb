@@ -38,7 +38,7 @@ func TestUserFunc(t *testing.T) {
 		expectStatus int16
 	}{
 		{
-			name:         "Put user, everyting valid",
+			name:         "Put user, everything valid",
 			method:       http.MethodPut,
 			requestPath:  "/v1/users/alice",
 			bodyPath:     "../../testdata/valid_user.json",

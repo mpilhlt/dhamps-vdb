@@ -320,7 +320,7 @@ func createProject(t *testing.T, projectJSON string, user string, apiKey string)
 	return projectInfo.ProjectID, nil
 }
 
-// createAPIStandard creates an API standard defintion for testing and returns the handle and an error value
+// createAPIStandard creates an API standard definition for testing and returns the handle and an error value
 // it accepts a JSON string encoding the API standard object as input
 func createAPIStandard(t *testing.T, apiStandardJSON string, apiKey string) (string, error) {
 	fmt.Print("    Creating API standard ")

@@ -98,7 +98,7 @@ func putProjectFunc(ctx context.Context, input *models.PutProjectRequest) (*mode
 	return response, nil
 }
 
-// Create a user (without a handle being present in the URL)
+// Create a project (without a handle being present in the URL)
 func postProjectFunc(ctx context.Context, input *models.PostProjectRequest) (*models.UploadProjectResponse, error) {
 	return putProjectFunc(ctx, &models.PutProjectRequest{UserHandle: input.UserHandle, ProjectHandle: input.Body.ProjectHandle, Body: input.Body})
 }
