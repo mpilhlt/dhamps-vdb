@@ -41,9 +41,9 @@ func putProjectFunc(ctx context.Context, input *models.PutProjectRequest) (*mode
 		if user == "*" {
 			publicRead = true
 			// Still add existing users as readers for backwards compatibility
-			users, err := getUsersFunc(ctx, &models.GetUsersRequest{})
+			users, err := getUsersFunc(ctx, &models.GetUsersRequest{Limit: 999, Offset: 0})
 			if err != nil {
-				return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get user %s", user))
+				return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get users list: %v", err))
 			}
 			for _, uu := range users.Body {
 				if uu != input.UserHandle {
