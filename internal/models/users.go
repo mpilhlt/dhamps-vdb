@@ -7,9 +7,9 @@ type User struct {
 	UserHandle  string             `json:"user_handle"      doc:"User handle" maxLength:"20"  minLength:"3" example:"jdoe"`
 	Name        string             `json:"name,omitempty"   doc:"User name"   maxLength:"50"                example:"Jane Doe"`
 	Email       string             `json:"email"            doc:"User email"  maxLength:"100" minLength:"5" example:"foo@bar.com"`
-	APIKey      string             `json:"apiKey,omitempty" doc:"User API key for dhamps-vdb API" maxLength:"64" minLength:"64" example:"1234567890123456789012345678901212345678901234567890123456789012"`
-	Projects    ProjectMemberships `json:"projects,omitempty" doc:"Projects that the user is a member of"`
-	LLMServices LLMMemberships     `json:"llm_services,omitempty" doc:"LLM services that the user is a member of"`
+	APIKey      string             `json:"apiKey,omitempty" readOnly:"true" doc:"User API key for dhamps-vdb API" maxLength:"64" minLength:"64" example:"1234567890123456789012345678901212345678901234567890123456789012"`
+	Projects    ProjectMemberships `json:"projects,omitempty" readOnly:"true" doc:"Projects that the user is a member of"`
+	LLMServices LLMMemberships     `json:"llm_services,omitempty" readOnly:"true" doc:"LLM services that the user is a member of"`
 }
 
 type LLMMembership struct {

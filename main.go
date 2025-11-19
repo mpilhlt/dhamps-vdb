@@ -14,6 +14,7 @@ import (
 	"github.com/mpilhlt/dhamps-vdb/internal/models"
 
 	"github.com/danielgtaylor/huma/v2/adapters/humago"
+	"github.com/danielgtaylor/huma/v2/autopatch"
 	"github.com/danielgtaylor/huma/v2/humacli"
 	"github.com/joho/godotenv"
 
@@ -114,6 +115,9 @@ func main() {
 			fmt.Printf("    Unable to add routes: %v\n", err)
 			os.Exit(1)
 		}
+
+		// Add AutoPatch to automatically create PATCH endpoints for resources with GET+PUT
+		autopatch.AutoPatch(api)
 
 		// Create the HTTP server
 		// TODO: Add limits to the server (e.g. timeouts, max header size, etc.)

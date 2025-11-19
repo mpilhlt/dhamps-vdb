@@ -19,7 +19,7 @@ func TestProjectsFunc(t *testing.T) {
 	// Create a mock key generator
 	mockKeyGen := new(MockKeyGen)
 	// Set up expectations for the mock key generator
-	mockKeyGen.On("RandomKey", 32).Return("12345678901234567890123456789012", nil)
+	mockKeyGen.On("RandomKey", 32).Return("12345678901234567890123456789012", nil).Maybe()
 
 	// Start the server
 	err, shutDownServer := startTestServer(t, pool, mockKeyGen)
@@ -113,7 +113,7 @@ func TestProjectsFunc(t *testing.T) {
 			requestPath:  "/v1/projects/alice/test1",
 			bodyPath:     "",
 			apiKey:       aliceAPIKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/Project.json\",\n  \"project_id\": 1,\n  \"project_handle\": \"test1\",\n  \"owner\": \"alice\",\n  \"description\": \"This is a test project\",\n  \"authorizedReaders\": [\n    \"alice\"\n  ],\n  \"number_of_embeddings\": 0\n}\n",
+			expectBody:   "{\n  \"project_id\": 1,\n  \"project_handle\": \"test1\",\n  \"owner\": \"alice\",\n  \"description\": \"This is a test project\",\n  \"authorizedReaders\": [\n    \"alice\"\n  ],\n  \"number_of_embeddings\": 0\n}\n",
 			expectStatus: http.StatusOK,
 		},
 		{

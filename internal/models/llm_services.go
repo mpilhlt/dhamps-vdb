@@ -21,9 +21,9 @@ type LLMServiceInput struct {
 }
 
 type LLMService struct {
-	LLMServiceID     int    `json:"llm_service_id,omitempty" doc:"Unique service identifier" example:"153"`
+	LLMServiceID     int    `json:"llm_service_id,omitempty" readOnly:"true" doc:"Unique service identifier" example:"153"`
 	LLMServiceHandle string `json:"llm_service_handle" minLength:"3" maxLength:"20" example:"GPT-4 API" doc:"Service name"`
-	Owner            string `json:"owner" doc:"User handle of the service owner"`
+	Owner            string `json:"owner" readOnly:"true" doc:"User handle of the service owner"`
 	Endpoint         string `json:"endpoint" example:"https://api.openai.com/v1/embeddings" doc:"Service endpoint"`
 	Description      string `json:"description,omitempty" doc:"Service description"`
 	APIKey           string `json:"api_key,omitempty" example:"12345678901234567890123456789012" doc:"Authentication token for the service"`
@@ -44,16 +44,16 @@ type LLMService struct {
 // PUT Path: "/v1/llm-services/{user_handle}/{llm_service_handle}"
 
 type PutLLMRequest struct {
-	UserHandle       string          `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
-	LLMServiceHandle string          `json:"llm_service_handle" path:"llm_service_handle" maxLength:"20" minLength:"3" example:"my-gpt-4" doc:"LLM service handle"`
-	Body             LLMServiceInput `json:"llm_service" doc:"LLM service to create or update"`
+	UserHandle       string     `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
+	LLMServiceHandle string     `json:"llm_service_handle" path:"llm_service_handle" maxLength:"20" minLength:"3" example:"my-gpt-4" doc:"LLM service handle"`
+	Body             LLMService `json:"llm_service" doc:"LLM service to create or update"`
 }
 
 // POST Path: "/v1/llm-services/{user_handle}"
 
 type PostLLMRequest struct {
-	UserHandle string          `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
-	Body       LLMServiceInput `json:"llm_service" doc:"LLM service to create or update"`
+	UserHandle string     `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
+	Body       LLMService `json:"llm_service" doc:"LLM service to create or update"`
 }
 
 type UploadLLMResponse struct {

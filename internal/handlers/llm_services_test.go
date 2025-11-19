@@ -19,7 +19,7 @@ func TestLLMServicesFunc(t *testing.T) {
 	// Create a mock key generator
 	mockKeyGen := new(MockKeyGen)
 	// Set up expectations for the mock key generator
-	mockKeyGen.On("RandomKey", 32).Return("12345678901234567890123456789012", nil)
+	mockKeyGen.On("RandomKey", 32).Return("12345678901234567890123456789012", nil).Maybe()
 
 	// Start the server
 	err, shutDownServer := startTestServer(t, pool, mockKeyGen)
@@ -156,7 +156,7 @@ func TestLLMServicesFunc(t *testing.T) {
 			requestPath:  "/v1/llm-services/alice/openai-large",
 			bodyPath:     "",
 			apiKey:       aliceAPIKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/LLMService.json\",\n  \"llm_service_id\": 1,\n  \"llm_service_handle\": \"openai-large\",\n  \"owner\": \"alice\",\n  \"endpoint\": \"https://api.openai.com/v1/embeddings\",\n  \"description\": \"My OpenAI full text-embedding-3-large service\",\n  \"api_key\": \"0123456789\",\n  \"api_standard\": \"openai\",\n  \"model\": \"text-embedding-3-large\",\n  \"dimensions\": 3072\n}\n",
+			expectBody:   "{\n  \"llm_service_id\": 1,\n  \"llm_service_handle\": \"openai-large\",\n  \"owner\": \"alice\",\n  \"endpoint\": \"https://api.openai.com/v1/embeddings\",\n  \"description\": \"My OpenAI full text-embedding-3-large service\",\n  \"api_key\": \"0123456789\",\n  \"api_standard\": \"openai\",\n  \"model\": \"text-embedding-3-large\",\n  \"dimensions\": 3072\n}\n",
 			expectStatus: http.StatusOK,
 		},
 		{

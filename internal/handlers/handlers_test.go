@@ -21,6 +21,7 @@ import (
 
 	huma "github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humago"
+	"github.com/danielgtaylor/huma/v2/autopatch"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -188,6 +189,10 @@ func startTestServer(t *testing.T, pool *pgxpool.Pool, keyGen handlers.RandomKey
 		fmt.Printf("Unable to add routes to API: %v", err)
 		return err, func() {}
 	}
+
+	// Add AutoPatch to automatically create PATCH endpoints for resources with GET+PUT
+	autopatch.AutoPatch(api)
+
 	fmt.Print("    Router ready\n")
 
 	/* HTTP Server setup (we set up httptest.Server below instead)
