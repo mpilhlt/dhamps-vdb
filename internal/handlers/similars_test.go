@@ -180,3 +180,18 @@ func TestSimilarsFunc(t *testing.T) {
 	})
 
 }
+
+// TestPostSimilarStub is a placeholder test for the POST similar functionality.
+// The POST similar functionality is not yet implemented (returns nil, nil).
+// This test documents that the handler exists but is not yet functional.
+func TestPostSimilarStub(t *testing.T) {
+	t.Skip("POST similar functionality is not yet implemented")
+	
+	// TODO: When postSimilarFunc is implemented, add tests for:
+	// - Valid POST request with embedding vector
+	// - Invalid POST request with malformed data
+	// - Finding similar items based on provided vector
+	// - Authentication/authorization checks
+	// - Edge cases and error handling
+}
+
