@@ -129,6 +129,34 @@ For a more detailed, and always up-to-date documentation of the endpoints, inclu
 
 \* API standards are definitions of how to access an LLM Service: API endpoints, authentication mechanism etc. They are referred to from LLM Service definitions. When LLM Processing will be attempted, this is what will be implemented. Examples are the Cohere Embed API, Version 2, as documented in <https://docs.cohere.com/reference/embed>, or the OpenAI Embeddings API, Version 1, as documented in <https://platform.openai.com/docs/api-reference/embeddings>. You can find these examples in the [valid_api_standard\*.json](./testdata/) files in the `testdata` directory.
 
+### Partial Updates with PATCH
+
+For resources that support both GET and PUT operations, PATCH requests are automatically available for partial updates. You only need to include the fields you want to change. This is particularly useful for updating single fields without having to provide all resource data.
+
+**Supported resources:**
+- Users: `/v1/users/{username}`
+- Projects: `/v1/projects/{username}/{projectname}`
+- LLM Services: `/v1/llm-services/{username}/{llm_servicename}`
+- API Standards: `/v1/api-standards/{standardname}`
+
+**Example: Enable world-readable access for a project**
+```bash
+curl -X PATCH https://<hostname>/v1/projects/alice/myproject \
+  -H "Authorization: Bearer <api_key>" \
+  -H "Content-Type: application/json" \
+  -d '{"authorizedReaders": ["*"]}'
+```
+
+**Example: Update project description**
+```bash
+curl -X PATCH https://<hostname>/v1/projects/alice/myproject \
+  -H "Authorization: Bearer <api_key>" \
+  -H "Content-Type: application/json" \
+  -d '{"description": "Updated project description"}'
+```
+
+The PATCH endpoint merges your changes with the existing resource data retrieved via GET, then applies the update via PUT.
+
 ## Code creation and structure
 
 This API is programmed in go and uses the [huma](https://huma.rocks/) framework with go's stock `http.ServeMux()` routing.
