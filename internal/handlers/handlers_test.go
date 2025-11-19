@@ -255,8 +255,21 @@ func (m *MockKeyGen) RandomKey(len int) (string, error) {
 // createUser creates a user and returns the API key and an error value
 // it accepts a JSON string encoding the user object as input
 func createUser(t *testing.T, userJSON string) (string, error) {
-	fmt.Print("    Creating user (\"alice\") for testing ...\n")
-	requestURL := fmt.Sprintf("http://%s:%d/v1/users/alice", options.Host, options.Port)
+	// Extract user handle from JSON
+	jsonInput := &struct {
+		UserHandle string `json:"user_handle"`
+		Name       string `json:"name"`
+		Email      string `json:"email"`
+	}{}
+	err := json.Unmarshal([]byte(userJSON), jsonInput)
+	if err != nil {
+		fmt.Printf("Error unmarshalling user JSON: %v\n", err)
+		return "", err
+	}
+	assert.NoError(t, err)
+	
+	fmt.Printf("    Creating user (\"%s\") for testing ...\n", jsonInput.UserHandle)
+	requestURL := fmt.Sprintf("http://%s:%d/v1/users/%s", options.Host, options.Port, jsonInput.UserHandle)
 	requestBody := bytes.NewReader([]byte(userJSON))
 	req, err := http.NewRequest(http.MethodPut, requestURL, requestBody)
 	assert.NoError(t, err)
@@ -265,12 +278,23 @@ func createUser(t *testing.T, userJSON string) (string, error) {
 	assert.NoError(t, err)
 	defer resp.Body.Close()
 
-	// get API key for user alice from response body
+	// get API key for user from response body
 	body, err := io.ReadAll(resp.Body)
 	assert.NoError(t, err)
+	
+	// Check if response was successful
+	if resp.StatusCode != http.StatusCreated {
+		fmt.Printf("Error creating user: status code %d, body: %s\n", resp.StatusCode, string(body))
+		return "", fmt.Errorf("status code %d: %s", resp.StatusCode, string(body))
+	}
+	
 	// fmt.Printf("Response body: %v\n", string(body))
 	userInfo := models.HandleAPIStruct{}
 	err = json.Unmarshal(body, &userInfo)
+	if err != nil {
+		fmt.Printf("Error unmarshalling user info: %v\nbody: %v\n", err, string(body))
+		return "", err
+	}
 	assert.NoError(t, err)
 	fmt.Printf("        Successfully created user (handle: \"%s\", apiKey: \"%s\").\n", userInfo.UserHandle, userInfo.APIKey)
 	// fmt.Printf("        User info: %v\n", userInfo)

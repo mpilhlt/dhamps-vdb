@@ -19,7 +19,7 @@ func TestPublicAccess(t *testing.T) {
 	// Create a mock key generator
 	mockKeyGen := new(MockKeyGen)
 	// Set up expectations for the mock key generator
-	mockKeyGen.On("RandomKey", 32).Return("12345678901234567890123456789012", nil)
+	mockKeyGen.On("RandomKey", 32).Return("12345678901234567890123456789012", nil).Maybe()
 
 	// Start the server
 	err, shutDownServer := startTestServer(t, pool, mockKeyGen)
@@ -143,6 +143,19 @@ func TestPublicAccess(t *testing.T) {
 	}
 
 	// Cleanup
+	fmt.Print("\n\nRunning cleanup ...\n\n")
+
+	requestURL := fmt.Sprintf("http://%s:%d/v1/admin/footgun", options.Host, options.Port)
+	req, err := http.NewRequest(http.MethodGet, requestURL, nil)
+	assert.NoError(t, err)
+	req.Header.Set("Authorization", "Bearer "+options.AdminKey)
+	_, err = http.DefaultClient.Do(req)
+	if err != nil && err.Error() != "no rows in result set" {
+		t.Fatalf("Error sending request: %v\n", err)
+	}
+	assert.NoError(t, err)
+
+	fmt.Print("Shutting down server\n\n")
 	shutDownServer()
 }
 
