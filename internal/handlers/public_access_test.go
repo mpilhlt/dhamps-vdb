@@ -98,6 +98,14 @@ func TestPublicAccess(t *testing.T) {
 			checkSuccess: true,
 		},
 		{
+			name:         "Get project metadata without authentication (public project)",
+			method:       http.MethodGet,
+			requestPath:  "/v1/projects/bob/public-test",
+			apiKeyHeader: "",
+			expectStatus: http.StatusOK,
+			checkSuccess: true,
+		},
+		{
 			name:         "Post embeddings without authentication should still be unauthorized (public project)",
 			method:       http.MethodPost,
 			requestPath:  "/v1/embeddings/bob/public-test",

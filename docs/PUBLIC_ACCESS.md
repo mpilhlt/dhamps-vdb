@@ -22,6 +22,7 @@ When creating or updating a project, include `"*"` in the `authorizedReaders` fi
 
 When a project has public read access enabled, the following endpoints can be accessed without authentication:
 
+- `GET /v1/projects/{user}/{project}` - Retrieve project metadata (including owner and authorizedReaders)
 - `GET /v1/embeddings/{user}/{project}` - Retrieve all embeddings for the project
 - `GET /v1/embeddings/{user}/{project}/{text_id}` - Retrieve a specific embedding
 - `GET /v1/similars/{user}/{project}/{text_id}` - Find similar documents
@@ -54,11 +55,18 @@ For backwards compatibility, when `"*"` is included in `authorizedReaders`:
 - All existing users are still added to the `users_projects` table as readers
 - This ensures that existing authentication mechanisms continue to work
 
+### Project Metadata Display
+
+When a project has `public_read` enabled:
+- The `authorizedReaders` field will display `["*"]` instead of an expanded list of all users
+- This makes it clear that the project is publicly accessible
+- Anonymous users can view project metadata including owner, description, and the `["*"]` indicator
+
 ## Security Considerations
 
 - Public access only applies to read operations (GET requests)
 - Write operations (POST, PUT, DELETE) always require authentication
-- Project metadata and ownership information is still protected
+- Project metadata and ownership information is publicly visible for public projects
 - The admin and owner authentication mechanisms are unaffected
 
 ## Examples
@@ -66,6 +74,10 @@ For backwards compatibility, when `"*"` is included in `authorizedReaders`:
 ### Accessing a Public Project Without Authentication
 
 ```bash
+# Get project metadata without authentication
+curl http://localhost:8080/v1/projects/alice/public-project
+# Returns: {"project_handle": "public-project", "owner": "alice", "authorizedReaders": ["*"], ...}
+
 # Get all embeddings without authentication
 curl http://localhost:8080/v1/embeddings/alice/public-project
 

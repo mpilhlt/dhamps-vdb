@@ -107,7 +107,7 @@ For a more detailed, and always up-to-date documentation of the endpoints, inclu
 | /users/\<username\> | DELETE | Delete a user and all their projects/llm services from the Db | admin, \<username\> |
 | /projects/\<username\> | GET  | Get all projects (objects) for user \<username\> | admin, \<username\> |
 | /projects/\<username\> | POST | Register a new project for user \<username\> | admin, \<username\> |
-| /projects/\<username\>/\<projectname\> | GET | Get project information for \<username\>'s project \<projectname\> | admin, \<username\> |
+| /projects/\<username\>/\<projectname\> | GET | Get project information for \<username\>'s project \<projectname\> | admin, \<username\>, authorized readers |
 | /projects/\<username\>/\<projectname\> | PUT | Register a new project calles \<projectname\> for user \<username\> | admin, \<username\> |
 | /projects/\<username\>/\<projectname\> | DELETE | Delete \<username\>'s project \<projectname\> | admin, \<username\> |
 | /llm-services/\<username\> | GET  | Get all LLM services (objects) for user \<username\> | admin, \<username\> |
