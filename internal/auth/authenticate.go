@@ -212,6 +212,7 @@ func APIKeyReaderAuth(api huma.API, pool *pgxpool.Pool, options *models.Options)
 			ProjectHandle: project,
 		}
 		publicRead, err := queries.IsProjectPubliclyReadable(ctx.Context(), publicReadParams)
+		// If project exists and public_read is true, allow unauthenticated access
 		if err == nil && publicRead.Valid && publicRead.Bool {
 			// Public read is enabled, allow unauthenticated access
 			fmt.Print("        Public read access granted (no authentication required)\n")
@@ -219,6 +220,8 @@ func APIKeyReaderAuth(api huma.API, pool *pgxpool.Pool, options *models.Options)
 			next(ctx)
 			return
 		}
+		// If there's an error (e.g., project not found), continue to check authorized readers
+		// The project existence check will happen in the handler
 
 		// If not public, check for authorized readers
 		getKeysParams := database.GetKeysByLinkedUsersParams{
