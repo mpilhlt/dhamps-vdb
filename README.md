@@ -155,30 +155,7 @@ curl -X PATCH https://<hostname>/v1/projects/alice/myproject \
   -d '{"description": "Updated project description"}'
 ```
 
-**Example: Add a user to authorized readers (append to array)**
-```bash
-curl -X PATCH https://<hostname>/v1/projects/alice/myproject \
-  -H "Authorization: Bearer <api_key>" \
-  -H "Content-Type: application/json" \
-  -d '{"authorizedReaders": ["alice", "bob", "charlie"]}'
-```
-
-**How PATCH Works**
-
-The PATCH endpoint uses JSON Merge Patch (RFC 7396) to merge your changes with the existing resource:
-
-1. The current resource state is retrieved via GET
-2. Your PATCH payload is merged with the current state
-3. The merged result is sent to PUT to update the resource
-
-**Important notes about arrays:**
-- When patching array fields (like `authorizedReaders`), you must provide the **complete desired array**
-- To add an item to an array, include all existing items plus the new one
-- To remove an item, send the array without that item
-- Setting an array field to `null` or omitting it keeps the existing values
-- Example: If `authorizedReaders` is `["alice"]` and you want to add `"bob"`, send `["alice", "bob"]`
-
-For more details on JSON Merge Patch syntax, see [RFC 7396](https://datatracker.ietf.org/doc/html/rfc7396).
+The PATCH endpoint merges your changes with the existing resource data retrieved via GET, then applies the update via PUT.
 
 ## Code creation and structure
 
