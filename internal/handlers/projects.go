@@ -36,8 +36,11 @@ func putProjectFunc(ctx context.Context, input *models.PutProjectRequest) (*mode
 
 	// Build query parameters (project)
 	readers := make(map[string]bool)
+	publicRead := false
 	for _, user := range input.Body.AuthorizedReaders {
 		if user == "*" {
+			publicRead = true
+			// Still add existing users as readers for backwards compatibility
 			users, err := getUsersFunc(ctx, &models.GetUsersRequest{})
 			if err != nil {
 				return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get user %s", user))
@@ -65,6 +68,7 @@ func putProjectFunc(ctx context.Context, input *models.PutProjectRequest) (*mode
 		ProjectHandle: input.ProjectHandle,
 		Description:   pgtype.Text{String: input.Body.Description, Valid: true},
 		Owner:         input.UserHandle,
+		PublicRead:    pgtype.Bool{Bool: publicRead, Valid: true},
 	}
 
 	queries := database.New(pool)

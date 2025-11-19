@@ -59,13 +59,14 @@ ORDER BY users."user_handle" ASC LIMIT $3 OFFSET $4;
 -- name: UpsertProject :one
 INSERT
 INTO projects (
-  "project_handle", "owner", "description", "metadata_scheme", "created_at", "updated_at"
+  "project_handle", "owner", "description", "metadata_scheme", "public_read", "created_at", "updated_at"
 ) VALUES (
-  $1, $2, $3, $4, NOW(), NOW()
+  $1, $2, $3, $4, $5, NOW(), NOW()
 )
 ON CONFLICT ("owner", "project_handle") DO UPDATE SET
   "description" = $3,
   "metadata_scheme" = $4,
+  "public_read" = $5,
   "updated_at" = NOW()
 RETURNING "project_id", "owner", "project_handle";
 
@@ -85,6 +86,13 @@ ORDER BY projects."project_handle" ASC LIMIT $2 OFFSET $3;
 
 -- name: RetrieveProject :one
 SELECT *
+FROM projects
+WHERE "owner" = $1
+AND "project_handle" = $2
+LIMIT 1;
+
+-- name: IsProjectPubliclyReadable :one
+SELECT "public_read"
 FROM projects
 WHERE "owner" = $1
 AND "project_handle" = $2
