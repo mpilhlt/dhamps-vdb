@@ -36,8 +36,11 @@ func putProjectFunc(ctx context.Context, input *models.PutProjectRequest) (*mode
 
 	// Build query parameters (project)
 	readers := make(map[string]bool)
+	publicRead := false
 	for _, user := range input.Body.AuthorizedReaders {
 		if user == "*" {
+			publicRead = true
+			// Still add existing users as readers for backwards compatibility
 			users, err := getUsersFunc(ctx, &models.GetUsersRequest{})
 			if err != nil {
 				return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get user %s", user))
@@ -65,6 +68,7 @@ func putProjectFunc(ctx context.Context, input *models.PutProjectRequest) (*mode
 		ProjectHandle: input.ProjectHandle,
 		Description:   pgtype.Text{String: input.Body.Description, Valid: true},
 		Owner:         input.UserHandle,
+		PublicRead:    pgtype.Bool{Bool: publicRead, Valid: true},
 	}
 
 	queries := database.New(pool)
@@ -133,12 +137,17 @@ func getProjectsFunc(ctx context.Context, input *models.GetProjectsRequest) (*mo
 	for _, project := range p {
 		// Get the authorized reader accounts for the project
 		readers := []string{}
-		rows, err := queries.GetUsersByProject(ctx, database.GetUsersByProjectParams{Owner: input.UserHandle, ProjectHandle: project.ProjectHandle, Limit: 999, Offset: 0})
-		if err != nil {
-			return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get readers for %s's project %s. %v", input.UserHandle, project.ProjectHandle, err))
-		}
-		for _, row := range rows {
-			readers = append(readers, row.UserHandle)
+		// If the project is publicly readable, show "*" in authorizedReaders
+		if project.PublicRead.Valid && project.PublicRead.Bool {
+			readers = []string{"*"}
+		} else {
+			rows, err := queries.GetUsersByProject(ctx, database.GetUsersByProjectParams{Owner: input.UserHandle, ProjectHandle: project.ProjectHandle, Limit: 999, Offset: 0})
+			if err != nil {
+				return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get readers for %s's project %s. %v", input.UserHandle, project.ProjectHandle, err))
+			}
+			for _, row := range rows {
+				readers = append(readers, row.UserHandle)
+			}
 		}
 
 		// Get the LLM Services for the project
@@ -225,12 +234,17 @@ func getProjectFunc(ctx context.Context, input *models.GetProjectRequest) (*mode
 
 	// Get the authorized reader accounts for the project
 	readers := []string{}
-	userRows, err := queries.GetUsersByProject(ctx, database.GetUsersByProjectParams{Owner: input.UserHandle, ProjectHandle: input.ProjectHandle, Limit: 999, Offset: 0})
-	if err != nil {
-		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get authorized reader accounts for %s's project %s. %v", input.UserHandle, input.ProjectHandle, err))
-	}
-	for _, row := range userRows {
-		readers = append(readers, row.UserHandle)
+	// If the project is publicly readable, show "*" in authorizedReaders
+	if p.PublicRead.Valid && p.PublicRead.Bool {
+		readers = []string{"*"}
+	} else {
+		userRows, err := queries.GetUsersByProject(ctx, database.GetUsersByProjectParams{Owner: input.UserHandle, ProjectHandle: input.ProjectHandle, Limit: 999, Offset: 0})
+		if err != nil {
+			return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get authorized reader accounts for %s's project %s. %v", input.UserHandle, input.ProjectHandle, err))
+		}
+		for _, row := range userRows {
+			readers = append(readers, row.UserHandle)
+		}
 	}
 
 	// Get the LLM Services for the project

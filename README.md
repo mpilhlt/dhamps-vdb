@@ -81,7 +81,9 @@ postgres=# CREATE EXTENSION IF NOT EXISTS vector;
 
 ### Client Authentication
 
-Clients should communicate the API key in the `Authorization` header with a `Bearer` prefix, e.g. `Bearer 024v2013621509245f2e24`. Most operations can only be done by the (admin or the) owner of the resource in question. For projects and their embeddings, you can define other user accounts that should be authorized as readers, too. (But at the moment, the function for adding them is still missing.)
+Clients should communicate the API key in the `Authorization` header with a `Bearer` prefix, e.g. `Bearer 024v2013621509245f2e24`. Most operations can only be done by the (admin or the) owner of the resource in question. For projects and their embeddings, you can define other user accounts that should be authorized as readers, too. 
+
+**Public Access**: Projects can be made publicly accessible (allowing unauthenticated read access to embeddings and similars) by including `"*"` in the `authorizedReaders` array when creating or updating the project. See [docs/PUBLIC_ACCESS.md](./docs/PUBLIC_ACCESS.md) for details.
 
 ## API documentation
 
@@ -105,7 +107,7 @@ For a more detailed, and always up-to-date documentation of the endpoints, inclu
 | /users/\<username\> | DELETE | Delete a user and all their projects/llm services from the Db | admin, \<username\> |
 | /projects/\<username\> | GET  | Get all projects (objects) for user \<username\> | admin, \<username\> |
 | /projects/\<username\> | POST | Register a new project for user \<username\> | admin, \<username\> |
-| /projects/\<username\>/\<projectname\> | GET | Get project information for \<username\>'s project \<projectname\> | admin, \<username\> |
+| /projects/\<username\>/\<projectname\> | GET | Get project information for \<username\>'s project \<projectname\> | admin, \<username\>, authorized readers |
 | /projects/\<username\>/\<projectname\> | PUT | Register a new project calles \<projectname\> for user \<username\> | admin, \<username\> |
 | /projects/\<username\>/\<projectname\> | DELETE | Delete \<username\>'s project \<projectname\> | admin, \<username\> |
 | /llm-services/\<username\> | GET  | Get all LLM services (objects) for user \<username\> | admin, \<username\> |
@@ -230,7 +232,7 @@ dhamps-vdb/
 - [ ] **Concurrency** (leaky bucket approach) and **Rate limiting** (redis, sliding window, implement headers)
 - [ ] Use **transactions** (most importantly, when an action requires several queries, e.g. projects being added and then linked to several read-authorized users)
 - [ ] Use PATCH method to change existing resources
-- [ ] Add mechanism to allow anonymous/public reading access to embeddings
+- [x] Add mechanism to allow anonymous/public reading access to embeddings (via `"*"` in `authorizedReaders`)
 - [ ] **Dockerization**
 - [ ] **Batch mode**
 - [ ] **Link or unlink** users/LLMs as standalone operations
