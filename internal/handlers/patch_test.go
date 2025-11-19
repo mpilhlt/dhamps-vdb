@@ -211,5 +211,18 @@ func TestPatchProjects(t *testing.T) {
 	})
 
 	// Clean up
+	fmt.Print("\n\nRunning cleanup ...\n\n")
+
+	cleanupURL := fmt.Sprintf("http://%s:%d/v1/admin/footgun", options.Host, options.Port)
+	cleanupReq, cleanupErr := http.NewRequest(http.MethodGet, cleanupURL, nil)
+	assert.NoError(t, cleanupErr)
+	cleanupReq.Header.Set("Authorization", "Bearer "+options.AdminKey)
+	_, cleanupErr = http.DefaultClient.Do(cleanupReq)
+	if cleanupErr != nil && cleanupErr.Error() != "no rows in result set" {
+		t.Fatalf("Error sending request: %v\n", cleanupErr)
+	}
+	assert.NoError(t, cleanupErr)
+
+	fmt.Print("Shutting down server\n\n")
 	shutDownServer()
 }

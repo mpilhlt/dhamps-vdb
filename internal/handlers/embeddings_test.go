@@ -20,7 +20,7 @@ func TestEmbeddingsFunc(t *testing.T) {
 	// Create a mock key generator
 	mockKeyGen := new(MockKeyGen)
 	// Set up expectations for the mock key generator
-	mockKeyGen.On("RandomKey", 32).Return("12345678901234567890123456789012", nil)
+	mockKeyGen.On("RandomKey", 32).Return("12345678901234567890123456789012", nil).Maybe()
 
 	// Start the server
 	err, shutDownServer := startTestServer(t, pool, mockKeyGen)
