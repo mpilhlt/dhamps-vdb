@@ -9,6 +9,7 @@ import (
 	"github.com/mpilhlt/dhamps-vdb/internal/models"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -33,32 +34,51 @@ func putLLMFunc(ctx context.Context, input *models.PutLLMRequest) (*models.Uploa
 		return nil, err
 	}
 
-	// Run the query
-	queries := database.New(pool)
-	llm, err := queries.UpsertLLM(ctx, database.UpsertLLMParams{
-		Owner:            input.UserHandle,
-		LLMServiceHandle: input.LLMServiceHandle,
-		Endpoint:         input.Body.Endpoint,
-		Description:      pgtype.Text{String: input.Body.Description, Valid: true},
-		APIKey:           pgtype.Text{String: input.Body.APIKey, Valid: true},
-		APIStandard:      input.Body.APIStandard,
-		Model:            input.Body.Model,
-		Dimensions:       int32(input.Body.Dimensions),
+	// Execute all database operations within a transaction
+	var llmServiceID int32
+	var llmServiceHandle string
+	var owner string
+
+	err = database.WithTransaction(ctx, pool, func(tx pgx.Tx) error {
+		queries := database.New(tx)
+
+		// 1. Upsert LLM service
+		llm, err := queries.UpsertLLM(ctx, database.UpsertLLMParams{
+			Owner:            input.UserHandle,
+			LLMServiceHandle: input.LLMServiceHandle,
+			Endpoint:         input.Body.Endpoint,
+			Description:      pgtype.Text{String: input.Body.Description, Valid: true},
+			APIKey:           pgtype.Text{String: input.Body.APIKey, Valid: true},
+			APIStandard:      input.Body.APIStandard,
+			Model:            input.Body.Model,
+			Dimensions:       int32(input.Body.Dimensions),
+		})
+		if err != nil {
+			return fmt.Errorf("unable to upload llm service. %v", err)
+		}
+
+		llmServiceID = llm.LLMServiceID
+		llmServiceHandle = llm.LLMServiceHandle
+		owner = llm.Owner
+
+		// 2. Link llm service to user
+		err = queries.LinkUserToLLM(ctx, database.LinkUserToLLMParams{UserHandle: input.UserHandle, LLMServiceID: llm.LLMServiceID, Role: "owner"})
+		if err != nil {
+			return fmt.Errorf("unable to link llm service to user. %v", err)
+		}
+
+		return nil
 	})
+
 	if err != nil {
-		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to upload llm service. %v", err))
-	}
-	// Add llm service to user
-	err = queries.LinkUserToLLM(ctx, database.LinkUserToLLMParams{UserHandle: input.UserHandle, LLMServiceID: llm.LLMServiceID, Role: "owner"})
-	if err != nil {
-		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to link llm service to user. %v", err))
+		return nil, huma.Error500InternalServerError(err.Error())
 	}
 
 	// Build response
 	response := &models.UploadLLMResponse{}
-	response.Body.Owner = llm.Owner
-	response.Body.LLMServiceHandle = llm.LLMServiceHandle
-	response.Body.LLMServiceID = int(llm.LLMServiceID)
+	response.Body.Owner = owner
+	response.Body.LLMServiceHandle = llmServiceHandle
+	response.Body.LLMServiceID = int(llmServiceID)
 
 	return response, nil
 }
