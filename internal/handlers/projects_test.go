@@ -248,3 +248,150 @@ func TestProjectsFunc(t *testing.T) {
 	})
 
 }
+
+// TestProjectTransactionRollback verifies that transactions are properly rolled back
+// when an error occurs during project creation, ensuring no orphaned records.
+func TestProjectTransactionRollback(t *testing.T) {
+	// Get the database connection pool from package variable
+	pool := connPool
+
+	// Create a mock key generator with unique keys for each user
+	mockKeyGen := new(MockKeyGen)
+	mockKeyGen.On("RandomKey", 32).Return("alicekey123456789012345678901", nil).Once()
+	mockKeyGen.On("RandomKey", 32).Return("bobkey1234567890123456789012", nil).Once()
+
+	// Start the server
+	err, shutDownServer := startTestServer(t, pool, mockKeyGen)
+	assert.NoError(t, err)
+
+	// Create user to be used in project tests
+	aliceJSON := `{"user_handle": "alice", "name": "Alice Doe", "email": "alice@foo.bar"}`
+	aliceAPIKey, err := createUser(t, aliceJSON)
+	if err != nil {
+		t.Fatalf("Error creating user alice for testing: %v\n", err)
+	}
+
+	fmt.Printf("\nRunning project transaction rollback tests ...\n\n")
+
+	t.Run("Project creation with invalid reader should rollback completely", func(t *testing.T) {
+		// Attempt to create a project with a non-existent reader
+		// This should fail during user validation and not even reach the transaction
+		f, err := os.Open("../../testdata/project_with_invalid_reader.json")
+		assert.NoError(t, err)
+		defer f.Close()
+
+		b := new(bytes.Buffer)
+		_, err = io.Copy(b, f)
+		assert.NoError(t, err)
+
+		requestURL := fmt.Sprintf("http://%s:%d/v1/projects/alice/test-rollback", options.Host, options.Port)
+		req, err := http.NewRequest(http.MethodPut, requestURL, bytes.NewReader(b.Bytes()))
+		assert.NoError(t, err)
+		req.Header.Set("Authorization", "Bearer "+aliceAPIKey)
+
+		resp, err := http.DefaultClient.Do(req)
+		assert.NoError(t, err)
+		defer resp.Body.Close()
+
+		// The request should fail with 500 Internal Server Error
+		assert.Equal(t, http.StatusInternalServerError, resp.StatusCode,
+			"Expected 500 error when creating project with invalid reader")
+
+		respBody, err := io.ReadAll(resp.Body)
+		assert.NoError(t, err)
+		assert.Contains(t, string(respBody), "unable to get user nonexistent_user",
+			"Error message should mention the invalid user")
+
+		// Verify that no project was created (transaction rolled back)
+		// Try to get the project - it should not exist
+		getURL := fmt.Sprintf("http://%s:%d/v1/projects/alice/test-rollback", options.Host, options.Port)
+		getReq, err := http.NewRequest(http.MethodGet, getURL, nil)
+		assert.NoError(t, err)
+		getReq.Header.Set("Authorization", "Bearer "+aliceAPIKey)
+
+		getResp, err := http.DefaultClient.Do(getReq)
+		assert.NoError(t, err)
+		defer getResp.Body.Close()
+
+		// The project should not exist
+		assert.Equal(t, http.StatusNotFound, getResp.StatusCode,
+			"Project should not exist after rollback")
+
+		t.Log("Transaction rollback verified: no orphaned project record")
+	})
+
+	t.Run("Successful project creation commits all changes", func(t *testing.T) {
+		// Create a second user to be a reader
+		bobJSON := `{"user_handle": "bob", "name": "Bob Smith", "email": "bob@foo.bar"}`
+		_, err := createUser(t, bobJSON)
+		assert.NoError(t, err)
+
+		// Create a project with Bob as a reader
+		projectJSON := `{"project_handle": "test-success", "description": "Test successful transaction", "authorizedReaders": ["bob"]}`
+		requestURL := fmt.Sprintf("http://%s:%d/v1/projects/alice/test-success", options.Host, options.Port)
+		req, err := http.NewRequest(http.MethodPut, requestURL, bytes.NewReader([]byte(projectJSON)))
+		assert.NoError(t, err)
+		req.Header.Set("Authorization", "Bearer "+aliceAPIKey)
+
+		resp, err := http.DefaultClient.Do(req)
+		assert.NoError(t, err)
+		defer resp.Body.Close()
+
+		// The request should succeed
+		assert.Equal(t, http.StatusCreated, resp.StatusCode,
+			"Expected 201 when creating project with valid reader")
+
+		// Verify the project exists
+		getURL := fmt.Sprintf("http://%s:%d/v1/projects/alice/test-success", options.Host, options.Port)
+		getReq, err := http.NewRequest(http.MethodGet, getURL, nil)
+		assert.NoError(t, err)
+		getReq.Header.Set("Authorization", "Bearer "+aliceAPIKey)
+
+		getResp, err := http.DefaultClient.Do(getReq)
+		assert.NoError(t, err)
+		defer getResp.Body.Close()
+
+		assert.Equal(t, http.StatusOK, getResp.StatusCode,
+			"Project should exist after successful transaction")
+
+		// Verify the response includes both alice (owner) and bob (reader)
+		respBody, err := io.ReadAll(getResp.Body)
+		assert.NoError(t, err)
+
+		var projectData map[string]interface{}
+		err = json.Unmarshal(respBody, &projectData)
+		assert.NoError(t, err)
+
+		readers, ok := projectData["authorizedReaders"].([]interface{})
+		assert.True(t, ok, "authorizedReaders should be an array")
+
+		// Convert to string slice for easier checking
+		readerStrings := make([]string, len(readers))
+		for i, r := range readers {
+			readerStrings[i] = r.(string)
+		}
+
+		// Check that alice (owner) and bob (reader) are both in the list
+		assert.Contains(t, readerStrings, "alice", "Alice should be in authorized readers")
+		assert.Contains(t, readerStrings, "bob", "Bob should be in authorized readers")
+
+		t.Log("Transaction commit verified: all records created successfully")
+	})
+
+	// Cleanup
+	t.Cleanup(func() {
+		fmt.Print("\n\nRunning transaction test cleanup ...\n\n")
+
+		requestURL := fmt.Sprintf("http://%s:%d/v1/admin/footgun", options.Host, options.Port)
+		req, err := http.NewRequest(http.MethodGet, requestURL, nil)
+		assert.NoError(t, err)
+		req.Header.Set("Authorization", "Bearer "+options.AdminKey)
+		_, err = http.DefaultClient.Do(req)
+		if err != nil && err.Error() != "no rows in result set" {
+			t.Fatalf("Error sending request: %v\n", err)
+		}
+
+		fmt.Print("Shutting down server\n\n")
+		shutDownServer()
+	})
+}
