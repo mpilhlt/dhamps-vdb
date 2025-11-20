@@ -9,6 +9,7 @@ import (
 	"github.com/mpilhlt/dhamps-vdb/internal/models"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -71,33 +72,48 @@ func putProjectFunc(ctx context.Context, input *models.PutProjectRequest) (*mode
 		PublicRead:    pgtype.Bool{Bool: publicRead, Valid: true},
 	}
 
-	queries := database.New(pool)
-	p, err := queries.UpsertProject(ctx, project)
-	if err != nil {
-		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to upload project. %v", err))
-	}
+	// Execute all database operations within a transaction
+	var projectID int32
+	var projectHandle string
 
-	// 2. Link project and owner
-	params := database.LinkProjectToUserParams{ProjectID: p.ProjectID, UserHandle: input.UserHandle, Role: "owner"}
-	_, err = queries.LinkProjectToUser(ctx, params)
-	if err != nil {
-		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to link project to owner %s. %v", input.UserHandle, err))
-	}
+	err = database.WithTransaction(ctx, pool, func(tx pgx.Tx) error {
+		queries := database.New(tx)
 
-	// 3. Link project and other assigned readers
-	for reader := range readers {
-		params := database.LinkProjectToUserParams{ProjectID: p.ProjectID, UserHandle: reader, Role: "reader"}
-		_, err := queries.LinkProjectToUser(ctx, params)
+		// 1. Upload project
+		p, err := queries.UpsertProject(ctx, project)
 		if err != nil {
-			return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to upload project reader %s. %v", reader, err))
+			return fmt.Errorf("unable to upload project. %v", err)
 		}
-		// registeredReaders = append(registeredReaders, u.UserHandle)
+		projectID = p.ProjectID
+		projectHandle = p.ProjectHandle
+
+		// 2. Link project and owner
+		params := database.LinkProjectToUserParams{ProjectID: p.ProjectID, UserHandle: input.UserHandle, Role: "owner"}
+		_, err = queries.LinkProjectToUser(ctx, params)
+		if err != nil {
+			return fmt.Errorf("unable to link project to owner %s. %v", input.UserHandle, err)
+		}
+
+		// 3. Link project and other assigned readers
+		for reader := range readers {
+			params := database.LinkProjectToUserParams{ProjectID: p.ProjectID, UserHandle: reader, Role: "reader"}
+			_, err := queries.LinkProjectToUser(ctx, params)
+			if err != nil {
+				return fmt.Errorf("unable to upload project reader %s. %v", reader, err)
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, huma.Error500InternalServerError(err.Error())
 	}
 
 	// 4. Build the response
 	response := &models.UploadProjectResponse{}
-	response.Body.ProjectHandle = p.ProjectHandle
-	response.Body.ProjectID = int(p.ProjectID)
+	response.Body.ProjectHandle = projectHandle
+	response.Body.ProjectID = int(projectID)
 
 	return response, nil
 }
@@ -320,11 +336,18 @@ func deleteProjectFunc(ctx context.Context, input *models.DeleteProjectRequest) 
 		ProjectHandle: input.ProjectHandle,
 	}
 
-	// Run the query
-	queries := database.New(pool)
-	err = queries.DeleteProject(ctx, params)
+	// Execute delete operation within a transaction
+	err = database.WithTransaction(ctx, pool, func(tx pgx.Tx) error {
+		queries := database.New(tx)
+		err := queries.DeleteProject(ctx, params)
+		if err != nil {
+			return fmt.Errorf("unable to delete project %s for user %s. %v", input.ProjectHandle, input.UserHandle, err)
+		}
+		return nil
+	})
+
 	if err != nil {
-		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to delete project %s for user %s. %v", input.ProjectHandle, input.UserHandle, err))
+		return nil, huma.Error500InternalServerError(err.Error())
 	}
 
 	// Build the response
