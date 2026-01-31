@@ -95,34 +95,49 @@ func TestValidateEmbeddingDimensions(t *testing.T) {
 
 func TestValidateMetadataAgainstSchema(t *testing.T) {
 	tests := []struct {
-		name        string
-		metadata    json.RawMessage
-		schemaStr   string
-		wantErr     bool
-		errContains string
+		name             string
+		metadata         json.RawMessage
+		schemaStr        string
+		isUpdate         bool
+		existingMetadata json.RawMessage
+		wantErr          bool
+		errContains      string
 	}{
 		{
 			name:      "No schema provided",
 			metadata:  json.RawMessage(`{"author": "John Doe"}`),
 			schemaStr: "",
+			isUpdate:  false,
 			wantErr:   false,
 		},
 		{
-			name:      "No metadata provided",
-			metadata:  json.RawMessage(``),
-			schemaStr: `{"type":"object","properties":{"author":{"type":"string"}},"required":["author"]}`,
-			wantErr:   false,
+			name:             "No metadata provided on update with existing metadata",
+			metadata:         json.RawMessage(``),
+			schemaStr:        `{"type":"object","properties":{"author":{"type":"string"}},"required":["author"]}`,
+			isUpdate:         true,
+			existingMetadata: json.RawMessage(`{"author": "John Doe"}`),
+			wantErr:          false,
+		},
+		{
+			name:        "No metadata provided on new record with schema",
+			metadata:    json.RawMessage(``),
+			schemaStr:   `{"type":"object","properties":{"author":{"type":"string"}},"required":["author"]}`,
+			isUpdate:    false,
+			wantErr:     true,
+			errContains: "metadata is required",
 		},
 		{
 			name:      "Valid metadata",
 			metadata:  json.RawMessage(`{"author": "John Doe", "year": 2021}`),
 			schemaStr: `{"type":"object","properties":{"author":{"type":"string"},"year":{"type":"integer"}},"required":["author"]}`,
+			isUpdate:  false,
 			wantErr:   false,
 		},
 		{
 			name:        "Missing required field",
 			metadata:    json.RawMessage(`{"year": 2021}`),
 			schemaStr:   `{"type":"object","properties":{"author":{"type":"string"},"year":{"type":"integer"}},"required":["author"]}`,
+			isUpdate:    false,
 			wantErr:     true,
 			errContains: "author",
 		},
@@ -130,6 +145,7 @@ func TestValidateMetadataAgainstSchema(t *testing.T) {
 			name:        "Wrong type",
 			metadata:    json.RawMessage(`{"author": "John Doe", "year": "2021"}`),
 			schemaStr:   `{"type":"object","properties":{"author":{"type":"string"},"year":{"type":"integer"}},"required":["author"]}`,
+			isUpdate:    false,
 			wantErr:     true,
 			errContains: "year",
 		},
@@ -137,7 +153,7 @@ func TestValidateMetadataAgainstSchema(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := ValidateMetadataAgainstSchema(tt.metadata, tt.schemaStr)
+			err := ValidateMetadataAgainstSchema(tt.metadata, tt.schemaStr, tt.isUpdate, tt.existingMetadata)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ValidateMetadataAgainstSchema() error = %v, wantErr %v", err, tt.wantErr)
 				return

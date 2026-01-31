@@ -78,8 +78,20 @@ func postProjEmbeddingsFunc(ctx context.Context, input *models.PostProjEmbedding
 			return nil, huma.Error400BadRequest(fmt.Sprintf("dimension validation failed: %v", err))
 		}
 
+		// Check if embedding already exists to determine if this is an update
+		existingEmbedding, err := queries.RetrieveEmbeddings(ctx, database.RetrieveEmbeddingsParams{
+			Owner:         input.UserHandle,
+			ProjectHandle: input.ProjectHandle,
+			TextID:        pgtype.Text{String: embedding.TextID, Valid: true},
+		})
+		isUpdate := err == nil
+		var existingMetadata json.RawMessage
+		if isUpdate {
+			existingMetadata = existingEmbedding.Metadata
+		}
+
 		// Validate metadata against schema if provided
-		if err := ValidateMetadataAgainstSchema(embedding.Metadata, project.Body.MetadataScheme); err != nil {
+		if err := ValidateMetadataAgainstSchema(embedding.Metadata, project.Body.MetadataScheme, isUpdate, existingMetadata); err != nil {
 			return nil, huma.Error400BadRequest(fmt.Sprintf("metadata validation failed for text_id '%s': %v", embedding.TextID, err))
 		}
 		// Build query parameters (embeddings)

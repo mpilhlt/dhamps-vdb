@@ -176,7 +176,7 @@ curl -X GET http://localhost:8080/v1/admin/sanity-check \
 ```
 
 Status values:
-- `PASSED`: No issues found (warnings may be present)
+- `PASSED`: No issues or warnings found
 - `WARNING`: No critical issues, but warnings exist
 - `FAILED`: Validation issues found that need attention
 

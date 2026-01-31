@@ -115,7 +115,8 @@ func sanityCheckFunc(ctx context.Context, input *models.SanityCheckRequest) (*mo
 
 			// Check metadata against schema if schema is defined
 			if project.MetadataScheme.Valid && project.MetadataScheme.String != "" {
-				if err := ValidateEmbeddingMetadataAgainstProjectSchema(embedding.Metadata, project.MetadataScheme.String, textID); err != nil {
+				// For sanity check, we're checking existing data, so isUpdate=true and we have existing metadata
+				if err := ValidateEmbeddingMetadataAgainstProjectSchema(embedding.Metadata, project.MetadataScheme.String, textID, true, embedding.Metadata); err != nil {
 					issues = append(issues, fmt.Sprintf("Project %s: %v", projectName, err))
 				}
 			}

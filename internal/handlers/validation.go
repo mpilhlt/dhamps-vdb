@@ -37,15 +37,20 @@ func ValidateEmbeddingDimensions(embedding models.EmbeddingsInput, llmDimensions
 }
 
 // ValidateMetadataAgainstSchema validates the metadata against a JSON schema if provided
-func ValidateMetadataAgainstSchema(metadata json.RawMessage, schemaStr string) error {
+func ValidateMetadataAgainstSchema(metadata json.RawMessage, schemaStr string, isUpdate bool, existingMetadata json.RawMessage) error {
 	// If no schema is provided, skip validation
 	if schemaStr == "" {
 		return nil
 	}
 
-	// If no metadata is provided but schema exists, that's okay (metadata is optional)
+	// If no metadata is provided but schema exists
 	if len(metadata) == 0 || string(metadata) == "null" {
-		return nil
+		// For updates, if we have existing metadata, that's okay - we're not changing it
+		if isUpdate && len(existingMetadata) > 0 && string(existingMetadata) != "null" {
+			return nil
+		}
+		// For new records or updates without existing metadata, metadata is required
+		return fmt.Errorf("metadata is required when project has a metadata schema defined")
 	}
 
 	// Parse the schema
@@ -85,8 +90,8 @@ func ValidateEmbeddingAgainstLLMDimension(vectorDim int32, llmDimensions int32, 
 }
 
 // ValidateEmbeddingMetadataAgainstProjectSchema validates an embedding's metadata against project schema
-func ValidateEmbeddingMetadataAgainstProjectSchema(metadata json.RawMessage, schemaStr string, textID string) error {
-	err := ValidateMetadataAgainstSchema(metadata, schemaStr)
+func ValidateEmbeddingMetadataAgainstProjectSchema(metadata json.RawMessage, schemaStr string, textID string, isUpdate bool, existingMetadata json.RawMessage) error {
+	err := ValidateMetadataAgainstSchema(metadata, schemaStr, isUpdate, existingMetadata)
 	if err != nil {
 		return fmt.Errorf("text_id '%s': %v", textID, err)
 	}
