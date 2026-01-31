@@ -132,3 +132,39 @@ func testQuery(ctx context.Context, conn *pgxpool.Conn) error {
 	}
 	return nil
 }
+
+// WithTransaction executes a function within a database transaction.
+// If the function returns an error, the transaction is rolled back.
+// Otherwise, the transaction is committed.
+// The context is given a timeout of 10 seconds for the transaction.
+func WithTransaction(ctx context.Context, pool *pgxpool.Pool, fn func(pgx.Tx) error) error {
+	// Create a context with timeout for the transaction
+	txCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	// Begin the transaction
+	tx, err := pool.Begin(txCtx)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+
+	// Ensure rollback is called if we don't commit
+	// This is safe to call even after commit
+	defer func() {
+		if err := tx.Rollback(txCtx); err != nil && err != pgx.ErrTxClosed {
+			fmt.Fprintf(os.Stderr, "EEE Failed to rollback transaction: %v\n", err)
+		}
+	}()
+
+	// Execute the function
+	if err := fn(tx); err != nil {
+		return err
+	}
+
+	// Commit the transaction
+	if err := tx.Commit(txCtx); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}
