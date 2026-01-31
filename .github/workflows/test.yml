@@ -1,0 +1,50 @@
+name: Test
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+        
+    - name: Install sqlc
+      run: |
+        go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
+        
+    - name: Generate sqlc code
+      run: |
+        sqlc generate --no-remote
+      env:
+        SERVICE_DB_USER: postgres
+        SERVICE_DB_PASSWORD: postgres
+        SERVICE_DB_HOST: localhost
+        SERVICE_DB_PORT: 5432
+        SERVICE_DB_NAME: postgres
+        
+    - name: Download dependencies
+      run: go mod download
+      
+    - name: Run tests
+      run: go test -v ./...
+      env:
+        SERVICE_DEBUG: true
+        SERVICE_HOST: localhost
+        SERVICE_PORT: 8888
+        SERVICE_DBHOST: localhost
+        SERVICE_DBPORT: 5432
+        SERVICE_DBUSER: postgres
+        SERVICE_DBPASSWORD: postgres
+        SERVICE_DBNAME: postgres
+        SERVICE_ADMINKEY: TestAdminKey123
