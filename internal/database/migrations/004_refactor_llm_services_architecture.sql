@@ -52,8 +52,9 @@ CREATE TABLE IF NOT EXISTS llm_service_instances_shared_with(
   PRIMARY KEY ("user_handle", "instance_id")
 );
 
--- Step 8: Rename users_llm_services to reference instances
-ALTER TABLE users_llm_services RENAME COLUMN llm_service_id TO instance_id;
+-- Step 8: Rename users_llm_services table and update to reference instances
+ALTER TABLE users_llm_services RENAME TO users_llm_service_instances;
+ALTER TABLE users_llm_service_instances RENAME COLUMN llm_service_id TO instance_id;
 
 -- Step 9: Update projects to have a single LLM service instance (1:1 relationship)
 -- Add the new column (nullable initially)
@@ -83,7 +84,22 @@ ALTER TABLE projects_llm_services RENAME COLUMN llm_service_id TO llm_service_in
 -- Projects now have exactly one instance via the llm_service_instance_id column
 DROP TABLE IF EXISTS projects_llm_services;
 
--- Step 14: Seed default LLM Service Definitions from _system user
+-- Step 14: Ensure required API standards exist before creating definitions
+-- These API standards are needed for the default LLM Service Definitions
+
+INSERT INTO api_standards ("api_standard_handle", "description", "key_method", "key_field", "created_at", "updated_at")
+VALUES ('openai', 'OpenAI Embeddings API, Version 1', 'auth_bearer', 'Authorization', NOW(), NOW())
+ON CONFLICT ("api_standard_handle") DO NOTHING;
+
+INSERT INTO api_standards ("api_standard_handle", "description", "key_method", "key_field", "created_at", "updated_at")
+VALUES ('cohere', 'Cohere Embed API, Version 2', 'auth_bearer', 'Authorization', NOW(), NOW())
+ON CONFLICT ("api_standard_handle") DO NOTHING;
+
+INSERT INTO api_standards ("api_standard_handle", "description", "key_method", "key_field", "created_at", "updated_at")
+VALUES ('gemini', 'Gemini Embeddings API', 'auth_bearer', 'x-goog-api-key', NOW(), NOW())
+ON CONFLICT ("api_standard_handle") DO NOTHING;
+
+-- Step 15: Seed default LLM Service Definitions from _system user
 -- These serve as templates that all users can reference
 
 -- OpenAI text-embedding-3-large
@@ -155,8 +171,9 @@ ALTER TABLE embeddings RENAME COLUMN llm_service_instance_id TO llm_service_id;
 -- Remove the single instance reference from projects
 ALTER TABLE projects DROP COLUMN IF EXISTS llm_service_instance_id;
 
--- Rename users_llm_services column back
-ALTER TABLE users_llm_services RENAME COLUMN instance_id TO llm_service_id;
+-- Rename users_llm_service_instances table back
+ALTER TABLE users_llm_service_instances RENAME COLUMN instance_id TO llm_service_id;
+ALTER TABLE users_llm_service_instances RENAME TO users_llm_services;
 
 -- Drop instance sharing table
 DROP TABLE IF EXISTS llm_service_instances_shared_with;

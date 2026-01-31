@@ -186,6 +186,39 @@ ON CONFLICT ("owner", "instance_handle") DO UPDATE SET
   "updated_at" = NOW()
 RETURNING "owner", "instance_handle", "instance_id";
 
+-- name: CreateLLMInstanceFromDefinition :one
+-- Create an instance based on a definition (copies definition fields, allows user to specify API key)
+INSERT
+INTO llm_service_instances (
+  "owner", "instance_handle", "definition_id", "endpoint", "description", "api_key", "api_key_encrypted", "api_standard", "model", "dimensions", "created_at", "updated_at"
+)
+SELECT 
+  $1 as "owner",
+  $2 as "instance_handle", 
+  def."definition_id",
+  COALESCE($3, def."endpoint") as "endpoint",
+  COALESCE($4, def."description") as "description",
+  $5 as "api_key",
+  $6 as "api_key_encrypted",
+  COALESCE($7, def."api_standard") as "api_standard",
+  COALESCE($8, def."model") as "model",
+  COALESCE($9::INTEGER, def."dimensions") as "dimensions",
+  NOW() as "created_at",
+  NOW() as "updated_at"
+FROM llm_service_definitions def
+WHERE def."owner" = $10 AND def."definition_handle" = $11
+ON CONFLICT ("owner", "instance_handle") DO UPDATE SET
+  "definition_id" = EXCLUDED."definition_id",
+  "endpoint" = EXCLUDED."endpoint",
+  "description" = EXCLUDED."description",
+  "api_key" = EXCLUDED."api_key",
+  "api_key_encrypted" = EXCLUDED."api_key_encrypted",
+  "api_standard" = EXCLUDED."api_standard",
+  "model" = EXCLUDED."model",
+  "dimensions" = EXCLUDED."dimensions",
+  "updated_at" = NOW()
+RETURNING "owner", "instance_handle", "instance_id";
+
 -- name: DeleteLLMInstance :exec
 DELETE
 FROM llm_service_instances
@@ -199,6 +232,13 @@ WHERE "owner" = $1
 AND "instance_handle" = $2
 LIMIT 1;
 
+-- name: RetrieveLLMInstanceByOwnerHandle :one
+-- Get instance by owner/handle format for shared instances
+SELECT *
+FROM llm_service_instances
+WHERE ("owner" = $1 AND "instance_handle" = $2)
+LIMIT 1;
+
 -- name: RetrieveLLMInstanceByID :one
 SELECT *
 FROM llm_service_instances
@@ -207,7 +247,7 @@ LIMIT 1;
 
 -- name: LinkUserToLLMInstance :exec
 INSERT
-INTO users_llm_services (
+INTO users_llm_service_instances (
   "user_handle", "instance_id", "role", "created_at", "updated_at"
 ) VALUES (
   $1, $2, $3, NOW(), NOW()
@@ -240,7 +280,7 @@ FROM llm_service_instances_shared_with
 WHERE "instance_id" = $1
 ORDER BY "user_handle" ASC;
 
--- name: GetLLMInstancesByProject :one
+-- name: GetLLMInstanceByProject :one
 SELECT llm_service_instances.*
 FROM llm_service_instances
 JOIN projects
@@ -250,11 +290,11 @@ WHERE projects."owner" = $1
 LIMIT 1;
 
 -- name: GetLLMInstancesByUser :many
-SELECT llm_service_instances.*, users_llm_services."role"
+SELECT llm_service_instances.*, users_llm_service_instances."role"
 FROM llm_service_instances
-JOIN users_llm_services
-ON llm_service_instances."instance_id" = users_llm_services."instance_id"
-WHERE users_llm_services."user_handle" = $1
+JOIN users_llm_service_instances
+ON llm_service_instances."instance_id" = users_llm_service_instances."instance_id"
+WHERE users_llm_service_instances."user_handle" = $1
 ORDER BY llm_service_instances."instance_handle" ASC LIMIT $2 OFFSET $3;
 
 -- name: GetSharedLLMInstances :many
@@ -264,6 +304,29 @@ JOIN llm_service_instances_shared_with
 ON llm_service_instances."instance_id" = llm_service_instances_shared_with."instance_id"
 WHERE llm_service_instances_shared_with."user_handle" = $1
 ORDER BY llm_service_instances."instance_handle" ASC LIMIT $2 OFFSET $3;
+
+-- name: GetAllAccessibleLLMInstances :many
+-- Get all instances accessible to a user (owned + shared)
+-- Returns instances with metadata indicating ownership
+SELECT 
+  llm_service_instances.*,
+  CASE 
+    WHEN llm_service_instances."owner" = $1 THEN 'owner'
+    ELSE COALESCE(llm_service_instances_shared_with."role", users_llm_service_instances."role")
+  END as "role",
+  llm_service_instances."owner" = $1 as "is_owner"
+FROM llm_service_instances
+LEFT JOIN users_llm_service_instances
+  ON llm_service_instances."instance_id" = users_llm_service_instances."instance_id"
+  AND users_llm_service_instances."user_handle" = $1
+LEFT JOIN llm_service_instances_shared_with
+  ON llm_service_instances."instance_id" = llm_service_instances_shared_with."instance_id"
+  AND llm_service_instances_shared_with."user_handle" = $1
+WHERE llm_service_instances."owner" = $1
+   OR users_llm_service_instances."user_handle" = $1
+   OR llm_service_instances_shared_with."user_handle" = $1
+ORDER BY llm_service_instances."owner" ASC, llm_service_instances."instance_handle" ASC 
+LIMIT $2 OFFSET $3;
 
 -- name: UpsertEmbeddings :one
 INSERT

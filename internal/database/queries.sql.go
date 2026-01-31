@@ -12,6 +12,79 @@ import (
 	pgvector_go "github.com/pgvector/pgvector-go"
 )
 
+const createLLMInstanceFromDefinition = `-- name: CreateLLMInstanceFromDefinition :one
+INSERT
+INTO llm_service_instances (
+  "owner", "instance_handle", "definition_id", "endpoint", "description", "api_key", "api_key_encrypted", "api_standard", "model", "dimensions", "created_at", "updated_at"
+)
+SELECT 
+  $1 as "owner",
+  $2 as "instance_handle", 
+  def."definition_id",
+  COALESCE($3, def."endpoint") as "endpoint",
+  COALESCE($4, def."description") as "description",
+  $5 as "api_key",
+  $6 as "api_key_encrypted",
+  COALESCE($7, def."api_standard") as "api_standard",
+  COALESCE($8, def."model") as "model",
+  COALESCE($9::INTEGER, def."dimensions") as "dimensions",
+  NOW() as "created_at",
+  NOW() as "updated_at"
+FROM llm_service_definitions def
+WHERE def."owner" = $10 AND def."definition_handle" = $11
+ON CONFLICT ("owner", "instance_handle") DO UPDATE SET
+  "definition_id" = EXCLUDED."definition_id",
+  "endpoint" = EXCLUDED."endpoint",
+  "description" = EXCLUDED."description",
+  "api_key" = EXCLUDED."api_key",
+  "api_key_encrypted" = EXCLUDED."api_key_encrypted",
+  "api_standard" = EXCLUDED."api_standard",
+  "model" = EXCLUDED."model",
+  "dimensions" = EXCLUDED."dimensions",
+  "updated_at" = NOW()
+RETURNING "owner", "instance_handle", "instance_id"
+`
+
+type CreateLLMInstanceFromDefinitionParams struct {
+	Owner            string      `db:"owner" json:"owner"`
+	InstanceHandle   string      `db:"instance_handle" json:"instance_handle"`
+	Endpoint         string      `db:"endpoint" json:"endpoint"`
+	Description      pgtype.Text `db:"description" json:"description"`
+	APIKey           pgtype.Text `db:"api_key" json:"api_key"`
+	ApiKeyEncrypted  []byte      `db:"api_key_encrypted" json:"api_key_encrypted"`
+	APIStandard      string      `db:"api_standard" json:"api_standard"`
+	Model            string      `db:"model" json:"model"`
+	Column9          int32       `db:"column_9" json:"column_9"`
+	Owner_2          string      `db:"owner_2" json:"owner_2"`
+	DefinitionHandle string      `db:"definition_handle" json:"definition_handle"`
+}
+
+type CreateLLMInstanceFromDefinitionRow struct {
+	Owner          string `db:"owner" json:"owner"`
+	InstanceHandle string `db:"instance_handle" json:"instance_handle"`
+	InstanceID     int32  `db:"instance_id" json:"instance_id"`
+}
+
+// Create an instance based on a definition (copies definition fields, allows user to specify API key)
+func (q *Queries) CreateLLMInstanceFromDefinition(ctx context.Context, arg CreateLLMInstanceFromDefinitionParams) (CreateLLMInstanceFromDefinitionRow, error) {
+	row := q.db.QueryRow(ctx, createLLMInstanceFromDefinition,
+		arg.Owner,
+		arg.InstanceHandle,
+		arg.Endpoint,
+		arg.Description,
+		arg.APIKey,
+		arg.ApiKeyEncrypted,
+		arg.APIStandard,
+		arg.Model,
+		arg.Column9,
+		arg.Owner_2,
+		arg.DefinitionHandle,
+	)
+	var i CreateLLMInstanceFromDefinitionRow
+	err := row.Scan(&i.Owner, &i.InstanceHandle, &i.InstanceID)
+	return i, err
+}
+
 const deleteAPIStandard = `-- name: DeleteAPIStandard :exec
 DELETE
 FROM api_standards
@@ -185,6 +258,90 @@ func (q *Queries) GetAPIStandards(ctx context.Context, arg GetAPIStandardsParams
 			&i.KeyField,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getAllAccessibleLLMInstances = `-- name: GetAllAccessibleLLMInstances :many
+SELECT 
+  llm_service_instances.instance_id, llm_service_instances.instance_handle, llm_service_instances.owner, llm_service_instances.endpoint, llm_service_instances.description, llm_service_instances.api_key, llm_service_instances.api_standard, llm_service_instances.model, llm_service_instances.dimensions, llm_service_instances.created_at, llm_service_instances.updated_at, llm_service_instances.definition_id, llm_service_instances.api_key_encrypted,
+  CASE 
+    WHEN llm_service_instances."owner" = $1 THEN 'owner'
+    ELSE COALESCE(llm_service_instances_shared_with."role", users_llm_service_instances."role")
+  END as "role",
+  llm_service_instances."owner" = $1 as "is_owner"
+FROM llm_service_instances
+LEFT JOIN users_llm_service_instances
+  ON llm_service_instances."instance_id" = users_llm_service_instances."instance_id"
+  AND users_llm_service_instances."user_handle" = $1
+LEFT JOIN llm_service_instances_shared_with
+  ON llm_service_instances."instance_id" = llm_service_instances_shared_with."instance_id"
+  AND llm_service_instances_shared_with."user_handle" = $1
+WHERE llm_service_instances."owner" = $1
+   OR users_llm_service_instances."user_handle" = $1
+   OR llm_service_instances_shared_with."user_handle" = $1
+ORDER BY llm_service_instances."owner" ASC, llm_service_instances."instance_handle" ASC 
+LIMIT $2 OFFSET $3
+`
+
+type GetAllAccessibleLLMInstancesParams struct {
+	Owner  string `db:"owner" json:"owner"`
+	Limit  int32  `db:"limit" json:"limit"`
+	Offset int32  `db:"offset" json:"offset"`
+}
+
+type GetAllAccessibleLLMInstancesRow struct {
+	InstanceID      int32            `db:"instance_id" json:"instance_id"`
+	InstanceHandle  string           `db:"instance_handle" json:"instance_handle"`
+	Owner           string           `db:"owner" json:"owner"`
+	Endpoint        string           `db:"endpoint" json:"endpoint"`
+	Description     pgtype.Text      `db:"description" json:"description"`
+	APIKey          pgtype.Text      `db:"api_key" json:"api_key"`
+	APIStandard     string           `db:"api_standard" json:"api_standard"`
+	Model           string           `db:"model" json:"model"`
+	Dimensions      int32            `db:"dimensions" json:"dimensions"`
+	CreatedAt       pgtype.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt       pgtype.Timestamp `db:"updated_at" json:"updated_at"`
+	DefinitionID    pgtype.Int4      `db:"definition_id" json:"definition_id"`
+	ApiKeyEncrypted []byte           `db:"api_key_encrypted" json:"api_key_encrypted"`
+	Role            interface{}      `db:"role" json:"role"`
+	IsOwner         bool             `db:"is_owner" json:"is_owner"`
+}
+
+// Get all instances accessible to a user (owned + shared)
+// Returns instances with metadata indicating ownership
+func (q *Queries) GetAllAccessibleLLMInstances(ctx context.Context, arg GetAllAccessibleLLMInstancesParams) ([]GetAllAccessibleLLMInstancesRow, error) {
+	rows, err := q.db.Query(ctx, getAllAccessibleLLMInstances, arg.Owner, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetAllAccessibleLLMInstancesRow
+	for rows.Next() {
+		var i GetAllAccessibleLLMInstancesRow
+		if err := rows.Scan(
+			&i.InstanceID,
+			&i.InstanceHandle,
+			&i.Owner,
+			&i.Endpoint,
+			&i.Description,
+			&i.APIKey,
+			&i.APIStandard,
+			&i.Model,
+			&i.Dimensions,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.DefinitionID,
+			&i.ApiKeyEncrypted,
+			&i.Role,
+			&i.IsOwner,
 		); err != nil {
 			return nil, err
 		}
@@ -457,7 +614,7 @@ func (q *Queries) GetLLMDefinitionsByUser(ctx context.Context, arg GetLLMDefinit
 	return items, nil
 }
 
-const getLLMInstancesByProject = `-- name: GetLLMInstancesByProject :one
+const getLLMInstanceByProject = `-- name: GetLLMInstanceByProject :one
 SELECT llm_service_instances.instance_id, llm_service_instances.instance_handle, llm_service_instances.owner, llm_service_instances.endpoint, llm_service_instances.description, llm_service_instances.api_key, llm_service_instances.api_standard, llm_service_instances.model, llm_service_instances.dimensions, llm_service_instances.created_at, llm_service_instances.updated_at, llm_service_instances.definition_id, llm_service_instances.api_key_encrypted
 FROM llm_service_instances
 JOIN projects
@@ -467,13 +624,13 @@ WHERE projects."owner" = $1
 LIMIT 1
 `
 
-type GetLLMInstancesByProjectParams struct {
+type GetLLMInstanceByProjectParams struct {
 	Owner         string `db:"owner" json:"owner"`
 	ProjectHandle string `db:"project_handle" json:"project_handle"`
 }
 
-func (q *Queries) GetLLMInstancesByProject(ctx context.Context, arg GetLLMInstancesByProjectParams) (LlmServiceInstance, error) {
-	row := q.db.QueryRow(ctx, getLLMInstancesByProject, arg.Owner, arg.ProjectHandle)
+func (q *Queries) GetLLMInstanceByProject(ctx context.Context, arg GetLLMInstanceByProjectParams) (LlmServiceInstance, error) {
+	row := q.db.QueryRow(ctx, getLLMInstanceByProject, arg.Owner, arg.ProjectHandle)
 	var i LlmServiceInstance
 	err := row.Scan(
 		&i.InstanceID,
@@ -494,11 +651,11 @@ func (q *Queries) GetLLMInstancesByProject(ctx context.Context, arg GetLLMInstan
 }
 
 const getLLMInstancesByUser = `-- name: GetLLMInstancesByUser :many
-SELECT llm_service_instances.instance_id, llm_service_instances.instance_handle, llm_service_instances.owner, llm_service_instances.endpoint, llm_service_instances.description, llm_service_instances.api_key, llm_service_instances.api_standard, llm_service_instances.model, llm_service_instances.dimensions, llm_service_instances.created_at, llm_service_instances.updated_at, llm_service_instances.definition_id, llm_service_instances.api_key_encrypted, users_llm_services."role"
+SELECT llm_service_instances.instance_id, llm_service_instances.instance_handle, llm_service_instances.owner, llm_service_instances.endpoint, llm_service_instances.description, llm_service_instances.api_key, llm_service_instances.api_standard, llm_service_instances.model, llm_service_instances.dimensions, llm_service_instances.created_at, llm_service_instances.updated_at, llm_service_instances.definition_id, llm_service_instances.api_key_encrypted, users_llm_service_instances."role"
 FROM llm_service_instances
-JOIN users_llm_services
-ON llm_service_instances."instance_id" = users_llm_services."instance_id"
-WHERE users_llm_services."user_handle" = $1
+JOIN users_llm_service_instances
+ON llm_service_instances."instance_id" = users_llm_service_instances."instance_id"
+WHERE users_llm_service_instances."user_handle" = $1
 ORDER BY llm_service_instances."instance_handle" ASC LIMIT $2 OFFSET $3
 `
 
@@ -1071,7 +1228,7 @@ func (q *Queries) LinkProjectToUser(ctx context.Context, arg LinkProjectToUserPa
 
 const linkUserToLLMInstance = `-- name: LinkUserToLLMInstance :exec
 INSERT
-INTO users_llm_services (
+INTO users_llm_service_instances (
   "user_handle", "instance_id", "role", "created_at", "updated_at"
 ) VALUES (
   $1, $2, $3, NOW(), NOW()
@@ -1263,6 +1420,40 @@ LIMIT 1
 
 func (q *Queries) RetrieveLLMInstanceByID(ctx context.Context, instanceID int32) (LlmServiceInstance, error) {
 	row := q.db.QueryRow(ctx, retrieveLLMInstanceByID, instanceID)
+	var i LlmServiceInstance
+	err := row.Scan(
+		&i.InstanceID,
+		&i.InstanceHandle,
+		&i.Owner,
+		&i.Endpoint,
+		&i.Description,
+		&i.APIKey,
+		&i.APIStandard,
+		&i.Model,
+		&i.Dimensions,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DefinitionID,
+		&i.ApiKeyEncrypted,
+	)
+	return i, err
+}
+
+const retrieveLLMInstanceByOwnerHandle = `-- name: RetrieveLLMInstanceByOwnerHandle :one
+SELECT instance_id, instance_handle, owner, endpoint, description, api_key, api_standard, model, dimensions, created_at, updated_at, definition_id, api_key_encrypted
+FROM llm_service_instances
+WHERE ("owner" = $1 AND "instance_handle" = $2)
+LIMIT 1
+`
+
+type RetrieveLLMInstanceByOwnerHandleParams struct {
+	Owner          string `db:"owner" json:"owner"`
+	InstanceHandle string `db:"instance_handle" json:"instance_handle"`
+}
+
+// Get instance by owner/handle format for shared instances
+func (q *Queries) RetrieveLLMInstanceByOwnerHandle(ctx context.Context, arg RetrieveLLMInstanceByOwnerHandleParams) (LlmServiceInstance, error) {
+	row := q.db.QueryRow(ctx, retrieveLLMInstanceByOwnerHandle, arg.Owner, arg.InstanceHandle)
 	var i LlmServiceInstance
 	err := row.Scan(
 		&i.InstanceID,

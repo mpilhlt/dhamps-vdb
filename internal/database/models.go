@@ -94,7 +94,7 @@ type User struct {
 	UpdatedAt  pgtype.Timestamp `db:"updated_at" json:"updated_at"`
 }
 
-type UsersLlmService struct {
+type UsersLlmServiceInstance struct {
 	UserHandle string           `db:"user_handle" json:"user_handle"`
 	InstanceID int32            `db:"instance_id" json:"instance_id"`
 	Role       string           `db:"role" json:"role"`
