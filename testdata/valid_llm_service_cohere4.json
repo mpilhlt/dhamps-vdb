@@ -1,0 +1,9 @@
+{
+  "llm_service_handle": "cohere4",
+  "endpoint": "https://api.cohere.com/v2/embed",
+	"description": "My Cohere embed-v4.0 service",
+  "api_key": "0123456789",
+  "api_standard": "cohere",
+  "model": "embed-v4.0",
+  "dimensions": 1536
+}

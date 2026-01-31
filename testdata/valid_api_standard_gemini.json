@@ -1,0 +1,6 @@
+{
+  "api_standard_handle": "gemini",
+  "description": "Gemini Embeddings API, as documented in https://ai.google.dev/gemini-api/docs/embeddings",
+  "key_method": "auth_bearer",
+  "key_field": "x-goog-api-key"
+}
