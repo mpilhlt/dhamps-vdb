@@ -10,6 +10,16 @@ import (
 
 // ValidateEmbeddingDimensions checks if the embeddings vector dimensions match the LLM service dimensions
 func ValidateEmbeddingDimensions(embedding models.EmbeddingsInput, llmDimensions int32) error {
+	// Check if text_id is not empty
+	if embedding.TextID == "" {
+		return fmt.Errorf("text_id cannot be empty")
+	}
+
+	// Check if vector is not empty
+	if len(embedding.Vector) == 0 {
+		return fmt.Errorf("vector cannot be empty for text_id '%s'", embedding.TextID)
+	}
+
 	// Check if declared vector_dim matches LLM service dimensions
 	if embedding.VectorDim != llmDimensions {
 		return fmt.Errorf("vector dimension mismatch: embedding declares %d dimensions but LLM service '%s' expects %d dimensions", 
