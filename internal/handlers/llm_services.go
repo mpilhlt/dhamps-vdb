@@ -62,7 +62,7 @@ func putLLMFunc(ctx context.Context, input *models.PutLLMRequest) (*models.Uploa
 		owner = llm.Owner
 
 		// 2. Link llm service to user
-		err = queries.LinkUserToLLM(ctx, database.LinkUserToLLMParams{UserHandle: input.UserHandle, LLMServiceID: llm.LLMServiceID, Role: "owner"})
+		err = queries.LinkUserToLLM(ctx, database.LinkUserToLLMParams{UserHandle: input.UserHandle, LLMServiceID: llmServiceID, Role: "owner"})
 		if err != nil {
 			return fmt.Errorf("unable to link llm service to user. %v", err)
 		}

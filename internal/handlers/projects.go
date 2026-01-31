@@ -88,7 +88,7 @@ func putProjectFunc(ctx context.Context, input *models.PutProjectRequest) (*mode
 		projectHandle = p.ProjectHandle
 
 		// 2. Link project and owner
-		params := database.LinkProjectToUserParams{ProjectID: p.ProjectID, UserHandle: input.UserHandle, Role: "owner"}
+		params := database.LinkProjectToUserParams{ProjectID: projectID, UserHandle: input.UserHandle, Role: "owner"}
 		_, err = queries.LinkProjectToUser(ctx, params)
 		if err != nil {
 			return fmt.Errorf("unable to link project to owner %s. %v", input.UserHandle, err)
@@ -96,7 +96,7 @@ func putProjectFunc(ctx context.Context, input *models.PutProjectRequest) (*mode
 
 		// 3. Link project and other assigned readers
 		for reader := range readers {
-			params := database.LinkProjectToUserParams{ProjectID: p.ProjectID, UserHandle: reader, Role: "reader"}
+			params := database.LinkProjectToUserParams{ProjectID: projectID, UserHandle: reader, Role: "reader"}
 			_, err := queries.LinkProjectToUser(ctx, params)
 			if err != nil {
 				return fmt.Errorf("unable to upload project reader %s. %v", reader, err)
