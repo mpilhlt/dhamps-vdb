@@ -165,19 +165,23 @@ func getUserFunc(ctx context.Context, input *models.GetUserRequest) (*models.Get
 		})
 	}
 
-	// Get LLM services the user is a member of
+	// Get LLM service instances the user is a member of
 	llmservices := models.LLMMemberships{}
-	ls, err := queries.GetLLMsByUser(ctx, database.GetLLMsByUserParams{UserHandle: input.UserHandle})
+	ls, err := queries.GetLLMInstancesByUser(ctx, database.GetLLMInstancesByUserParams{
+		UserHandle: input.UserHandle,
+		Limit:      999,
+		Offset:     0,
+	})
 	if err != nil {
 		if err.Error() == "no rows in result set" {
-			fmt.Printf("Warning: No projects registered for user %s.", input.UserHandle)
+			fmt.Printf("Warning: No LLM service instances registered for user %s.", input.UserHandle)
 		} else {
-			fmt.Printf("Warning: Unable to get list of projects for user %s. %v", input.UserHandle, err)
+			fmt.Printf("Warning: Unable to get list of LLM service instances for user %s: %v", input.UserHandle, err)
 		}
 	}
 	for _, llmservice := range ls {
 		llmservices = append(llmservices, models.LLMMembership{
-			LLMServiceHandle: llmservice.LLMServiceHandle,
+			LLMServiceHandle: llmservice.InstanceHandle,
 			LLMServiceOwner:  llmservice.Owner,
 			Role:             llmservice.Role,
 		})

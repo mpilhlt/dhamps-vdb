@@ -167,26 +167,27 @@ func getProjectsFunc(ctx context.Context, input *models.GetProjectsRequest) (*mo
 			}
 		}
 
-		// Get the LLM Services for the project
+		// Get the LLM Service Instance for the project (1:1 relationship)
 		llmservices := []models.LLMService{}
-		llmRows, err := queries.GetLLMsByProject(ctx, database.GetLLMsByProjectParams{Owner: input.UserHandle, ProjectHandle: project.ProjectHandle, Limit: 999, Offset: 0})
+		llmRow, err := queries.GetLLMInstanceByProject(ctx, database.GetLLMInstanceByProjectParams{
+			Owner:         input.UserHandle,
+			ProjectHandle: project.ProjectHandle,
+		})
 		if err != nil {
-			if err.Error() == "no rows in result set" {
-				llmRows = []database.LlmService{}
-			} else {
-				return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get LLM Services for %s's project %s. %v", input.UserHandle, project.ProjectHandle, err))
+			if err.Error() != "no rows in result set" {
+				return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get LLM Service Instance for %s's project %s: %v", input.UserHandle, project.ProjectHandle, err))
 			}
-		}
-		for _, row := range llmRows {
+			// Project has no LLM service instance assigned yet
+		} else {
 			llmservice := models.LLMService{
-				Owner:            row.Owner,
-				LLMServiceID:     int(row.LLMServiceID),
-				LLMServiceHandle: row.LLMServiceHandle,
-				Endpoint:         row.Endpoint,
-				Description:      row.Description.String,
-				APIStandard:      row.APIStandard,
-				Model:            row.Model,
-				Dimensions:       row.Dimensions,
+				Owner:            llmRow.Owner,
+				LLMServiceID:     int(llmRow.InstanceID),
+				LLMServiceHandle: llmRow.InstanceHandle,
+				Endpoint:         llmRow.Endpoint,
+				Description:      llmRow.Description.String,
+				APIStandard:      llmRow.APIStandard,
+				Model:            llmRow.Model,
+				Dimensions:       llmRow.Dimensions,
 			}
 			llmservices = append(llmservices, llmservice)
 		}
@@ -264,26 +265,27 @@ func getProjectFunc(ctx context.Context, input *models.GetProjectRequest) (*mode
 		}
 	}
 
-	// Get the LLM Services for the project
+	// Get the LLM Service Instance for the project (1:1 relationship)
 	llmservices := []models.LLMService{}
-	llmRows, err := queries.GetLLMsByProject(ctx, database.GetLLMsByProjectParams{Owner: input.UserHandle, ProjectHandle: input.ProjectHandle, Limit: 999, Offset: 0})
+	llmRow, err := queries.GetLLMInstanceByProject(ctx, database.GetLLMInstanceByProjectParams{
+		Owner:         input.UserHandle,
+		ProjectHandle: input.ProjectHandle,
+	})
 	if err != nil {
-		if err.Error() == "no rows in result set" {
-			llmRows = []database.LlmService{}
-		} else {
-			return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get LLM Services for %s's project %s. %v", input.UserHandle, input.ProjectHandle, err))
+		if err.Error() != "no rows in result set" {
+			return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get LLM Service Instance for %s's project %s: %v", input.UserHandle, input.ProjectHandle, err))
 		}
-	}
-	for _, row := range llmRows {
+		// Project has no LLM service instance assigned yet
+	} else {
 		llmservice := models.LLMService{
-			Owner:            row.Owner,
-			LLMServiceID:     int(row.LLMServiceID),
-			LLMServiceHandle: row.LLMServiceHandle,
-			Endpoint:         row.Endpoint,
-			Description:      row.Description.String,
-			APIStandard:      row.APIStandard,
-			Model:            row.Model,
-			Dimensions:       row.Dimensions,
+			Owner:            llmRow.Owner,
+			LLMServiceID:     int(llmRow.InstanceID),
+			LLMServiceHandle: llmRow.InstanceHandle,
+			Endpoint:         llmRow.Endpoint,
+			Description:      llmRow.Description.String,
+			APIStandard:      llmRow.APIStandard,
+			Model:            llmRow.Model,
+			Dimensions:       llmRow.Dimensions,
 		}
 		llmservices = append(llmservices, llmservice)
 	}

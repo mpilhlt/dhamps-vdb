@@ -96,14 +96,14 @@ func postProjEmbeddingsFunc(ctx context.Context, input *models.PostProjEmbedding
 		}
 		// Build query parameters (embeddings)
 		params := database.UpsertEmbeddingsParams{
-			TextID:       pgtype.Text{String: embedding.TextID, Valid: true},
-			Owner:        input.UserHandle,
-			ProjectID:    pid,
-			LLMServiceID: llmid,
-			Text:         pgtype.Text{String: embedding.Text, Valid: true},
-			Vector:       pgvector.NewHalfVector(embedding.Vector),
-			VectorDim:    embedding.VectorDim,
-			Metadata:     embedding.Metadata,
+			TextID:               pgtype.Text{String: embedding.TextID, Valid: true},
+			Owner:                input.UserHandle,
+			ProjectID:            pid,
+			LlmServiceInstanceID: llmid,
+			Text:                 pgtype.Text{String: embedding.Text, Valid: true},
+			Vector:               pgvector.NewHalfVector(embedding.Vector),
+			VectorDim:            embedding.VectorDim,
+			Metadata:             embedding.Metadata,
 		}
 		// Run the queries (upload embeddings)
 		result, err := queries.UpsertEmbeddings(ctx, params)
@@ -171,7 +171,7 @@ func getProjEmbeddingsFunc(ctx context.Context, input *models.GetProjEmbeddingsR
 			UserHandle:       embeddings.Owner,
 			ProjectHandle:    embeddings.ProjectHandle,
 			ProjectID:        int(embeddings.ProjectID),
-			LLMServiceHandle: embeddings.LLMServiceHandle,
+			LLMServiceHandle: embeddings.InstanceHandle,
 			Vector:           embeddings.Vector.Slice(),
 			VectorDim:        embeddings.VectorDim,
 			Text:             embeddings.Text.String,
@@ -268,7 +268,7 @@ func getDocEmbeddingsFunc(ctx context.Context, input *models.GetDocEmbeddingsReq
 		UserHandle:       embeddings.Owner,
 		ProjectHandle:    embeddings.ProjectHandle,
 		ProjectID:        int(embeddings.ProjectID),
-		LLMServiceHandle: embeddings.LLMServiceHandle,
+		LLMServiceHandle: embeddings.InstanceHandle,
 		Vector:           embeddings.Vector.Slice(),
 		VectorDim:        embeddings.VectorDim,
 		Text:             embeddings.Text.String,

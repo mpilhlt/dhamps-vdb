@@ -67,23 +67,19 @@ func sanityCheckFunc(ctx context.Context, input *models.SanityCheckRequest) (*mo
 	for _, project := range projects {
 		projectName := fmt.Sprintf("%s/%s", project.Owner, project.ProjectHandle)
 		
-		// Get all LLM services for this project
-		llmServices, err := queries.GetLLMsByProject(ctx, database.GetLLMsByProjectParams{
+		// Get the LLM service instance for this project (1:1 relationship)
+		llmService, err := queries.GetLLMInstanceByProject(ctx, database.GetLLMInstanceByProjectParams{
 			Owner:         project.Owner,
 			ProjectHandle: project.ProjectHandle,
-			Limit:         999,
-			Offset:        0,
 		})
 		if err != nil {
-			issues = append(issues, fmt.Sprintf("Project %s: unable to get LLM services: %v", projectName, err))
+			issues = append(issues, fmt.Sprintf("Project %s: unable to get LLM service instance: %v", projectName, err))
 			continue
 		}
 
-		// Create a map of LLM service dimensions
+		// Create a map with the single LLM service instance
 		llmDimensions := make(map[int32]int32)
-		for _, llm := range llmServices {
-			llmDimensions[llm.LLMServiceID] = llm.Dimensions
-		}
+		llmDimensions[llmService.InstanceID] = llmService.Dimensions
 
 		// Get all embeddings for this project
 		embeddings, err := queries.GetEmbeddingsByProject(ctx, database.GetEmbeddingsByProjectParams{
@@ -102,10 +98,10 @@ func sanityCheckFunc(ctx context.Context, input *models.SanityCheckRequest) (*mo
 			textID := embedding.TextID.String
 			
 			// Check dimension consistency
-			expectedDim, ok := llmDimensions[embedding.LLMServiceID]
+			expectedDim, ok := llmDimensions[embedding.LlmServiceInstanceID]
 			if !ok {
 				issues = append(issues, fmt.Sprintf("Project %s, text_id '%s': LLM service ID %d not found", 
-					projectName, textID, embedding.LLMServiceID))
+					projectName, textID, embedding.LlmServiceInstanceID))
 				continue
 			}
 

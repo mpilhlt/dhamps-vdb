@@ -107,3 +107,48 @@ type DeleteLLMRequest struct {
 type DeleteLLMResponse struct {
 	Header []http.Header `json:"header,omitempty" doc:"Response headers"`
 }
+
+// New types for Definitions and Instances architecture
+
+// LLMServiceDefinition represents a template for LLM service configurations
+// Definitions can be owned by _system (global templates) or individual users
+type LLMServiceDefinition struct {
+	DefinitionID     int    `json:"definition_id,omitempty" readOnly:"true" doc:"Unique definition identifier" example:"42"`
+	DefinitionHandle string `json:"definition_handle" minLength:"3" maxLength:"20" example:"openai-large" doc:"Definition handle"`
+	Owner            string `json:"owner" readOnly:"true" doc:"User handle of the definition owner (_system for global)" example:"_system"`
+	Endpoint         string `json:"endpoint" example:"https://api.openai.com/v1/embeddings" doc:"Service endpoint"`
+	Description      string `json:"description,omitempty" doc:"Service description"`
+	APIStandard      string `json:"api_standard" example:"openai" doc:"Standard of the API"`
+	Model            string `json:"model" example:"text-embedding-3-large" doc:"Model name"`
+	Dimensions       int32  `json:"dimensions" example:"3072" doc:"Number of dimensions in the embeddings"`
+}
+
+// LLMServiceInstance represents a user-specific instance of an LLM service
+// Instances can be based on a definition or standalone
+type LLMServiceInstance struct {
+	InstanceID       int     `json:"instance_id,omitempty" readOnly:"true" doc:"Unique instance identifier" example:"153"`
+	InstanceHandle   string  `json:"instance_handle" minLength:"3" maxLength:"20" example:"my-openai-large" doc:"Instance handle"`
+	Owner            string  `json:"owner" readOnly:"true" doc:"User handle of the instance owner"`
+	DefinitionID     *int    `json:"definition_id,omitempty" doc:"Reference to definition (if based on one)"`
+	DefinitionHandle string  `json:"definition_handle,omitempty" readOnly:"true" doc:"Handle of the definition (if based on one)"`
+	Endpoint         string  `json:"endpoint" example:"https://api.openai.com/v1/embeddings" doc:"Service endpoint"`
+	Description      string  `json:"description,omitempty" doc:"Service description"`
+	APIKey           string  `json:"api_key,omitempty" writeOnly:"true" doc:"Authentication token (write-only, never returned)"`
+	HasAPIKey        bool    `json:"has_api_key,omitempty" readOnly:"true" doc:"Indicates if instance has an API key configured"`
+	APIStandard      string  `json:"api_standard" example:"openai" doc:"Standard of the API"`
+	Model            string  `json:"model" example:"text-embedding-3-large" doc:"Model name"`
+	Dimensions       int32   `json:"dimensions" example:"3072" doc:"Number of dimensions in the embeddings"`
+	SharedWith       []string `json:"shared_with,omitempty" readOnly:"true" doc:"Users this instance is shared with"`
+	IsShared         bool    `json:"is_shared,omitempty" readOnly:"true" doc:"Indicates if this is a shared instance (not owned by requesting user)"`
+}
+
+// CreateInstanceFromDefinitionRequest is for creating an instance based on a definition
+type CreateInstanceFromDefinitionRequest struct {
+	UserHandle       string  `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
+	InstanceHandle   string  `json:"instance_handle" path:"instance_handle" maxLength:"20" minLength:"3" example:"my-openai" doc:"Instance handle"`
+	DefinitionOwner  string  `json:"definition_owner" example:"_system" doc:"Owner of the definition to base instance on"`
+	DefinitionHandle string  `json:"definition_handle" example:"openai-large" doc:"Handle of the definition to base instance on"`
+	APIKey           string  `json:"api_key,omitempty" doc:"Optional API key for this instance"`
+	Endpoint         *string `json:"endpoint,omitempty" doc:"Optional endpoint override"`
+	Description      *string `json:"description,omitempty" doc:"Optional description override"`
+}
