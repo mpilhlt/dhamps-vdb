@@ -74,3 +74,21 @@ func ValidateMetadataAgainstSchema(metadata json.RawMessage, schemaStr string) e
 
 	return nil
 }
+
+// ValidateEmbeddingAgainstLLMDimension validates that an embedding's dimensions match the LLM service
+func ValidateEmbeddingAgainstLLMDimension(vectorDim int32, llmDimensions int32, textID string) error {
+	if vectorDim != llmDimensions {
+		return fmt.Errorf("text_id '%s': vector dimension %d does not match LLM service dimension %d", 
+			textID, vectorDim, llmDimensions)
+	}
+	return nil
+}
+
+// ValidateEmbeddingMetadataAgainstProjectSchema validates an embedding's metadata against project schema
+func ValidateEmbeddingMetadataAgainstProjectSchema(metadata json.RawMessage, schemaStr string, textID string) error {
+	err := ValidateMetadataAgainstSchema(metadata, schemaStr)
+	if err != nil {
+		return fmt.Errorf("text_id '%s': %v", textID, err)
+	}
+	return nil
+}
