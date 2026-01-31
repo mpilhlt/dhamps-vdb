@@ -108,6 +108,15 @@ If validation fails, you'll receive a `400 Bad Request` response with a detailed
 }
 ```
 
+### Similarity Query Dimension Filtering
+
+When querying for similar embeddings, the system automatically filters results to only include embeddings with matching dimensions. This ensures that similarity comparisons are only made between vectors of the same dimensionality, preventing invalid comparisons.
+
+The similarity queries enforce:
+- Only embeddings with matching `vector_dim` are compared
+- Only embeddings from the same project are considered
+- Vector similarity is calculated using cosine distance on compatible dimensions
+
 ### Metadata Schema Validation
 
 Projects can optionally define a JSON Schema to validate metadata attached to embeddings. This ensures that all embeddings in a project have consistent, well-structured metadata.
@@ -138,6 +147,38 @@ When uploading embeddings to a project with a metadata schema, the API validates
   "detail": "metadata validation failed for text_id 'doc123': metadata validation failed:\n  - author: author is required"
 }
 ```
+
+### Admin Sanity Check
+
+Administrators can verify database integrity using the `/v1/admin/sanity-check` endpoint. This endpoint:
+
+- Checks all embeddings have dimensions matching their LLM service
+- Validates all metadata against project schemas (if defined)
+- Reports issues and warnings in a structured format
+
+**Example sanity check request:**
+```bash
+curl -X GET http://localhost:8080/v1/admin/sanity-check \
+  -H "Authorization: ******"
+```
+
+**Example response:**
+```json
+{
+  "status": "PASSED",
+  "total_projects": 5,
+  "issues_count": 0,
+  "warnings_count": 1,
+  "warnings": [
+    "Project alice/project1 has 100 embeddings but no metadata schema defined"
+  ]
+}
+```
+
+Status values:
+- `PASSED`: No issues found (warnings may be present)
+- `WARNING`: No critical issues, but warnings exist
+- `FAILED`: Validation issues found that need attention
 
 #### Example Metadata Schemas
 
@@ -218,6 +259,7 @@ For a more detailed, and always up-to-date documentation of the endpoints, inclu
 | Endpoint | Method | Description | Allowed Users |
 |----------|--------|-------------|---------------|
 | /admin/footgun | GET | Reset Database: Remove all records from database and reset serials/counters | admin |
+| /admin/sanity-check | GET | Verify all data in database conforms to schemas and dimension requirements | admin |
 | /users | GET  | Get all users (list of handles) registered with the Db | admin |
 | /users | POST | Register a new user with the Db | admin |
 | /users/\<username\> | GET | Get information about user \<username\> | admin, \<username\> |
