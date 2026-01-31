@@ -36,6 +36,9 @@ jobs:
     - name: Download dependencies
       run: go mod download
       
+    - name: Verify build
+      run: go build -o build/dhamps-vdb main.go
+      
     - name: Run tests
       run: go test -v ./...
       env:
