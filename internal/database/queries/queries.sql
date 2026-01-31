@@ -59,14 +59,15 @@ ORDER BY users."user_handle" ASC LIMIT $3 OFFSET $4;
 -- name: UpsertProject :one
 INSERT
 INTO projects (
-  "project_handle", "owner", "description", "metadata_scheme", "public_read", "created_at", "updated_at"
+  "project_handle", "owner", "description", "metadata_scheme", "public_read", "llm_service_instance_id", "created_at", "updated_at"
 ) VALUES (
-  $1, $2, $3, $4, $5, NOW(), NOW()
+  $1, $2, $3, $4, $5, $6, NOW(), NOW()
 )
 ON CONFLICT ("owner", "project_handle") DO UPDATE SET
   "description" = $3,
   "metadata_scheme" = $4,
   "public_read" = $5,
+  "llm_service_instance_id" = $6,
   "updated_at" = NOW()
 RETURNING "project_id", "owner", "project_handle";
 
@@ -116,92 +117,168 @@ ON CONFLICT ("user_handle", "project_id") DO UPDATE SET
 RETURNING *;
 
 
--- name: UpsertLLM :one
+-- LLM Service Definitions (templates that can be shared)
+
+-- name: UpsertLLMDefinition :one
 INSERT
-INTO llm_services (
-  "owner", "llm_service_handle", "endpoint", "description", "api_key", "api_standard", "model", "dimensions", "created_at", "updated_at"
+INTO llm_service_definitions (
+  "owner", "definition_handle", "endpoint", "description", "api_standard", "model", "dimensions", "created_at", "updated_at"
 ) VALUES (
-  $1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW()
+  $1, $2, $3, $4, $5, $6, $7, NOW(), NOW()
 )
-ON CONFLICT ("owner", "llm_service_handle") DO UPDATE SET
+ON CONFLICT ("owner", "definition_handle") DO UPDATE SET
   "endpoint" = $3,
   "description" = $4,
-  "api_key" = $5,
-  "api_standard" = $6,
-  "model" = $7,
-  "dimensions" = $8,
+  "api_standard" = $5,
+  "model" = $6,
+  "dimensions" = $7,
   "updated_at" = NOW()
-RETURNING "owner", "llm_service_handle", "llm_service_id";
+RETURNING "owner", "definition_handle", "definition_id";
 
--- name: DeleteLLM :exec
+-- name: DeleteLLMDefinition :exec
 DELETE
-FROM llm_services
+FROM llm_service_definitions
 WHERE "owner" = $1
-AND "llm_service_handle" = $2;
+AND "definition_handle" = $2;
 
--- name: RetrieveLLM :one
+-- name: RetrieveLLMDefinition :one
 SELECT *
-FROM llm_services
+FROM llm_service_definitions
 WHERE "owner" = $1
-AND "llm_service_handle" = $2
+AND "definition_handle" = $2
 LIMIT 1;
 
--- name: LinkUserToLLM :exec
+-- name: GetLLMDefinitionsByUser :many
+SELECT *
+FROM llm_service_definitions
+WHERE "owner" = $1
+ORDER BY "definition_handle" ASC LIMIT $2 OFFSET $3;
+
+-- name: GetAllLLMDefinitions :many
+SELECT *
+FROM llm_service_definitions
+ORDER BY "owner" ASC, "definition_handle" ASC LIMIT $1 OFFSET $2;
+
+-- name: GetSystemLLMDefinitions :many
+SELECT *
+FROM llm_service_definitions
+WHERE "owner" = '_system'
+ORDER BY "definition_handle" ASC LIMIT $1 OFFSET $2;
+
+-- LLM Service Instances (user-specific instances with optional API keys)
+
+-- name: UpsertLLMInstance :one
+INSERT
+INTO llm_service_instances (
+  "owner", "instance_handle", "definition_id", "endpoint", "description", "api_key", "api_key_encrypted", "api_standard", "model", "dimensions", "created_at", "updated_at"
+) VALUES (
+  $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW()
+)
+ON CONFLICT ("owner", "instance_handle") DO UPDATE SET
+  "definition_id" = $3,
+  "endpoint" = $4,
+  "description" = $5,
+  "api_key" = $6,
+  "api_key_encrypted" = $7,
+  "api_standard" = $8,
+  "model" = $9,
+  "dimensions" = $10,
+  "updated_at" = NOW()
+RETURNING "owner", "instance_handle", "instance_id";
+
+-- name: DeleteLLMInstance :exec
+DELETE
+FROM llm_service_instances
+WHERE "owner" = $1
+AND "instance_handle" = $2;
+
+-- name: RetrieveLLMInstance :one
+SELECT *
+FROM llm_service_instances
+WHERE "owner" = $1
+AND "instance_handle" = $2
+LIMIT 1;
+
+-- name: RetrieveLLMInstanceByID :one
+SELECT *
+FROM llm_service_instances
+WHERE "instance_id" = $1
+LIMIT 1;
+
+-- name: LinkUserToLLMInstance :exec
 INSERT
 INTO users_llm_services (
-  "user_handle", "llm_service_id", "role", "created_at", "updated_at"
+  "user_handle", "instance_id", "role", "created_at", "updated_at"
 ) VALUES (
   $1, $2, $3, NOW(), NOW()
 )
-ON CONFLICT ("user_handle", "llm_service_id") DO UPDATE SET
+ON CONFLICT ("user_handle", "instance_id") DO UPDATE SET
   "role" = $3,
   "updated_at" = NOW()
 RETURNING *;
 
--- name: LinkProjectToLLM :exec
+-- name: ShareLLMInstance :exec
 INSERT
-INTO projects_llm_services (
-  "project_id", "llm_service_id", "created_at", "updated_at"
+INTO llm_service_instances_shared_with (
+  "user_handle", "instance_id", "role", "created_at", "updated_at"
 ) VALUES (
-  $1, $2, NOW(), NOW()
+  $1, $2, $3, NOW(), NOW()
 )
-ON CONFLICT ("project_id", "llm_service_id") DO NOTHING
-RETURNING *;
+ON CONFLICT ("user_handle", "instance_id") DO UPDATE SET
+  "role" = $3,
+  "updated_at" = NOW();
 
--- name: GetLLMsByProject :many
-SELECT llm_services.*
-FROM llm_services
-JOIN (
-  projects_llm_services JOIN projects
-  ON projects_llm_services."project_id" = projects."project_id"
-)
-ON llm_services."llm_service_id" = projects_llm_services."llm_service_id"
+-- name: UnshareLLMInstance :exec
+DELETE
+FROM llm_service_instances_shared_with
+WHERE "user_handle" = $1
+AND "instance_id" = $2;
+
+-- name: GetSharedUsersForInstance :many
+SELECT "user_handle", "role"
+FROM llm_service_instances_shared_with
+WHERE "instance_id" = $1
+ORDER BY "user_handle" ASC;
+
+-- name: GetLLMInstancesByProject :one
+SELECT llm_service_instances.*
+FROM llm_service_instances
+JOIN projects
+ON projects."llm_service_instance_id" = llm_service_instances."instance_id"
 WHERE projects."owner" = $1
   AND projects."project_handle" = $2
-ORDER BY llm_services."llm_service_handle" ASC LIMIT $3 OFFSET $4;
+LIMIT 1;
 
--- name: GetLLMsByUser :many
-SELECT llm_services.*, users_llm_services."role"
-FROM llm_services
+-- name: GetLLMInstancesByUser :many
+SELECT llm_service_instances.*, users_llm_services."role"
+FROM llm_service_instances
 JOIN users_llm_services
-ON llm_services."llm_service_id" = users_llm_services."llm_service_id"
+ON llm_service_instances."instance_id" = users_llm_services."instance_id"
 WHERE users_llm_services."user_handle" = $1
-ORDER BY llm_services."llm_service_handle" ASC LIMIT $2 OFFSET $3;
+ORDER BY llm_service_instances."instance_handle" ASC LIMIT $2 OFFSET $3;
+
+-- name: GetSharedLLMInstances :many
+SELECT llm_service_instances.*, llm_service_instances_shared_with."role"
+FROM llm_service_instances
+JOIN llm_service_instances_shared_with
+ON llm_service_instances."instance_id" = llm_service_instances_shared_with."instance_id"
+WHERE llm_service_instances_shared_with."user_handle" = $1
+ORDER BY llm_service_instances."instance_handle" ASC LIMIT $2 OFFSET $3;
 
 -- name: UpsertEmbeddings :one
 INSERT
 INTO embeddings (
-  "text_id", "owner", "project_id", "llm_service_id", "text", "vector", "vector_dim", "metadata", "created_at", "updated_at"
+  "text_id", "owner", "project_id", "llm_service_instance_id", "text", "vector", "vector_dim", "metadata", "created_at", "updated_at"
 ) VALUES (
   $1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW()
 )
-ON CONFLICT ("text_id", "owner", "project_id", "llm_service_id") DO UPDATE SET
+ON CONFLICT ("text_id", "owner", "project_id", "llm_service_instance_id") DO UPDATE SET
   "text" = $5,
   "vector" = $6,
   "vector_dim" = $7,
   "metadata" = $8,
   "updated_at" = NOW()
-RETURNING "embeddings_id", "text_id", "owner", "project_id", "llm_service_id";
+RETURNING "embeddings_id", "text_id", "owner", "project_id", "llm_service_instance_id";
 
 -- name: DeleteEmbeddingsByID :exec
 DELETE
@@ -227,10 +304,10 @@ WHERE e."owner" = $1
   AND e."text_id" = $3;
 
 -- name: RetrieveEmbeddings :one
-SELECT embeddings.*, projects."project_handle", llm_services."llm_service_handle"
+SELECT embeddings.*, projects."project_handle", llm_service_instances."instance_handle"
 FROM embeddings
-JOIN llm_services
-ON embeddings."llm_service_id" = llm_services."llm_service_id"
+JOIN llm_service_instances
+ON embeddings."llm_service_instance_id" = llm_service_instances."instance_id"
 JOIN projects
 ON embeddings."project_id" = projects."project_id"
 WHERE embeddings."owner" = $1
@@ -239,10 +316,10 @@ AND embeddings."text_id" = $3
 LIMIT 1;
 
 -- name: GetEmbeddingsByProject :many
-SELECT embeddings.*, projects."project_handle", llm_services."llm_service_handle"
+SELECT embeddings.*, projects."project_handle", llm_service_instances."instance_handle"
 FROM embeddings
-JOIN llm_services
-ON llm_services."llm_service_id" = embeddings."llm_service_id"
+JOIN llm_service_instances
+ON llm_service_instances."instance_id" = embeddings."llm_service_instance_id"
 JOIN projects
 ON projects."project_id" = embeddings."project_id"
 WHERE embeddings."owner" = $1
@@ -290,10 +367,10 @@ ORDER BY "api_standard_handle" ASC LIMIT $1 OFFSET $2;
 
 
 -- name: GetSimilarsByVector :many
-SELECT embeddings."embeddings_id", embeddings."text_id", llm_services."owner", llm_services."llm_service_handle"
+SELECT embeddings."embeddings_id", embeddings."text_id", llm_service_instances."owner", llm_service_instances."instance_handle"
 FROM embeddings
-JOIN llm_services
-ON embeddings."llm_service_id" = llm_services."llm_service_id"
+JOIN llm_service_instances
+ON embeddings."llm_service_instance_id" = llm_service_instances."instance_id"
 ORDER BY "vector" <=> $1
 LIMIT $2 OFFSET $3;
 
