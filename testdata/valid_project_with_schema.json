@@ -1,0 +1,5 @@
+{
+  "project_handle": "test-schema",
+  "description": "Test project with metadata schema",
+  "metadataScheme": "{\"type\":\"object\",\"properties\":{\"author\":{\"type\":\"string\"},\"year\":{\"type\":\"integer\"}},\"required\":[\"author\"]}"
+}

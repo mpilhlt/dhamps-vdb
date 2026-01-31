@@ -50,6 +50,12 @@ func postProjEmbeddingsFunc(ctx context.Context, input *models.PostProjEmbedding
 		return nil, err
 	}
 
+	// Get project details to access metadata schema
+	project, err := getProjectFunc(ctx, &models.GetProjectRequest{UserHandle: input.UserHandle, ProjectHandle: input.ProjectHandle})
+	if err != nil {
+		return nil, err
+	}
+
 	// Check if llm service exists
 	llm, err := getLLMFunc(ctx, &models.GetLLMRequest{UserHandle: input.UserHandle, LLMServiceHandle: input.Body.Embeddings[0].LLMServiceHandle})
 	if err != nil {
@@ -67,6 +73,15 @@ func postProjEmbeddingsFunc(ctx context.Context, input *models.PostProjEmbedding
 	ids := []string{}
 	queries := database.New(pool)
 	for _, embedding := range input.Body.Embeddings {
+		// Validate embedding dimensions
+		if err := ValidateEmbeddingDimensions(embedding, llm.Body.Dimensions); err != nil {
+			return nil, huma.Error400BadRequest(fmt.Sprintf("dimension validation failed: %v", err))
+		}
+
+		// Validate metadata against schema if provided
+		if err := ValidateMetadataAgainstSchema(embedding.Metadata, project.Body.MetadataScheme); err != nil {
+			return nil, huma.Error400BadRequest(fmt.Sprintf("metadata validation failed for text_id '%s': %v", embedding.TextID, err))
+		}
 		// Build query parameters (embeddings)
 		params := database.UpsertEmbeddingsParams{
 			TextID:       pgtype.Text{String: embedding.TextID, Valid: true},

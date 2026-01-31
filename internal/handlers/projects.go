@@ -65,10 +65,11 @@ func putProjectFunc(ctx context.Context, input *models.PutProjectRequest) (*mode
 	}
 
 	project := database.UpsertProjectParams{
-		ProjectHandle: input.ProjectHandle,
-		Description:   pgtype.Text{String: input.Body.Description, Valid: true},
-		Owner:         input.UserHandle,
-		PublicRead:    pgtype.Bool{Bool: publicRead, Valid: true},
+		ProjectHandle:  input.ProjectHandle,
+		Description:    pgtype.Text{String: input.Body.Description, Valid: true},
+		MetadataScheme: pgtype.Text{String: input.Body.MetadataScheme, Valid: input.Body.MetadataScheme != ""},
+		Owner:          input.UserHandle,
+		PublicRead:     pgtype.Bool{Bool: publicRead, Valid: true},
 	}
 
 	queries := database.New(pool)
