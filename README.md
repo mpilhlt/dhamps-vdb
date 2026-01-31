@@ -23,6 +23,7 @@ In both cases, the service returns a list of text identifiers that you can then 
 - OpenAPI documentation
 - Supports different embeddings configurations (e.g. dimensions)
 - Rights management (authentication via API token)
+- Automatic validation of embeddings and metadata
 
 ## Getting started
 
@@ -85,6 +86,164 @@ Clients should communicate the API key in the `Authorization` header with a `Bea
 
 **Public Access**: Projects can be made publicly accessible (allowing unauthenticated read access to embeddings and similars) by including `"*"` in the `authorizedReaders` array when creating or updating the project. See [docs/PUBLIC_ACCESS.md](./docs/PUBLIC_ACCESS.md) for details.
 
+## Data Validation
+
+The API provides automatic validation to ensure data quality and consistency:
+
+### Embeddings Dimension Validation
+
+When uploading embeddings, the system automatically validates:
+
+1. **Vector dimension consistency**: The `vector_dim` field in your embeddings must match the `dimensions` configured in the LLM service being used.
+2. **Vector length verification**: The actual number of elements in the `vector` array must match the declared `vector_dim`.
+
+If validation fails, you'll receive a `400 Bad Request` response with a detailed error message explaining the mismatch.
+
+**Example error response:**
+```json
+{
+  "title": "Bad Request",
+  "status": 400,
+  "detail": "dimension validation failed: vector dimension mismatch: embedding declares 3072 dimensions but LLM service 'openai-large' expects 5 dimensions"
+}
+```
+
+### Similarity Query Dimension Filtering
+
+When querying for similar embeddings, the system automatically filters results to only include embeddings with matching dimensions. This ensures that similarity comparisons are only made between vectors of the same dimensionality, preventing invalid comparisons.
+
+The similarity queries enforce:
+- Only embeddings with matching `vector_dim` are compared
+- Only embeddings from the same project are considered
+- Vector similarity is calculated using cosine distance on compatible dimensions
+
+### Metadata Schema Validation
+
+Projects can optionally define a JSON Schema to validate metadata attached to embeddings. This ensures that all embeddings in a project have consistent, well-structured metadata.
+
+#### Defining a Metadata Schema
+
+Include a `metadataScheme` field when creating or updating a project with a valid JSON Schema:
+
+```json
+{
+  "project_handle": "my-project",
+  "description": "Project with metadata validation",
+  "metadataScheme": "{\"type\":\"object\",\"properties\":{\"author\":{\"type\":\"string\"},\"year\":{\"type\":\"integer\"}},\"required\":[\"author\"]}"
+}
+```
+
+The schema above requires an `author` field (string) and allows an optional `year` field (integer).
+
+#### Schema Validation on Upload
+
+When uploading embeddings to a project with a metadata schema, the API validates each embedding's metadata against the schema. If validation fails, you'll receive a detailed error message:
+
+**Example error response:**
+```json
+{
+  "title": "Bad Request",
+  "status": 400,
+  "detail": "metadata validation failed for text_id 'doc123': metadata validation failed:\n  - author: author is required"
+}
+```
+
+### Admin Sanity Check
+
+Administrators can verify database integrity using the `/v1/admin/sanity-check` endpoint. This endpoint:
+
+- Checks all embeddings have dimensions matching their LLM service
+- Validates all metadata against project schemas (if defined)
+- Reports issues and warnings in a structured format
+
+**Example sanity check request:**
+```bash
+curl -X GET http://localhost:8080/v1/admin/sanity-check \
+  -H "Authorization: ******"
+```
+
+**Example response:**
+```json
+{
+  "status": "PASSED",
+  "total_projects": 5,
+  "issues_count": 0,
+  "warnings_count": 1,
+  "warnings": [
+    "Project alice/project1 has 100 embeddings but no metadata schema defined"
+  ]
+}
+```
+
+Status values:
+- `PASSED`: No issues or warnings found
+- `WARNING`: No critical issues, but warnings exist
+- `FAILED`: Validation issues found that need attention
+
+#### Example Metadata Schemas
+
+**Simple schema with required fields:**
+```json
+{
+  "type": "object",
+  "properties": {
+    "author": {"type": "string"},
+    "year": {"type": "integer"},
+    "language": {"type": "string"}
+  },
+  "required": ["author", "year"]
+}
+```
+
+**Schema with nested objects:**
+```json
+{
+  "type": "object",
+  "properties": {
+    "author": {
+      "type": "object",
+      "properties": {
+        "name": {"type": "string"},
+        "id": {"type": "string"}
+      },
+      "required": ["name"]
+    },
+    "publication": {
+      "type": "object",
+      "properties": {
+        "year": {"type": "integer"},
+        "title": {"type": "string"}
+      }
+    }
+  },
+  "required": ["author"]
+}
+```
+
+**Schema with enums and constraints:**
+```json
+{
+  "type": "object",
+  "properties": {
+    "genre": {
+      "type": "string",
+      "enum": ["fiction", "non-fiction", "poetry", "drama"]
+    },
+    "rating": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 5
+    },
+    "tags": {
+      "type": "array",
+      "items": {"type": "string"}
+    }
+  }
+}
+```
+
+For more information on JSON Schema syntax, see [json-schema.org](https://json-schema.org/).
+
 ## API documentation
 
 ### API Versioning
@@ -100,6 +259,7 @@ For a more detailed, and always up-to-date documentation of the endpoints, inclu
 | Endpoint | Method | Description | Allowed Users |
 |----------|--------|-------------|---------------|
 | /admin/footgun | GET | Reset Database: Remove all records from database and reset serials/counters | admin |
+| /admin/sanity-check | GET | Verify all data in database conforms to schemas and dimension requirements | admin |
 | /users | GET  | Get all users (list of handles) registered with the Db | admin |
 | /users | POST | Register a new user with the Db | admin |
 | /users/\<username\> | GET | Get information about user \<username\> | admin, \<username\> |
@@ -247,13 +407,13 @@ dhamps-vdb/
 - [x] Tests
   - [x] When testing, check cleanup by adding a new query/function to see if all tables are empty
   - [ ] Make sure pagination is supported consistently
-  - [ ] Make sure input is validated consistently
+  - [x] Make sure input is validated consistently
 - [x] Catch POST to existing resources
 - [x] User authentication & restrictions on some API calls
 - [x] API versioning
 - [x] better **options** handling (<https://huma.rocks/features/cli/>)
 - [x] handle **metadata**
-  - [ ] Validation with metadata schema
+  - [x] Validation with metadata schema
 - [x] Allow to filter similar passages by metadata field (so as to exclude e.g. documents from the same author)
   - [ ] Add documentation (the GET query parameters are called `metadata_path` and `metadata_value` as in: `https://xy.org/vdb-api/v1/similars/sal/sal-openai-large/https%3A%2F%2Fid.myproject.net%2Ftexts%2FW0011%3A1.3.1.3.1?threshold=0.7&limit=5&metadata_path=author_id&metadata_value=A0083`)
 - [ ] Implement and make consequent use of **max_idle** (5), **max_concurr** (5), **timeouts**, and **cancellations**

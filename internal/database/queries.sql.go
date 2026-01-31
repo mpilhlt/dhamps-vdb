@@ -179,6 +179,41 @@ func (q *Queries) GetAPIStandards(ctx context.Context, arg GetAPIStandardsParams
 	return items, nil
 }
 
+const getAllProjects = `-- name: GetAllProjects :many
+SELECT project_id, project_handle, owner, description, metadata_scheme, created_at, updated_at, public_read
+FROM projects
+ORDER BY "owner" ASC, "project_handle" ASC
+`
+
+func (q *Queries) GetAllProjects(ctx context.Context) ([]Project, error) {
+	rows, err := q.db.Query(ctx, getAllProjects)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Project
+	for rows.Next() {
+		var i Project
+		if err := rows.Scan(
+			&i.ProjectID,
+			&i.ProjectHandle,
+			&i.Owner,
+			&i.Description,
+			&i.MetadataScheme,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.PublicRead,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getEmbeddingsByProject = `-- name: GetEmbeddingsByProject :many
 SELECT embeddings.embeddings_id, embeddings.text_id, embeddings.owner, embeddings.project_id, embeddings.llm_service_id, embeddings.text, embeddings.vector, embeddings.vector_dim, embeddings.metadata, embeddings.created_at, embeddings.updated_at, projects."project_handle", llm_services."llm_service_handle"
 FROM embeddings
@@ -526,6 +561,8 @@ WHERE e2."embeddings_id" != e1."embeddings_id"
   AND e1."text_id" = $1
   AND e1."owner" = $2
   AND projects."project_handle" = $3
+  AND e1."vector_dim" = e2."vector_dim"
+  AND e1."project_id" = e2."project_id"
   AND 1 - (e1.vector <=> e2.vector) >= $4::double precision
 ORDER BY e1.vector <=> e2.vector
 LIMIT $5 OFFSET $6
@@ -577,6 +614,8 @@ WHERE e2."embeddings_id" != e1."embeddings_id"
   AND e1."text_id" = $1
   AND e1."owner" = $2
   AND projects."project_handle" = $3
+  AND e1."vector_dim" = e2."vector_dim"
+  AND e1."project_id" = e2."project_id"
   AND 1 - (e1.vector <=> e2.vector) >= $4::double precision
   AND (e2."metadata" ->> $5::text IS NULL OR trim(e2."metadata" ->> $5::text) <> trim($6::text))
 ORDER BY e1.vector <=> e2.vector

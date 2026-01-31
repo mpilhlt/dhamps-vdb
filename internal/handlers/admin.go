@@ -45,6 +45,109 @@ func resetDbFunc(ctx context.Context, input *models.ResetDbRequest) (*models.Res
 	return response, nil
 }
 
+func sanityCheckFunc(ctx context.Context, input *models.SanityCheckRequest) (*models.SanityCheckResponse, error) {
+	// Get the database connection pool from the context
+	pool, err := GetDBPool(ctx)
+	if err != nil {
+		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get database connection pool. %v", err))
+	}
+
+	queries := database.New(pool)
+	
+	// Get all projects with their metadata schemes
+	projects, err := queries.GetAllProjects(ctx)
+	if err != nil {
+		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get projects. %v", err))
+	}
+
+	var issues []string
+	var warnings []string
+
+	// Check each project
+	for _, project := range projects {
+		projectName := fmt.Sprintf("%s/%s", project.Owner, project.ProjectHandle)
+		
+		// Get all LLM services for this project
+		llmServices, err := queries.GetLLMsByProject(ctx, database.GetLLMsByProjectParams{
+			Owner:         project.Owner,
+			ProjectHandle: project.ProjectHandle,
+			Limit:         999,
+			Offset:        0,
+		})
+		if err != nil {
+			issues = append(issues, fmt.Sprintf("Project %s: unable to get LLM services: %v", projectName, err))
+			continue
+		}
+
+		// Create a map of LLM service dimensions
+		llmDimensions := make(map[int32]int32)
+		for _, llm := range llmServices {
+			llmDimensions[llm.LLMServiceID] = llm.Dimensions
+		}
+
+		// Get all embeddings for this project
+		embeddings, err := queries.GetEmbeddingsByProject(ctx, database.GetEmbeddingsByProjectParams{
+			Owner:         project.Owner,
+			ProjectHandle: project.ProjectHandle,
+			Limit:         99999,
+			Offset:        0,
+		})
+		if err != nil {
+			issues = append(issues, fmt.Sprintf("Project %s: unable to get embeddings: %v", projectName, err))
+			continue
+		}
+
+		// Check each embedding
+		for _, embedding := range embeddings {
+			textID := embedding.TextID.String
+			
+			// Check dimension consistency
+			expectedDim, ok := llmDimensions[embedding.LLMServiceID]
+			if !ok {
+				issues = append(issues, fmt.Sprintf("Project %s, text_id '%s': LLM service ID %d not found", 
+					projectName, textID, embedding.LLMServiceID))
+				continue
+			}
+
+			if err := ValidateEmbeddingAgainstLLMDimension(embedding.VectorDim, expectedDim, textID); err != nil {
+				issues = append(issues, fmt.Sprintf("Project %s: %v", projectName, err))
+			}
+
+			// Check metadata against schema if schema is defined
+			if project.MetadataScheme.Valid && project.MetadataScheme.String != "" {
+				// For sanity check, we're checking existing data, so isUpdate=true and we have existing metadata
+				if err := ValidateEmbeddingMetadataAgainstProjectSchema(embedding.Metadata, project.MetadataScheme.String, textID, true, embedding.Metadata); err != nil {
+					issues = append(issues, fmt.Sprintf("Project %s: %v", projectName, err))
+				}
+			}
+		}
+
+		// Warn if project has embeddings but no metadata scheme defined
+		if len(embeddings) > 0 && (!project.MetadataScheme.Valid || project.MetadataScheme.String == "") {
+			warnings = append(warnings, fmt.Sprintf("Project %s has %d embeddings but no metadata schema defined", 
+				projectName, len(embeddings)))
+		}
+	}
+
+	// Build response
+	response := &models.SanityCheckResponse{}
+	response.Body.TotalProjects = len(projects)
+	response.Body.Issues = issues
+	response.Body.Warnings = warnings
+	response.Body.IssuesCount = len(issues)
+	response.Body.WarningsCount = len(warnings)
+
+	if len(issues) > 0 {
+		response.Body.Status = "FAILED"
+	} else if len(warnings) > 0 {
+		response.Body.Status = "WARNING"
+	} else {
+		response.Body.Status = "PASSED"
+	}
+
+	return response, nil
+}
+
 // RegisterUsersRoutes registers all the admin routes with the API
 func RegisterAdminRoutes(pool *pgxpool.Pool, api huma.API) error {
 	// Define huma.Operations for each route
@@ -63,7 +166,19 @@ func RegisterAdminRoutes(pool *pgxpool.Pool, api huma.API) error {
 		Tags: []string{"admin"},
 	}
 
+	sanityCheckOp := huma.Operation{
+		OperationID: "sanityCheck",
+		Method:      http.MethodGet,
+		Path:        "/v1/admin/sanity-check",
+		Summary:     "Verify all data in database conforms to schemas and dimension requirements",
+		Security: []map[string][]string{
+			{"adminAuth": []string{"admin"}},
+		},
+		Tags: []string{"admin"},
+	}
+
 	// Register the routes with middleware
 	huma.Register(api, footgunOp, addPoolToContext(pool, resetDbFunc))
+	huma.Register(api, sanityCheckOp, addPoolToContext(pool, sanityCheckFunc))
 	return nil
 }

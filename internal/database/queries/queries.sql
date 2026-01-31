@@ -98,6 +98,11 @@ WHERE "owner" = $1
 AND "project_handle" = $2
 LIMIT 1;
 
+-- name: GetAllProjects :many
+SELECT *
+FROM projects
+ORDER BY "owner" ASC, "project_handle" ASC;
+
 -- name: LinkProjectToUser :one
 INSERT
 INTO users_projects (
@@ -302,6 +307,8 @@ WHERE e2."embeddings_id" != e1."embeddings_id"
   AND e1."text_id" = $1
   AND e1."owner" = $2
   AND projects."project_handle" = $3
+  AND e1."vector_dim" = e2."vector_dim"
+  AND e1."project_id" = e2."project_id"
   AND 1 - (e1.vector <=> e2.vector) >= $4::double precision
 ORDER BY e1.vector <=> e2.vector
 LIMIT $5 OFFSET $6;
@@ -316,6 +323,8 @@ WHERE e2."embeddings_id" != e1."embeddings_id"
   AND e1."text_id" = $1
   AND e1."owner" = $2
   AND projects."project_handle" = $3
+  AND e1."vector_dim" = e2."vector_dim"
+  AND e1."project_id" = e2."project_id"
   AND 1 - (e1.vector <=> e2.vector) >= $4::double precision
   AND (e2."metadata" ->> $5::text IS NULL OR trim(e2."metadata" ->> $5::text) <> trim($6::text))
 ORDER BY e1.vector <=> e2.vector
