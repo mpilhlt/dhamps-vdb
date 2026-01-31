@@ -5,6 +5,9 @@ on:
     branches: [ main, develop ]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   test:
     name: Validate Push
@@ -18,6 +21,7 @@ jobs:
       uses: actions/setup-go@v5
       with:
         go-version: '1.24'
+        cache: true
         
     - name: Install sqlc
       run: |
@@ -51,3 +55,4 @@ jobs:
         SERVICE_DBPASSWORD: postgres
         SERVICE_DBNAME: postgres
         SERVICE_ADMINKEY: TestAdminKey123
+
