@@ -47,7 +47,7 @@ func TestSimilarsFunc(t *testing.T) {
 	}
 
 	// Create LLM Service
-	llmServiceJSON := `{ "llm_service_handle": "openai-large", "endpoint": "https://api.openai.com/v1/embeddings", "description": "My OpenAI full text-embedding-3-large service", "api_key": "0123456789", "api_standard": "openai", "model": "text-embedding-3-large", "dimensions": 3072}`
+	llmServiceJSON := `{ "llm_service_handle": "test1", "endpoint": "https://api.foo.bar/v1/embed", "description": "An LLM Service just for testing if the dhamps-vdb code is working", "api_key": "0123456789", "api_standard": "openai", "model": "embed-test1", "dimensions": 5}`
 	_, err = createLLMService(t, llmServiceJSON, "alice", aliceAPIKey)
 	if err != nil {
 		t.Fatalf("Error creating LLM service openai-large for testing: %v\n", err)
@@ -186,7 +186,7 @@ func TestSimilarsFunc(t *testing.T) {
 // This test documents that the handler exists but is not yet functional.
 func TestPostSimilarStub(t *testing.T) {
 	t.Skip("POST similar functionality is not yet implemented")
-	
+
 	// TODO: When postSimilarFunc is implemented, add tests for:
 	// - Valid POST request with embedding vector
 	// - Invalid POST request with malformed data
@@ -194,4 +194,3 @@ func TestPostSimilarStub(t *testing.T) {
 	// - Authentication/authorization checks
 	// - Edge cases and error handling
 }
-

@@ -50,7 +50,7 @@ func TestPublicAccess(t *testing.T) {
 	}
 
 	// Create LLM Service to be used in embeddings tests
-	llmServiceJSON := `{ "llm_service_handle": "openai-large", "endpoint": "https://api.openai.com/v1/embeddings", "description": "My OpenAI full text-embedding-3-large service", "api_key": "0123456789", "api_standard": "openai", "model": "text-embedding-3-large", "dimensions": 3072}`
+	llmServiceJSON := `{ "llm_service_handle": "test1", "endpoint": "https://api.foo.bar/v1/embed", "description": "An LLM Service just for testing if the dhamps-vdb code is working", "api_key": "0123456789", "api_standard": "openai", "model": "embed-test1", "dimensions": 5}`
 	_, err = createLLMService(t, llmServiceJSON, "bob", bobAPIKey)
 	if err != nil {
 		t.Fatalf("Error creating LLM service openai-large for testing: %v\n", err)
@@ -120,24 +120,24 @@ func TestPublicAccess(t *testing.T) {
 			requestURL := fmt.Sprintf("http://%v:%d%v", options.Host, options.Port, v.requestPath)
 			req, err := http.NewRequest(v.method, requestURL, nil)
 			assert.NoError(t, err)
-			
+
 			if v.apiKeyHeader != "" {
 				req.Header.Add("Authorization", "Bearer "+v.apiKeyHeader)
 			}
-			
+
 			resp, err := http.DefaultClient.Do(req)
 			if err != nil {
 				t.Errorf("Error sending request: %v\n", err)
 			}
 			assert.NoError(t, err)
-			
+
 			// Check status code
 			assert.Equal(t, v.expectStatus, resp.StatusCode, "Status code mismatch for %s", v.name)
-			
+
 			if v.checkSuccess && resp.StatusCode >= 200 && resp.StatusCode < 300 {
 				t.Logf("✓ %s: Got successful response with status %d", v.name, resp.StatusCode)
 			}
-			
+
 			resp.Body.Close()
 		})
 	}
