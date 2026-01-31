@@ -62,8 +62,7 @@ func ValidateMetadataAgainstSchema(metadata json.RawMessage, schemaStr string) e
 
 	if !result.Valid() {
 		// Build a helpful error message with all validation errors
-		var errMsg string
-		errMsg = "metadata validation failed:\n"
+		errMsg := "metadata validation failed:\n"
 		for i, desc := range result.Errors() {
 			if i > 0 {
 				errMsg += "\n"

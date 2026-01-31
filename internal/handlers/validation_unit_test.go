@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/mpilhlt/dhamps-vdb/internal/models"
@@ -84,7 +85,7 @@ func TestValidateEmbeddingDimensions(t *testing.T) {
 				return
 			}
 			if err != nil && tt.errContains != "" {
-				if !contains(err.Error(), tt.errContains) {
+				if !strings.Contains(err.Error(), tt.errContains) {
 					t.Errorf("ValidateEmbeddingDimensions() error = %v, should contain %v", err.Error(), tt.errContains)
 				}
 			}
@@ -142,23 +143,10 @@ func TestValidateMetadataAgainstSchema(t *testing.T) {
 				return
 			}
 			if err != nil && tt.errContains != "" {
-				if !contains(err.Error(), tt.errContains) {
+				if !strings.Contains(err.Error(), tt.errContains) {
 					t.Errorf("ValidateMetadataAgainstSchema() error = %v, should contain %v", err.Error(), tt.errContains)
 				}
 			}
 		})
 	}
-}
-
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && (s[:len(substr)] == substr || s[len(s)-len(substr):] == substr || len(s) > len(substr)+1 && containsInner(s, substr)))
-}
-
-func containsInner(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }
