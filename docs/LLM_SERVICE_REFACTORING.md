@@ -389,6 +389,313 @@ The migration (004) handles data migration automatically:
 - Field names preserved in JSON responses (for API compatibility)
 - Old plaintext API keys continue to work
 
+## Client Migration Guide
+
+This section explains what API clients need to change after the refactoring.
+
+### Summary of Changes for Clients
+
+**Good News:** Most API endpoints remain unchanged! The main changes are:
+1. API keys are no longer returned in responses (security improvement)
+2. Projects must be created with a valid LLM service instance (1:1 relationship)
+3. Embeddings JSON uses `instance_handle` instead of `llm_service_handle`
+
+### API Endpoints - No Changes Required
+
+All existing API endpoints continue to work with the same paths:
+
+```
+✅ PUT    /v1/llm-services/{user}/{handle}           # Create/update instance
+✅ GET    /v1/llm-services/{user}                    # List user's instances
+✅ GET    /v1/llm-services/{user}/{handle}           # Get specific instance
+✅ DELETE /v1/llm-services/{user}/{handle}           # Delete instance
+
+✅ PUT    /v1/projects/{user}/{project}              # Create/update project
+✅ GET    /v1/projects/{user}/{project}              # Get project
+✅ DELETE /v1/projects/{user}/{project}              # Delete project
+
+✅ POST   /v1/embeddings/{user}/{project}            # Upload embeddings
+✅ GET    /v1/embeddings/{user}/{project}            # List embeddings
+✅ DELETE /v1/embeddings/{user}/{project}            # Delete embeddings
+```
+
+### Change #1: API Keys No Longer Returned (Security)
+
+**Before:** API keys were returned in GET responses
+```json
+GET /v1/llm-services/alice/my-openai
+Response: {
+  "instance_handle": "my-openai",
+  "owner": "alice",
+  "endpoint": "https://api.openai.com/v1/embeddings",
+  "api_key": "sk-proj-..."  ← Was visible
+}
+```
+
+**After:** API keys are write-only (never returned)
+```json
+GET /v1/llm-services/alice/my-openai
+Response: {
+  "instance_handle": "my-openai",
+  "owner": "alice",
+  "endpoint": "https://api.openai.com/v1/embeddings"
+  // Note: No api_key field
+}
+```
+
+**Action Required:**
+- ⚠️ If your client code reads API keys from GET responses, update it to store keys locally
+- ✅ You can still SET api_key in PUT/POST requests
+- ✅ The server will use the stored (encrypted) key when needed
+
+### Change #2: Embeddings Field Name Update
+
+**Before:** Used `llm_service_handle` in embeddings JSON
+```json
+POST /v1/embeddings/alice/my-project
+{
+  "text_id": "doc1",
+  "llm_service_handle": "my-openai",  ← Old field name
+  "embedding": [0.1, 0.2, ...],
+  "metadata": {...}
+}
+```
+
+**After:** Use `instance_handle` instead
+```json
+POST /v1/embeddings/alice/my-project
+{
+  "text_id": "doc1",
+  "instance_handle": "my-openai",  ← New field name
+  "embedding": [0.1, 0.2, ...],
+  "metadata": {...}
+}
+```
+
+**Action Required:**
+- ⚠️ Update embedding upload code to use `instance_handle` field
+- ⚠️ Update code that reads embeddings to expect `instance_handle` in responses
+
+### Change #3: Projects Must Have LLM Service Instance
+
+**Before:** Projects could be created without specifying an LLM service
+```json
+PUT /v1/projects/alice/my-project
+{
+  "description": "My project"
+}
+```
+
+**After:** Projects require a valid `llm_service_instance_id`
+```json
+PUT /v1/projects/alice/my-project
+{
+  "description": "My project",
+  "llm_service_instance_id": 123  ← Required
+}
+```
+
+**Action Required:**
+- ⚠️ Create an LLM service instance BEFORE creating projects
+- ⚠️ Include `llm_service_instance_id` in project creation requests
+- ℹ️ You can find the instance_id from the GET instances response
+
+### Complete Migration Workflow
+
+Here's the recommended workflow for clients:
+
+#### Step 1: Create LLM Service Instance (if not exists)
+
+```bash
+# Check if instance exists
+GET /v1/llm-services/alice
+
+# If not, create one
+PUT /v1/llm-services/alice/my-openai
+Content-Type: application/json
+
+{
+  "endpoint": "https://api.openai.com/v1/embeddings",
+  "api_standard": "openai",
+  "model": "text-embedding-3-large",
+  "dimensions": 3072,
+  "api_key": "sk-proj-your-key-here"
+}
+
+# Response includes instance_id
+{
+  "instance_id": 123,
+  "instance_handle": "my-openai",
+  "owner": "alice",
+  "endpoint": "https://api.openai.com/v1/embeddings",
+  "api_standard": "openai",
+  "model": "text-embedding-3-large",
+  "dimensions": 3072
+  // Note: api_key not returned
+}
+```
+
+#### Step 2: Create Project with Instance ID
+
+```bash
+PUT /v1/projects/alice/my-project
+Content-Type: application/json
+
+{
+  "description": "My research project",
+  "llm_service_instance_id": 123  # From step 1
+}
+```
+
+#### Step 3: Upload Embeddings
+
+```bash
+POST /v1/embeddings/alice/my-project
+Content-Type: application/json
+
+{
+  "text_id": "doc1",
+  "instance_handle": "my-openai",  # Use instance_handle (not llm_service_handle)
+  "embedding": [0.1, 0.2, 0.3, ...],
+  "metadata": {
+    "title": "Document 1",
+    "author": "Alice"
+  }
+}
+```
+
+### Environment Setup for New Installations
+
+**Before:** No encryption key needed
+```bash
+# .env
+DATABASE_URL=postgresql://...
+ADMIN_KEY=your-admin-key
+```
+
+**After:** Add encryption key
+```bash
+# .env
+DATABASE_URL=postgresql://...
+ADMIN_KEY=your-admin-key
+ENCRYPTION_KEY=your-secure-32-char-minimum-key  # NEW
+```
+
+**Action Required:**
+- ⚠️ Add `ENCRYPTION_KEY` to your environment variables
+- ✅ Use a strong, random string (32+ characters recommended)
+- ✅ Keep this key secure - losing it means losing access to encrypted API keys
+
+### Migration Checklist for Existing Clients
+
+Use this checklist to ensure your client is fully migrated:
+
+- [ ] **Stop reading API keys from GET responses**
+  - Update code to store API keys locally instead
+  - Remove any code that expects `api_key` field in responses
+
+- [ ] **Update embedding field names**
+  - Change `llm_service_handle` → `instance_handle` in upload code
+  - Update parsing code to read `instance_handle` from responses
+
+- [ ] **Update project creation workflow**
+  - Create LLM service instance first
+  - Include `llm_service_instance_id` in project creation
+  - Get instance_id from instance creation/list response
+
+- [ ] **Update environment configuration**
+  - Add `ENCRYPTION_KEY` to environment variables (for new installations)
+  - Restart services to pick up new configuration
+
+- [ ] **Test end-to-end workflow**
+  - Create instance → Create project → Upload embeddings
+  - Verify all steps work correctly
+
+### Troubleshooting
+
+**Problem:** "Project must have llm_service_instance_id" error
+
+**Solution:** Create an LLM service instance first, then use its ID when creating the project.
+
+---
+
+**Problem:** Embeddings upload fails with "unknown field llm_service_handle"
+
+**Solution:** Update your JSON to use `instance_handle` instead of `llm_service_handle`.
+
+---
+
+**Problem:** Can't see API key after creating instance
+
+**Solution:** This is expected behavior (security improvement). Store the API key on the client side when you create the instance.
+
+---
+
+**Problem:** Old embeddings have `llm_service_handle` in their data
+
+**Solution:** The migration automatically preserves existing data. New embeddings should use `instance_handle`, but old ones will still have the old field name.
+
+---
+
+**Problem:** Missing ENCRYPTION_KEY environment variable
+
+**Solution:** Add `ENCRYPTION_KEY=your-secure-key` to your environment variables. This is only required for new installations or if you want to start encrypting API keys.
+
+### Testing Your Migration
+
+Here's a test sequence to verify your client works correctly:
+
+```bash
+# 1. Create instance
+curl -X PUT "http://localhost:8000/v1/llm-services/testuser/test-instance" \
+  -H "Authorization: Bearer your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "endpoint": "https://api.openai.com/v1/embeddings",
+    "api_standard": "openai",
+    "model": "text-embedding-3-large",
+    "dimensions": 3072,
+    "api_key": "test-key"
+  }'
+
+# 2. List instances (verify api_key is NOT returned)
+curl -X GET "http://localhost:8000/v1/llm-services/testuser" \
+  -H "Authorization: Bearer your-api-key"
+
+# 3. Create project with instance_id
+curl -X PUT "http://localhost:8000/v1/projects/testuser/test-project" \
+  -H "Authorization: Bearer your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "description": "Test project",
+    "llm_service_instance_id": 123
+  }'
+
+# 4. Upload embeddings with instance_handle
+curl -X POST "http://localhost:8000/v1/embeddings/testuser/test-project" \
+  -H "Authorization: Bearer your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text_id": "test1",
+    "instance_handle": "test-instance",
+    "embedding": [0.1, 0.2, 0.3],
+    "metadata": {}
+  }'
+```
+
+### Summary of Required Client Changes
+
+| Area | Old Behavior | New Behavior | Action |
+|------|-------------|--------------|--------|
+| **API Endpoints** | Same paths | Same paths | ✅ No change |
+| **API Keys in GET** | Returned in response | NOT returned | ⚠️ Stop reading, store locally |
+| **Embeddings field** | `llm_service_handle` | `instance_handle` | ⚠️ Update field name |
+| **Project creation** | Optional instance | Required `llm_service_instance_id` | ⚠️ Create instance first |
+| **Project-instance** | Many-to-many | 1:1 relationship | ⚠️ One instance per project |
+| **Environment vars** | No encryption key | `ENCRYPTION_KEY` needed | ⚠️ Add to .env (new installs) |
+
+**Legend:** ✅ No action needed | ⚠️ Action required | ℹ️ Optional/informational
+
 ## Testing
 
 ### Test Status
