@@ -280,7 +280,6 @@ SELECT
 FROM llm_service_instances
 LEFT JOIN llm_service_instances_shared_with
   ON llm_service_instances."instance_id" = llm_service_instances_shared_with."instance_id"
-  AND llm_service_instances_shared_with."user_handle" = $1
 WHERE llm_service_instances."owner" = $1
    OR llm_service_instances_shared_with."user_handle" = $1
 ORDER BY llm_service_instances."owner" ASC, llm_service_instances."instance_handle" ASC 

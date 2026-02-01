@@ -102,7 +102,7 @@ func TestLLMServicesFunc(t *testing.T) {
 			requestPath:  "/v1/llm-services/alice",
 			bodyPath:     "",
 			apiKey:       options.AdminKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/GetUserLLMsResponseBody.json\",\n  \"llm_service\": [\n    {\n      \"llm_service_id\": 1,\n      \"llm_service_handle\": \"test1\",\n      \"owner\": \"alice\",\n      \"endpoint\": \"https://api.foo.bar/v1/embed\",\n      \"description\": \"An LLM Service just for testing if the dhamps-vdb code is working\",\n      \"api_key\": \"0123456789\",\n      \"api_standard\": \"openai\",\n      \"model\": \"embed-test1\",\n      \"dimensions\": 5\n    }\n  ]\n}\n",
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/GetUserLLMsResponseBody.json\",\n  \"llm_service\": [\n    {\n      \"llm_service_id\": 1,\n      \"llm_service_handle\": \"test1\",\n      \"owner\": \"alice\",\n      \"endpoint\": \"https://api.foo.bar/v1/embed\",\n      \"description\": \"An LLM Service just for testing if the dhamps-vdb code is working\",\n      \"api_standard\": \"openai\",\n      \"model\": \"embed-test1\",\n      \"dimensions\": 5\n    }\n  ]\n}\n",
 			expectStatus: http.StatusOK,
 		},
 		{
@@ -111,7 +111,7 @@ func TestLLMServicesFunc(t *testing.T) {
 			requestPath:  "/v1/llm-services/alice",
 			bodyPath:     "",
 			apiKey:       aliceAPIKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/GetUserLLMsResponseBody.json\",\n  \"llm_service\": [\n    {\n      \"llm_service_id\": 1,\n      \"llm_service_handle\": \"test1\",\n      \"owner\": \"alice\",\n      \"endpoint\": \"https://api.foo.bar/v1/embed\",\n      \"description\": \"An LLM Service just for testing if the dhamps-vdb code is working\",\n      \"api_key\": \"0123456789\",\n      \"api_standard\": \"openai\",\n      \"model\": \"embed-test1\",\n      \"dimensions\": 5\n    }\n  ]\n}\n",
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/GetUserLLMsResponseBody.json\",\n  \"llm_service\": [\n    {\n      \"llm_service_id\": 1,\n      \"llm_service_handle\": \"test1\",\n      \"owner\": \"alice\",\n      \"endpoint\": \"https://api.foo.bar/v1/embed\",\n      \"description\": \"An LLM Service just for testing if the dhamps-vdb code is working\",\n      \"api_standard\": \"openai\",\n      \"model\": \"embed-test1\",\n      \"dimensions\": 5\n    }\n  ]\n}\n",
 			expectStatus: http.StatusOK,
 		},
 		{
@@ -156,7 +156,7 @@ func TestLLMServicesFunc(t *testing.T) {
 			requestPath:  "/v1/llm-services/alice/test1",
 			bodyPath:     "",
 			apiKey:       aliceAPIKey,
-			expectBody:   "{\n  \"llm_service_id\": 1,\n  \"llm_service_handle\": \"test1\",\n  \"owner\": \"alice\",\n  \"endpoint\": \"https://api.foo.bar/v1/embed\",\n  \"description\": \"An LLM Service just for testing if the dhamps-vdb code is working\",\n  \"api_key\": \"0123456789\",\n  \"api_standard\": \"openai\",\n  \"model\": \"embed-test1\",\n  \"dimensions\": 5\n}\n",
+			expectBody:   "{\n  \"llm_service_id\": 1,\n  \"llm_service_handle\": \"test1\",\n  \"owner\": \"alice\",\n  \"endpoint\": \"https://api.foo.bar/v1/embed\",\n  \"description\": \"An LLM Service just for testing if the dhamps-vdb code is working\",\n  \"api_standard\": \"openai\",\n  \"model\": \"embed-test1\",\n  \"dimensions\": 5\n}\n",
 			expectStatus: http.StatusOK,
 		},
 		{
