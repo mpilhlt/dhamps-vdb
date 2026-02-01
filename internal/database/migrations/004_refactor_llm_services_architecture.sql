@@ -57,9 +57,9 @@ CREATE TABLE IF NOT EXISTS llm_service_instances_shared_with(
   PRIMARY KEY ("user_handle", "instance_id")
 );
 
--- Step 8: Rename users_llm_services table and update to reference instances
-ALTER TABLE users_llm_services RENAME TO users_llm_service_instances;
-ALTER TABLE users_llm_service_instances RENAME COLUMN llm_service_id TO instance_id;
+-- Step 8: Drop redundant users_llm_services table
+-- Ownership is tracked in llm_service_instances.owner, no separate table needed
+DROP TABLE IF EXISTS users_llm_services;
 
 -- Step 9: Update projects to have a single LLM service instance (1:1 relationship)
 -- Add the new column (nullable initially)
@@ -164,9 +164,15 @@ ALTER TABLE embeddings RENAME COLUMN llm_service_instance_id TO llm_service_id;
 -- Remove the single instance reference from projects
 ALTER TABLE projects DROP COLUMN IF EXISTS llm_service_instance_id;
 
--- Rename users_llm_service_instances table back
-ALTER TABLE users_llm_service_instances RENAME COLUMN instance_id TO llm_service_id;
-ALTER TABLE users_llm_service_instances RENAME TO users_llm_services;
+-- Restore users_llm_services table (rollback)
+CREATE TABLE IF NOT EXISTS users_llm_services(
+  "user_handle" VARCHAR(20) NOT NULL REFERENCES "users"("user_handle") ON DELETE CASCADE,
+  "llm_service_id" SERIAL NOT NULL REFERENCES "llm_services"("llm_service_id") ON DELETE CASCADE,
+  "role" VARCHAR(20) NOT NULL REFERENCES "vdb_roles"("vdb_role"),
+  "created_at" TIMESTAMP NOT NULL,
+  "updated_at" TIMESTAMP NOT NULL,
+  PRIMARY KEY ("user_handle", "llm_service_id")
+);
 
 -- Drop instance sharing table
 DROP TABLE IF EXISTS llm_service_instances_shared_with;

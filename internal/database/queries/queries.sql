@@ -245,18 +245,6 @@ FROM llm_service_instances
 WHERE "instance_id" = $1
 LIMIT 1;
 
--- name: LinkUserToLLMInstance :exec
-INSERT
-INTO users_llm_service_instances (
-  "user_handle", "instance_id", "role", "created_at", "updated_at"
-) VALUES (
-  $1, $2, $3, NOW(), NOW()
-)
-ON CONFLICT ("user_handle", "instance_id") DO UPDATE SET
-  "role" = $3,
-  "updated_at" = NOW()
-RETURNING *;
-
 -- name: ShareLLMInstance :exec
 INSERT
 INTO llm_service_instances_shared_with (
@@ -290,11 +278,10 @@ WHERE projects."owner" = $1
 LIMIT 1;
 
 -- name: GetLLMInstancesByUser :many
-SELECT llm_service_instances.*, users_llm_service_instances."role"
+-- Get all instances owned by a user
+SELECT llm_service_instances.*, 'owner' as "role"
 FROM llm_service_instances
-JOIN users_llm_service_instances
-ON llm_service_instances."instance_id" = users_llm_service_instances."instance_id"
-WHERE users_llm_service_instances."user_handle" = $1
+WHERE llm_service_instances."owner" = $1
 ORDER BY llm_service_instances."instance_handle" ASC LIMIT $2 OFFSET $3;
 
 -- name: GetSharedLLMInstances :many
@@ -313,18 +300,14 @@ SELECT
   llm_service_instances.*,
   CASE 
     WHEN llm_service_instances."owner" = $1 THEN 'owner'
-    ELSE COALESCE(llm_service_instances_shared_with."role", users_llm_service_instances."role")
+    ELSE llm_service_instances_shared_with."role"
   END as "role",
   llm_service_instances."owner" = $1 as "is_owner"
 FROM llm_service_instances
-LEFT JOIN users_llm_service_instances
-  ON llm_service_instances."instance_id" = users_llm_service_instances."instance_id"
-  AND users_llm_service_instances."user_handle" = $1
 LEFT JOIN llm_service_instances_shared_with
   ON llm_service_instances."instance_id" = llm_service_instances_shared_with."instance_id"
   AND llm_service_instances_shared_with."user_handle" = $1
 WHERE llm_service_instances."owner" = $1
-   OR users_llm_service_instances."user_handle" = $1
    OR llm_service_instances_shared_with."user_handle" = $1
 ORDER BY llm_service_instances."owner" ASC, llm_service_instances."instance_handle" ASC 
 LIMIT $2 OFFSET $3;

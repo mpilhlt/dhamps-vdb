@@ -168,9 +168,9 @@ func getUserFunc(ctx context.Context, input *models.GetUserRequest) (*models.Get
 	// Get LLM service instances the user is a member of
 	llmservices := models.LLMMemberships{}
 	ls, err := queries.GetLLMInstancesByUser(ctx, database.GetLLMInstancesByUserParams{
-		UserHandle: input.UserHandle,
-		Limit:      999,
-		Offset:     0,
+		Owner:  input.UserHandle,
+		Limit:  999,
+		Offset: 0,
 	})
 	if err != nil {
 		if err.Error() == "no rows in result set" {

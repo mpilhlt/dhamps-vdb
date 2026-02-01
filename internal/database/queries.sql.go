@@ -274,18 +274,14 @@ SELECT
   llm_service_instances.instance_id, llm_service_instances.instance_handle, llm_service_instances.owner, llm_service_instances.endpoint, llm_service_instances.description, llm_service_instances.api_key, llm_service_instances.api_standard, llm_service_instances.model, llm_service_instances.dimensions, llm_service_instances.created_at, llm_service_instances.updated_at, llm_service_instances.definition_id, llm_service_instances.api_key_encrypted,
   CASE 
     WHEN llm_service_instances."owner" = $1 THEN 'owner'
-    ELSE COALESCE(llm_service_instances_shared_with."role", users_llm_service_instances."role")
+    ELSE llm_service_instances_shared_with."role"
   END as "role",
   llm_service_instances."owner" = $1 as "is_owner"
 FROM llm_service_instances
-LEFT JOIN users_llm_service_instances
-  ON llm_service_instances."instance_id" = users_llm_service_instances."instance_id"
-  AND users_llm_service_instances."user_handle" = $1
 LEFT JOIN llm_service_instances_shared_with
   ON llm_service_instances."instance_id" = llm_service_instances_shared_with."instance_id"
   AND llm_service_instances_shared_with."user_handle" = $1
 WHERE llm_service_instances."owner" = $1
-   OR users_llm_service_instances."user_handle" = $1
    OR llm_service_instances_shared_with."user_handle" = $1
 ORDER BY llm_service_instances."owner" ASC, llm_service_instances."instance_handle" ASC 
 LIMIT $2 OFFSET $3
@@ -651,18 +647,16 @@ func (q *Queries) GetLLMInstanceByProject(ctx context.Context, arg GetLLMInstanc
 }
 
 const getLLMInstancesByUser = `-- name: GetLLMInstancesByUser :many
-SELECT llm_service_instances.instance_id, llm_service_instances.instance_handle, llm_service_instances.owner, llm_service_instances.endpoint, llm_service_instances.description, llm_service_instances.api_key, llm_service_instances.api_standard, llm_service_instances.model, llm_service_instances.dimensions, llm_service_instances.created_at, llm_service_instances.updated_at, llm_service_instances.definition_id, llm_service_instances.api_key_encrypted, users_llm_service_instances."role"
+SELECT llm_service_instances.instance_id, llm_service_instances.instance_handle, llm_service_instances.owner, llm_service_instances.endpoint, llm_service_instances.description, llm_service_instances.api_key, llm_service_instances.api_standard, llm_service_instances.model, llm_service_instances.dimensions, llm_service_instances.created_at, llm_service_instances.updated_at, llm_service_instances.definition_id, llm_service_instances.api_key_encrypted, 'owner' as "role"
 FROM llm_service_instances
-JOIN users_llm_service_instances
-ON llm_service_instances."instance_id" = users_llm_service_instances."instance_id"
-WHERE users_llm_service_instances."user_handle" = $1
+WHERE llm_service_instances."owner" = $1
 ORDER BY llm_service_instances."instance_handle" ASC LIMIT $2 OFFSET $3
 `
 
 type GetLLMInstancesByUserParams struct {
-	UserHandle string `db:"user_handle" json:"user_handle"`
-	Limit      int32  `db:"limit" json:"limit"`
-	Offset     int32  `db:"offset" json:"offset"`
+	Owner  string `db:"owner" json:"owner"`
+	Limit  int32  `db:"limit" json:"limit"`
+	Offset int32  `db:"offset" json:"offset"`
 }
 
 type GetLLMInstancesByUserRow struct {
@@ -682,8 +676,9 @@ type GetLLMInstancesByUserRow struct {
 	Role            string           `db:"role" json:"role"`
 }
 
+// Get all instances owned by a user
 func (q *Queries) GetLLMInstancesByUser(ctx context.Context, arg GetLLMInstancesByUserParams) ([]GetLLMInstancesByUserRow, error) {
-	rows, err := q.db.Query(ctx, getLLMInstancesByUser, arg.UserHandle, arg.Limit, arg.Offset)
+	rows, err := q.db.Query(ctx, getLLMInstancesByUser, arg.Owner, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
@@ -1225,30 +1220,6 @@ func (q *Queries) LinkProjectToUser(ctx context.Context, arg LinkProjectToUserPa
 		&i.UpdatedAt,
 	)
 	return i, err
-}
-
-const linkUserToLLMInstance = `-- name: LinkUserToLLMInstance :exec
-INSERT
-INTO users_llm_service_instances (
-  "user_handle", "instance_id", "role", "created_at", "updated_at"
-) VALUES (
-  $1, $2, $3, NOW(), NOW()
-)
-ON CONFLICT ("user_handle", "instance_id") DO UPDATE SET
-  "role" = $3,
-  "updated_at" = NOW()
-RETURNING user_handle, instance_id, role, created_at, updated_at
-`
-
-type LinkUserToLLMInstanceParams struct {
-	UserHandle string `db:"user_handle" json:"user_handle"`
-	InstanceID int32  `db:"instance_id" json:"instance_id"`
-	Role       string `db:"role" json:"role"`
-}
-
-func (q *Queries) LinkUserToLLMInstance(ctx context.Context, arg LinkUserToLLMInstanceParams) error {
-	_, err := q.db.Exec(ctx, linkUserToLLMInstance, arg.UserHandle, arg.InstanceID, arg.Role)
-	return err
 }
 
 const resetAllSerials = `-- name: ResetAllSerials :exec

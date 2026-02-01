@@ -86,15 +86,8 @@ func putLLMInstanceFunc(ctx context.Context, input *models.PutLLMRequest) (*mode
 		instanceHandle = llm.InstanceHandle
 		owner = llm.Owner
 
-		// 2. Link llm service instance to user
-		err = queries.LinkUserToLLMInstance(ctx, database.LinkUserToLLMInstanceParams{
-			UserHandle: input.UserHandle,
-			InstanceID: instanceID,
-			Role:       "owner",
-		})
-		if err != nil {
-			return fmt.Errorf("unable to link llm service instance to user: %v", err)
-		}
+		// Ownership is tracked via the owner column in llm_service_instances
+		// No need for separate linking table
 
 		return nil
 	})

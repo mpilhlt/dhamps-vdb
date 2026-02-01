@@ -94,14 +94,6 @@ type User struct {
 	UpdatedAt  pgtype.Timestamp `db:"updated_at" json:"updated_at"`
 }
 
-type UsersLlmServiceInstance struct {
-	UserHandle string           `db:"user_handle" json:"user_handle"`
-	InstanceID int32            `db:"instance_id" json:"instance_id"`
-	Role       string           `db:"role" json:"role"`
-	CreatedAt  pgtype.Timestamp `db:"created_at" json:"created_at"`
-	UpdatedAt  pgtype.Timestamp `db:"updated_at" json:"updated_at"`
-}
-
 type UsersProject struct {
 	UserHandle string           `db:"user_handle" json:"user_handle"`
 	ProjectID  int32            `db:"project_id" json:"project_id"`
