@@ -543,7 +543,7 @@ Content-Type: application/json
 
 {
   "description": "My research project",
-  "llm_service_instance_id": 123  # From step 1
+  "llm_service_instance_id": 123  // From step 1
 }
 ```
 
@@ -555,7 +555,7 @@ Content-Type: application/json
 
 {
   "text_id": "doc1",
-  "instance_handle": "my-openai",  # Use instance_handle (not llm_service_handle)
+  "instance_handle": "my-openai",  // Use instance_handle (not llm_service_handle)
   "embedding": [0.1, 0.2, 0.3, ...],
   "metadata": {
     "title": "Document 1",
@@ -633,7 +633,7 @@ Use this checklist to ensure your client is fully migrated:
 
 **Problem:** Old embeddings have `llm_service_handle` in their data
 
-**Solution:** The migration automatically preserves existing data. New embeddings should use `instance_handle`, but old ones will still have the old field name.
+**Solution:** Existing embeddings stored before the migration will continue to have the old field name in their metadata. This is preserved for backward compatibility. When retrieving these embeddings, your client should be able to handle both `llm_service_handle` (old data) and `instance_handle` (new data). However, all NEW embeddings uploaded after migration must use `instance_handle`.
 
 ---
 
