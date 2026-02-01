@@ -181,9 +181,9 @@ func getUserFunc(ctx context.Context, input *models.GetUserRequest) (*models.Get
 	}
 	for _, llmservice := range ls {
 		llmservices = append(llmservices, models.LLMMembership{
-			LLMServiceHandle: llmservice.InstanceHandle,
-			LLMServiceOwner:  llmservice.Owner,
-			Role:             llmservice.Role,
+			InstanceHandle: llmservice.InstanceHandle,
+			InstanceOwner:  llmservice.Owner,
+			Role:           llmservice.Role,
 		})
 	}
 

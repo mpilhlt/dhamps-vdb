@@ -13,9 +13,9 @@ type User struct {
 }
 
 type LLMMembership struct {
-	LLMServiceHandle string `json:"llm_service_handle" doc:"LLM service"`
-	LLMServiceOwner  string `json:"owner" doc:"Owner of the LLM service"`
-	Role             string `json:"role" doc:"Role of the user in the LLM service"`
+	InstanceHandle string `json:"instance_handle" doc:"LLM service instance"`
+	InstanceOwner  string `json:"owner" doc:"Owner of the LLM service instance"`
+	Role           string `json:"role" doc:"Role of the user in the LLM service instance"`
 }
 
 type LLMMemberships []LLMMembership

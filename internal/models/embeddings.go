@@ -11,7 +11,7 @@ type EmbeddingsInput struct {
 	UserHandle       string          `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
 	ProjectHandle    string          `json:"project_handle" path:"project_handle" maxLength:"20" minLength:"3" example:"my-gpt-4" doc:"Project handle"`
 	ProjectID        int             `json:"project_id,omitempty" doc:"Unique project identifier"`
-	LLMServiceHandle string          `json:"llm_service_handle" doc:"Handle of the language model service used to generate the embeddings"`
+	InstanceHandle   string          `json:"instance_handle" doc:"Handle of the LLM service instance used to generate the embeddings"`
 	Text             string          `json:"text,omitempty" doc:"Text content of the document"`
 	Vector           []float32       `json:"vector" doc:"Half-precision embeddings vector for the document"`
 	VectorDim        int32           `json:"vector_dim" doc:"Dimensionality of the embeddings vector"`
@@ -19,15 +19,15 @@ type EmbeddingsInput struct {
 }
 
 type Embeddings struct {
-	TextID           string                 `json:"text_id" doc:"Identifier for the document"`
-	UserHandle       string                 `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
-	ProjectHandle    string                 `json:"project_handle" path:"project_handle" maxLength:"20" minLength:"3" example:"my-gpt-4" doc:"Project handle"`
-	ProjectID        int                    `json:"project_id,omitempty" doc:"Unique project identifier"`
-	LLMServiceHandle string                 `json:"llm_service_handle" doc:"Handle of the language model service used to generate the embeddings"`
-	Text             string                 `json:"text,omitempty" doc:"Text content of the document"`
-	Vector           []float32              `json:"vector" doc:"Half-precision embeddings vector for the document"`
-	VectorDim        int32                  `json:"vector_dim" doc:"Dimensionality of the embeddings vector"`
-	Metadata         map[string]interface{} `json:"metadata,omitempty" doc:"Metadata (json) for the document. E.g. creation year, author name or text genre." example:"{\n  \"author\": \"Immanuel Kant\"\n}\n"`
+	TextID         string                 `json:"text_id" doc:"Identifier for the document"`
+	UserHandle     string                 `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
+	ProjectHandle  string                 `json:"project_handle" path:"project_handle" maxLength:"20" minLength:"3" example:"my-gpt-4" doc:"Project handle"`
+	ProjectID      int                    `json:"project_id,omitempty" doc:"Unique project identifier"`
+	InstanceHandle string                 `json:"instance_handle" doc:"Handle of the LLM service instance used to generate the embeddings"`
+	Text           string                 `json:"text,omitempty" doc:"Text content of the document"`
+	Vector         []float32              `json:"vector" doc:"Half-precision embeddings vector for the document"`
+	VectorDim      int32                  `json:"vector_dim" doc:"Dimensionality of the embeddings vector"`
+	Metadata       map[string]interface{} `json:"metadata,omitempty" doc:"Metadata (json) for the document. E.g. creation year, author name or text genre." example:"{\n  \"author\": \"Immanuel Kant\"\n}\n"`
 }
 
 type EmbeddingssInput []EmbeddingsInput

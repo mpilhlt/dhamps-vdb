@@ -57,7 +57,7 @@ func postProjEmbeddingsFunc(ctx context.Context, input *models.PostProjEmbedding
 	}
 
 	// Check if llm service exists
-	llm, err := getLLMFunc(ctx, &models.GetLLMRequest{UserHandle: input.UserHandle, LLMServiceHandle: input.Body.Embeddings[0].LLMServiceHandle})
+	llm, err := getLLMInstanceFunc(ctx, &models.GetLLMRequest{UserHandle: input.UserHandle, LLMServiceHandle: input.Body.Embeddings[0].InstanceHandle})
 	if err != nil {
 		return nil, err
 	}
@@ -171,7 +171,7 @@ func getProjEmbeddingsFunc(ctx context.Context, input *models.GetProjEmbeddingsR
 			UserHandle:       embeddings.Owner,
 			ProjectHandle:    embeddings.ProjectHandle,
 			ProjectID:        int(embeddings.ProjectID),
-			LLMServiceHandle: embeddings.InstanceHandle,
+			InstanceHandle: embeddings.InstanceHandle,
 			Vector:           embeddings.Vector.Slice(),
 			VectorDim:        embeddings.VectorDim,
 			Text:             embeddings.Text.String,
@@ -268,7 +268,7 @@ func getDocEmbeddingsFunc(ctx context.Context, input *models.GetDocEmbeddingsReq
 		UserHandle:       embeddings.Owner,
 		ProjectHandle:    embeddings.ProjectHandle,
 		ProjectID:        int(embeddings.ProjectID),
-		LLMServiceHandle: embeddings.InstanceHandle,
+		InstanceHandle: embeddings.InstanceHandle,
 		Vector:           embeddings.Vector.Slice(),
 		VectorDim:        embeddings.VectorDim,
 		Text:             embeddings.Text.String,

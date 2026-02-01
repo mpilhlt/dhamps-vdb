@@ -24,6 +24,11 @@ CREATE TABLE IF NOT EXISTS llm_service_definitions(
   UNIQUE ("owner", "definition_handle")
 );
 
+-- Create composite index on (owner, definition_handle) for efficient lookups
+-- This supports queries filtering by both owner and handle
+CREATE INDEX IF NOT EXISTS llm_service_definitions_owner_handle ON "llm_service_definitions"("owner", "definition_handle");
+
+-- Additional index on just definition_handle for cross-owner searches
 CREATE INDEX IF NOT EXISTS llm_service_definitions_handle ON "llm_service_definitions"("definition_handle");
 
 -- Step 3: Rename existing llm_services table to llm_service_instances
@@ -77,29 +82,26 @@ WHERE EXISTS (
 -- Step 11: Update embeddings table to reference instance_id
 ALTER TABLE embeddings RENAME COLUMN llm_service_id TO llm_service_instance_id;
 
--- Step 12: Update the projects_llm_services references
-ALTER TABLE projects_llm_services RENAME COLUMN llm_service_id TO llm_service_instance_id;
-
--- Step 13: Drop the old projects_llm_services table (many-to-many, no longer needed)
+-- Step 12: Drop the old projects_llm_services table (many-to-many, no longer needed)
 -- Projects now have exactly one instance via the llm_service_instance_id column
 DROP TABLE IF EXISTS projects_llm_services;
 
--- Step 14: Ensure required API standards exist before creating definitions
+-- Step 13: Ensure required API standards exist before creating definitions
 -- These API standards are needed for the default LLM Service Definitions
 
 INSERT INTO api_standards ("api_standard_handle", "description", "key_method", "key_field", "created_at", "updated_at")
-VALUES ('openai', 'OpenAI Embeddings API, Version 1', 'auth_bearer', 'Authorization', NOW(), NOW())
+VALUES ('openai', 'OpenAI Embeddings API, Version 1, as documented in https://platform.openai.com/docs/api-reference/embeddings', 'auth_bearer', 'Authorization', NOW(), NOW())
 ON CONFLICT ("api_standard_handle") DO NOTHING;
 
 INSERT INTO api_standards ("api_standard_handle", "description", "key_method", "key_field", "created_at", "updated_at")
-VALUES ('cohere', 'Cohere Embed API, Version 2', 'auth_bearer', 'Authorization', NOW(), NOW())
+VALUES ('cohere', 'Cohere Embed API, Version 2, as documented in https://docs.cohere.com/reference/embed', 'auth_bearer', 'Authorization', NOW(), NOW())
 ON CONFLICT ("api_standard_handle") DO NOTHING;
 
 INSERT INTO api_standards ("api_standard_handle", "description", "key_method", "key_field", "created_at", "updated_at")
-VALUES ('gemini', 'Gemini Embeddings API', 'auth_bearer', 'x-goog-api-key', NOW(), NOW())
+VALUES ('gemini', 'Gemini Embeddings API, as documented in https://ai.google.dev/gemini-api/docs/embeddings', 'auth_bearer', 'x-goog-api-key', NOW(), NOW())
 ON CONFLICT ("api_standard_handle") DO NOTHING;
 
--- Step 15: Seed default LLM Service Definitions from _system user
+-- Step 14: Seed default LLM Service Definitions from _system user
 -- These serve as templates that all users can reference
 
 -- OpenAI text-embedding-3-large
@@ -120,15 +122,6 @@ VALUES
    'openai', 'text-embedding-3-small', 1536, NOW(), NOW())
 ON CONFLICT ("owner", "definition_handle") DO NOTHING;
 
--- Cohere embed-multilingual-v3.0
-INSERT INTO llm_service_definitions 
-  ("definition_handle", "owner", "endpoint", "description", "api_standard", "model", "dimensions", "created_at", "updated_at")
-VALUES 
-  ('cohere-multilingual-v3', '_system', 'https://api.cohere.com/v2/embed', 
-   'Cohere embed-multilingual-v3.0 service (1024 dimensions)', 
-   'cohere', 'embed-multilingual-v3.0', 1024, NOW(), NOW())
-ON CONFLICT ("owner", "definition_handle") DO NOTHING;
-
 -- Cohere embed-v4.0
 INSERT INTO llm_service_definitions 
   ("definition_handle", "owner", "endpoint", "description", "api_standard", "model", "dimensions", "created_at", "updated_at")
@@ -144,8 +137,8 @@ INSERT INTO llm_service_definitions
 VALUES 
   ('gemini-embedding-001', '_system', 
    'https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent', 
-   'Google Gemini embedding-001 service (768 dimensions)', 
-   'gemini', 'gemini-embedding-001', 768, NOW(), NOW())
+   'Google Gemini embedding-001 service (768 dimensions, default 3072)', 
+   'gemini', 'gemini-embedding-001', 3072, NOW(), NOW())
 ON CONFLICT ("owner", "definition_handle") DO NOTHING;
 
 

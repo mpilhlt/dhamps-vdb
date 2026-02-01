@@ -22,8 +22,8 @@ func ValidateEmbeddingDimensions(embedding models.EmbeddingsInput, llmDimensions
 
 	// Check if declared vector_dim matches LLM service dimensions
 	if embedding.VectorDim != llmDimensions {
-		return fmt.Errorf("vector dimension mismatch: embedding declares %d dimensions but LLM service '%s' expects %d dimensions", 
-			embedding.VectorDim, embedding.LLMServiceHandle, llmDimensions)
+		return fmt.Errorf("vector dimension mismatch: embedding declares %d dimensions but LLM service instance '%s' expects %d dimensions", 
+			embedding.VectorDim, embedding.InstanceHandle, llmDimensions)
 	}
 
 	// Check if actual vector length matches declared vector_dim

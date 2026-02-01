@@ -25,7 +25,7 @@ func getEncryptionKey() *crypto.EncryptionKey {
 	return crypto.NewEncryptionKey(keyStr)
 }
 
-func putLLMFunc(ctx context.Context, input *models.PutLLMRequest) (*models.UploadLLMResponse, error) {
+func putLLMInstanceFunc(ctx context.Context, input *models.PutLLMRequest) (*models.UploadLLMResponse, error) {
 	if input.LLMServiceHandle != input.Body.LLMServiceHandle {
 		return nil, huma.Error400BadRequest(fmt.Sprintf("llm-service handle in URL (\"%s\") does not match llm-service handle in body (\"%s\")", input.LLMServiceHandle, input.Body.LLMServiceHandle))
 	}
@@ -71,8 +71,8 @@ func putLLMFunc(ctx context.Context, input *models.PutLLMRequest) (*models.Uploa
 			InstanceHandle:  input.LLMServiceHandle,
 			DefinitionID:    pgtype.Int4{Valid: false}, // Standalone instance (no definition reference)
 			Endpoint:        input.Body.Endpoint,
-			Description:     pgtype.Text{String: input.Body.Description, Valid: input.Body.Description != ""},
-			APIKey:          pgtype.Text{String: input.Body.APIKey, Valid: input.Body.APIKey != ""},
+			Description:     pgtype.Text{String: input.Body.Description, Valid: true},
+			APIKey:          pgtype.Text{String: input.Body.APIKey, Valid: true},
 			ApiKeyEncrypted: apiKeyEncrypted,
 			APIStandard:     input.Body.APIStandard,
 			Model:           input.Body.Model,
@@ -113,11 +113,11 @@ func putLLMFunc(ctx context.Context, input *models.PutLLMRequest) (*models.Uploa
 }
 
 // Create a llm service (without a handle being present in the URL)
-func postLLMFunc(ctx context.Context, input *models.PostLLMRequest) (*models.UploadLLMResponse, error) {
-	return putLLMFunc(ctx, &models.PutLLMRequest{UserHandle: input.UserHandle, LLMServiceHandle: input.Body.LLMServiceHandle, Body: input.Body})
+func postLLMInstanceFunc(ctx context.Context, input *models.PostLLMRequest) (*models.UploadLLMResponse, error) {
+	return putLLMInstanceFunc(ctx, &models.PutLLMRequest{UserHandle: input.UserHandle, LLMServiceHandle: input.Body.LLMServiceHandle, Body: input.Body})
 }
 
-func getLLMFunc(ctx context.Context, input *models.GetLLMRequest) (*models.GetLLMResponse, error) {
+func getLLMInstanceFunc(ctx context.Context, input *models.GetLLMRequest) (*models.GetLLMResponse, error) {
 	// Check if user exists
 	u, err := getUserFunc(ctx, &models.GetUserRequest{UserHandle: input.UserHandle})
 	if err != nil {
@@ -167,7 +167,7 @@ func getLLMFunc(ctx context.Context, input *models.GetLLMRequest) (*models.GetLL
 	return response, nil
 }
 
-func getUserLLMsFunc(ctx context.Context, input *models.GetUserLLMsRequest) (*models.GetUserLLMsResponse, error) {
+func getUserLLMInstancesFunc(ctx context.Context, input *models.GetUserLLMsRequest) (*models.GetUserLLMsResponse, error) {
 	// Check if user exists
 	u, err := getUserFunc(ctx, &models.GetUserRequest{UserHandle: input.UserHandle})
 	if err != nil {
@@ -221,7 +221,7 @@ func getUserLLMsFunc(ctx context.Context, input *models.GetUserLLMsRequest) (*mo
 	return response, nil
 }
 
-func deleteLLMFunc(ctx context.Context, input *models.DeleteLLMRequest) (*models.DeleteLLMResponse, error) {
+func deleteLLMInstanceFunc(ctx context.Context, input *models.DeleteLLMRequest) (*models.DeleteLLMResponse, error) {
 	// Check if user exists
 	u, err := getUserFunc(ctx, &models.GetUserRequest{UserHandle: input.UserHandle})
 	if err != nil {
@@ -232,7 +232,7 @@ func deleteLLMFunc(ctx context.Context, input *models.DeleteLLMRequest) (*models
 	}
 
 	// Check if llm service instance exists
-	_, err = getLLMFunc(ctx, &models.GetLLMRequest{UserHandle: input.UserHandle, LLMServiceHandle: input.LLMServiceHandle})
+	_, err = getLLMInstanceFunc(ctx, &models.GetLLMRequest{UserHandle: input.UserHandle, LLMServiceHandle: input.LLMServiceHandle})
 	if err != nil {
 		return nil, err
 	}
@@ -323,10 +323,10 @@ func RegisterLLMServicesRoutes(pool *pgxpool.Pool, api huma.API) error {
 		Tags: []string{"llm-services"},
 	}
 
-	huma.Register(api, postLLMServiceOp, addPoolToContext(pool, postLLMFunc))
-	huma.Register(api, putLLMServiceOp, addPoolToContext(pool, putLLMFunc))
-	huma.Register(api, getUserLLMServicesOp, addPoolToContext(pool, getUserLLMsFunc))
-	huma.Register(api, getLLMServiceOp, addPoolToContext(pool, getLLMFunc))
-	huma.Register(api, deleteLLMServiceOp, addPoolToContext(pool, deleteLLMFunc))
+	huma.Register(api, postLLMServiceOp, addPoolToContext(pool, postLLMInstanceFunc))
+	huma.Register(api, putLLMServiceOp, addPoolToContext(pool, putLLMInstanceFunc))
+	huma.Register(api, getUserLLMServicesOp, addPoolToContext(pool, getUserLLMInstancesFunc))
+	huma.Register(api, getLLMServiceOp, addPoolToContext(pool, getLLMInstanceFunc))
+	huma.Register(api, deleteLLMServiceOp, addPoolToContext(pool, deleteLLMInstanceFunc))
 	return nil
 }
