@@ -2,17 +2,17 @@
 
 ## Query Optimization Opportunities
 
-### GetAllAccessibleLLMInstances Query
+### GetAllAccessibleInstances Query
 
 **Current Implementation:**
 ```sql
-SELECT llm_service_instances.*, ...
-FROM llm_service_instances
-LEFT JOIN llm_service_instances_shared_with
-  ON llm_service_instances."instance_id" = llm_service_instances_shared_with."instance_id"
-WHERE llm_service_instances."owner" = $1
-   OR llm_service_instances_shared_with."user_handle" = $1
-ORDER BY llm_service_instances."owner" ASC, llm_service_instances."instance_handle" ASC 
+SELECT instances.*, ...
+FROM instances
+LEFT JOIN instances_shared_with
+  ON instances."instance_id" = instances_shared_with."instance_id"
+WHERE instances."owner" = $1
+   OR instances_shared_with."user_handle" = $1
+ORDER BY instances."owner" ASC, instances."instance_handle" ASC 
 LIMIT $2 OFFSET $3;
 ```
 
@@ -24,21 +24,21 @@ Use UNION ALL to separate owned instances from shared instances:
 
 ```sql
 -- Get owned instances
-SELECT llm_service_instances.*, 'owner' as "role", true as "is_owner"
-FROM llm_service_instances
-WHERE llm_service_instances."owner" = $1
+SELECT instances.*, 'owner' as "role", true as "is_owner"
+FROM instances
+WHERE instances."owner" = $1
 
 UNION ALL
 
 -- Get shared instances
-SELECT llm_service_instances.*, 
-       llm_service_instances_shared_with."role",
+SELECT instances.*, 
+       instances_shared_with."role",
        false as "is_owner"
-FROM llm_service_instances
-INNER JOIN llm_service_instances_shared_with
-  ON llm_service_instances."instance_id" = llm_service_instances_shared_with."instance_id"
-WHERE llm_service_instances_shared_with."user_handle" = $1
-  AND llm_service_instances."owner" != $1  -- Avoid duplicates
+FROM instances
+INNER JOIN instances_shared_with
+  ON instances."instance_id" = instances_shared_with."instance_id"
+WHERE instances_shared_with."user_handle" = $1
+  AND instances."owner" != $1  -- Avoid duplicates
 
 ORDER BY "owner" ASC, "instance_handle" ASC
 LIMIT $2 OFFSET $3;
@@ -65,15 +65,15 @@ LIMIT $2 OFFSET $3;
 ### Index Suggestions
 
 Current indexes (from migration 004):
-- `llm_service_definitions(definition_handle)`
-- `llm_service_definitions(owner, definition_handle)` (composite)
-- `llm_service_instances(instance_handle)`
-- `llm_service_instances_shared_with(instance_id, user_handle)` (implicit from PK)
+- `definitions(definition_handle)`
+- `definitions(owner, definition_handle)` (composite)
+- `instances(instance_handle)`
+- `instances_shared_with(instance_id, user_handle)` (implicit from PK)
 
 **Additional indexes to consider:**
-1. `llm_service_instances(owner)` - for owned instance lookups
-2. `llm_service_instances_shared_with(user_handle)` - for shared instance lookups
-3. `llm_service_instances(owner, instance_handle)` - composite for unique constraint
+1. `instances(owner)` - for owned instance lookups
+2. `instances_shared_with(user_handle)` - for shared instance lookups
+3. `instances(owner, instance_handle)` - composite for unique constraint
 
 ### Caching Opportunities
 
@@ -88,8 +88,8 @@ Current indexes (from migration 004):
 EXPLAIN ANALYZE SELECT ...;
 
 # Check table statistics
-ANALYZE llm_service_instances;
-ANALYZE llm_service_instances_shared_with;
+ANALYZE instances;
+ANALYZE instances_shared_with;
 
 # View current indexes
 \di llm_service_*
@@ -101,7 +101,7 @@ ANALYZE llm_service_instances_shared_with;
 
 1. **Load Test**: 1000 users, 10 instances each
 2. **Sharing Test**: 100 users sharing instances with 50 others each
-3. **Query Test**: Measure GetAllAccessibleLLMInstances with varying instance counts
+3. **Query Test**: Measure GetAllAccessibleInstances with varying instance counts
 
 ### Metrics to Track
 

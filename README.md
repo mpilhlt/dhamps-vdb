@@ -302,7 +302,7 @@ For resources that support both GET and PUT operations, PATCH requests are autom
 **Example: Enable world-readable access for a project**
 ```bash
 curl -X PATCH https://<hostname>/v1/projects/alice/myproject \
-  -H "Authorization: Bearer <api_key>" \
+  -H "Authorization: Bearer <vdb_key>" \
   -H "Content-Type: application/json" \
   -d '{"authorizedReaders": ["*"]}'
 ```
@@ -310,7 +310,7 @@ curl -X PATCH https://<hostname>/v1/projects/alice/myproject \
 **Example: Update project description**
 ```bash
 curl -X PATCH https://<hostname>/v1/projects/alice/myproject \
-  -H "Authorization: Bearer <api_key>" \
+  -H "Authorization: Bearer <vdb_key>" \
   -H "Content-Type: application/json" \
   -d '{"description": "Updated project description"}'
 ```
@@ -367,7 +367,7 @@ dhamps-vdb/
 │   │   ├── handlers.go
 │   │   ├── handlers_test.go
 │   │   ├── llm_processes.go
-│   │   ├── llm_services.go
+│   │   ├── instances.go
 │   │   ├── llm_services_test.go
 │   │   ├── projects.go
 │   │   ├── projects_test.go
@@ -379,7 +379,7 @@ dhamps-vdb/
 │       ├── api_standards.go
 │       ├── embeddings.go
 │       ├── llm_processes.go
-│       ├── llm_services.go
+│       ├── instances.go
 │       ├── options.go
 │       ├── projects.go
 │       ├── similars.go
@@ -418,7 +418,7 @@ dhamps-vdb/
   - [ ] Add documentation (the GET query parameters are called `metadata_path` and `metadata_value` as in: `https://xy.org/vdb-api/v1/similars/sal/sal-openai-large/https%3A%2F%2Fid.myproject.net%2Ftexts%2FW0011%3A1.3.1.3.1?threshold=0.7&limit=5&metadata_path=author_id&metadata_value=A0083`)
 - [ ] Implement and make consequent use of **max_idle** (5), **max_concurr** (5), **timeouts**, and **cancellations**
 - [ ] **Concurrency** (leaky bucket approach) and **Rate limiting** (redis, sliding window, implement headers)
-- [ ] Use **transactions** (most importantly, when an action requires several queries, e.g. projects being added and then linked to several read-authorized users)
+- [x] Use **transactions** (most importantly, when an action requires several queries, e.g. projects being added and then linked to several read-authorized users)
 - [ ] Use PATCH method to change existing resources
 - [x] Add mechanism to allow anonymous/public reading access to embeddings (via `"*"` in `authorizedReaders`)
 - [ ] **Dockerization**
@@ -432,6 +432,7 @@ dhamps-vdb/
 - [ ] LLM handling processing (receive text and send it to an llm service on the user's behalf, then store the results)
   - [ ] allow API keys for services to be read from env variables (on the server, but still maybe useful)
   - [ ] calls to LLM services
+  - [ ] include rate limiting in service definitions/instances and obey it in proxying
 
 ## License
 

@@ -2,6 +2,7 @@ package handlers_test
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,8 +12,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// TODO: Test against actual JSON body
+
 // TestPublicAccess tests the public access functionality when "*" is in authorizedReaders
 func TestPublicAccess(t *testing.T) {
+
+	fmt.Printf("\n\n\n\n")
+
 	// Get the database connection pool from package variable
 	pool := connPool
 
@@ -50,8 +56,8 @@ func TestPublicAccess(t *testing.T) {
 	}
 
 	// Create LLM Service to be used in embeddings tests
-	llmServiceJSON := `{ "llm_service_handle": "test1", "endpoint": "https://api.foo.bar/v1/embed", "description": "An LLM Service just for testing if the dhamps-vdb code is working", "api_key": "0123456789", "api_standard": "openai", "model": "embed-test1", "dimensions": 5}`
-	_, err = createLLMService(t, llmServiceJSON, "bob", bobAPIKey)
+	InstanceJSON := `{ "instance_handle": "embedding1", "endpoint": "https://api.foo.bar/v1/embed", "description": "An LLM Service just for testing if the dhamps-vdb code is working", "api_standard": "openai", "model": "embed-test1", "dimensions": 5}`
+	_, err = createInstance(t, InstanceJSON, "bob", bobAPIKey)
 	if err != nil {
 		t.Fatalf("Error creating LLM service openai-large for testing: %v\n", err)
 	}
@@ -69,76 +75,108 @@ func TestPublicAccess(t *testing.T) {
 		name         string
 		method       string
 		requestPath  string
-		apiKeyHeader string
-		expectStatus int
-		checkSuccess bool // If true, check for 200/2xx status instead of specific body
+		bodyPath     string
+		VDBKey       string
+		expectBody   string
+		expectStatus int16
 	}{
 		{
 			name:         "Get project embeddings without authentication (public project)",
 			method:       http.MethodGet,
 			requestPath:  "/v1/embeddings/bob/public-test",
-			apiKeyHeader: "",
+			bodyPath:     "",
+			VDBKey:       "",
+			expectBody:   "",
 			expectStatus: http.StatusOK,
-			checkSuccess: true,
 		},
 		{
 			name:         "Get document embeddings without authentication (public project)",
 			method:       http.MethodGet,
 			requestPath:  "/v1/embeddings/bob/public-test/https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.1.1.1.1",
-			apiKeyHeader: "",
+			bodyPath:     "",
+			VDBKey:       "",
+			expectBody:   "",
 			expectStatus: http.StatusOK,
-			checkSuccess: true,
 		},
 		{
 			name:         "Get similars without authentication (public project)",
 			method:       http.MethodGet,
 			requestPath:  "/v1/similars/bob/public-test/https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.1.1.1.1",
-			apiKeyHeader: "",
+			bodyPath:     "",
+			VDBKey:       "",
+			expectBody:   "",
 			expectStatus: http.StatusOK,
-			checkSuccess: true,
 		},
 		{
 			name:         "Get project metadata without authentication (public project)",
 			method:       http.MethodGet,
 			requestPath:  "/v1/projects/bob/public-test",
-			apiKeyHeader: "",
+			bodyPath:     "",
+			VDBKey:       "",
+			expectBody:   "",
 			expectStatus: http.StatusOK,
-			checkSuccess: true,
 		},
 		{
-			name:         "Post embeddings without authentication should still be unauthorized (public project)",
+			name:         "Post embeddings without authentication (public project)",
 			method:       http.MethodPost,
 			requestPath:  "/v1/embeddings/bob/public-test",
-			apiKeyHeader: "",
+			bodyPath:     "../../testdata/invalid_embeddings.json",
+			VDBKey:       "",
+			expectBody:   "",
 			expectStatus: http.StatusUnauthorized,
-			checkSuccess: false,
 		},
 	}
 
 	for _, v := range tt {
 		t.Run(v.name, func(t *testing.T) {
-			requestURL := fmt.Sprintf("http://%v:%d%v", options.Host, options.Port, v.requestPath)
-			req, err := http.NewRequest(v.method, requestURL, nil)
-			assert.NoError(t, err)
 
-			if v.apiKeyHeader != "" {
-				req.Header.Add("Authorization", "Bearer "+v.apiKeyHeader)
+			// We need to handle the body only for PUT and POST requests
+			// For GET and DELETE requests, the body is nil
+			reqBody := io.Reader(nil)
+			if v.method == http.MethodGet || v.method == http.MethodDelete {
+				reqBody = nil
+			} else {
+				f, err := os.Open(v.bodyPath)
+				assert.NoError(t, err)
+				defer func() {
+					if err := f.Close(); err != nil {
+						t.Fatal(err)
+					}
+				}()
+				b := new(bytes.Buffer)
+				_, err = io.Copy(b, f)
+				assert.NoError(t, err)
+				reqBody = bytes.NewReader(b.Bytes())
 			}
-
+			requestURL := fmt.Sprintf("http://%v:%d%v", options.Host, options.Port, v.requestPath)
+			req, err := http.NewRequest(v.method, requestURL, reqBody)
+			assert.NoError(t, err)
+			req.Header.Set("Authorization", "Bearer "+v.VDBKey)
 			resp, err := http.DefaultClient.Do(req)
 			if err != nil {
 				t.Errorf("Error sending request: %v\n", err)
 			}
-			assert.NoError(t, err)
+			// assert.NoError(t, err)
+			defer resp.Body.Close()
 
-			// Check status code
-			assert.Equal(t, v.expectStatus, resp.StatusCode, "Status code mismatch for %s", v.name)
-
-			if v.checkSuccess && resp.StatusCode >= 200 && resp.StatusCode < 300 {
-				t.Logf("✓ %s: Got successful response with status %d", v.name, resp.StatusCode)
+			if resp.StatusCode != int(v.expectStatus) {
+				t.Errorf("Expected status code %d, got %s\n", v.expectStatus, resp.Status)
+			} else {
+				t.Logf("Expected status code %d, got %s\n", v.expectStatus, resp.Status)
 			}
 
-			resp.Body.Close()
+			respBody, err := io.ReadAll(resp.Body) // response body is []byte
+			assert.NoError(t, err)
+			formattedResp := ""
+			if v.expectBody != "" {
+				fr := new(bytes.Buffer)
+				err = json.Indent(fr, respBody, "", "  ")
+				assert.NoError(t, err)
+				formattedResp = fr.String()
+			}
+			// if (resp.StatusCode != http.StatusOK) || (resp.StatusCode != int(v.expectStatus)) {
+			assert.Equal(t, v.expectBody, formattedResp, "they should be equal")
+			// }
 		})
 	}
 

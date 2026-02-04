@@ -94,7 +94,11 @@ func getAPIStandardsFunc(ctx context.Context, input *models.GetAPIStandardsReque
 
 	// Build the response
 	standards := []models.APIStandard{}
-	for _, a := range allAPIStandards {
+	for _, api := range allAPIStandards {
+		a, err := queries.RetrieveAPIStandard(ctx, api)
+		if err != nil {
+			return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get API standard data for standard %s. %v", api, err))
+		}
 		standard := models.APIStandard{
 			APIStandardHandle: a.APIStandardHandle,
 			Description:       a.Description.String,

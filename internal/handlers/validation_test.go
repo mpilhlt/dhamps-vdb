@@ -12,6 +12,9 @@ import (
 )
 
 func TestValidationFunc(t *testing.T) {
+
+	fmt.Printf("\n\n\n\n")
+
 	// Get the database connection pool from package variable
 	pool := connPool
 
@@ -52,14 +55,16 @@ func TestValidationFunc(t *testing.T) {
 		t.Fatalf("Error creating API standard openai for testing: %v\n", err)
 	}
 
-	// Create LLM Service with 5 dimensions for testing
-	llmServiceJSON := `{ "llm_service_handle": "openai-large", "endpoint": "https://api.openai.com/v1/embeddings", "description": "My OpenAI test service", "api_key": "0123456789", "api_standard": "openai", "model": "text-embedding-3-large", "dimensions": 5}`
-	_, err = createLLMService(t, llmServiceJSON, "alice", aliceAPIKey)
+	// Create LLM Service Instance with 5 dimensions for testing
+	InstanceInstanceJSON := `{ "instance_handle": "embedding1", "endpoint": "https://api.openai.com/v1/embeddings", "description": "My OpenAI test service", "api_standard": "openai", "model": "text-embedding-3-large", "dimensions": 5}`
+	_, err = createInstance(t, InstanceInstanceJSON, "alice", aliceAPIKey)
 	if err != nil {
-		t.Fatalf("Error creating LLM service openai-large for testing: %v\n", err)
+		t.Fatalf("Error creating LLM Service Instance embedding1 for testing: %v\n", err)
 	}
 
 	fmt.Printf("\nRunning validation tests ...\n\n")
+
+	// TODO test actual resonse bodies!!
 
 	// Define test cases
 	tt := []struct {

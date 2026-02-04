@@ -56,12 +56,21 @@ func postProjEmbeddingsFunc(ctx context.Context, input *models.PostProjEmbedding
 		return nil, err
 	}
 
-	// Check if llm service exists
-	llm, err := getLLMInstanceFunc(ctx, &models.GetLLMRequest{UserHandle: input.UserHandle, LLMServiceHandle: input.Body.Embeddings[0].InstanceHandle})
+	// Check if llm service instance exists
+	// First, see if the current user is owner of the instance or
+	// if they have specified another user as owner of the instance
+	ownerOfInstance := input.UserHandle
+	for _, embedding := range input.Body.Embeddings {
+		if embedding.InstanceOwner != "" && embedding.InstanceOwner != input.UserHandle {
+			ownerOfInstance = embedding.InstanceOwner
+			break
+		}
+	}
+	llm, err := getInstanceFunc(ctx, &models.GetInstanceRequest{UserHandle: ownerOfInstance, InstanceHandle: input.Body.Embeddings[0].InstanceHandle})
 	if err != nil {
 		return nil, err
 	}
-	llmid := int32(llm.Body.LLMServiceID)
+	llmid := int32(llm.Body.InstanceID)
 
 	// Get the database connection pool from the context
 	pool, err := GetDBPool(ctx)
@@ -96,14 +105,14 @@ func postProjEmbeddingsFunc(ctx context.Context, input *models.PostProjEmbedding
 		}
 		// Build query parameters (embeddings)
 		params := database.UpsertEmbeddingsParams{
-			TextID:               pgtype.Text{String: embedding.TextID, Valid: true},
-			Owner:                input.UserHandle,
-			ProjectID:            pid,
-			LlmServiceInstanceID: llmid,
-			Text:                 pgtype.Text{String: embedding.Text, Valid: true},
-			Vector:               pgvector.NewHalfVector(embedding.Vector),
-			VectorDim:            embedding.VectorDim,
-			Metadata:             embedding.Metadata,
+			TextID:     pgtype.Text{String: embedding.TextID, Valid: true},
+			Owner:      input.UserHandle,
+			ProjectID:  pid,
+			InstanceID: llmid,
+			Text:       pgtype.Text{String: embedding.Text, Valid: true},
+			Vector:     pgvector.NewHalfVector(embedding.Vector),
+			VectorDim:  embedding.VectorDim,
+			Metadata:   embedding.Metadata,
 		}
 		// Run the queries (upload embeddings)
 		result, err := queries.UpsertEmbeddings(ctx, params)
@@ -160,22 +169,31 @@ func getProjEmbeddingsFunc(ctx context.Context, input *models.GetProjEmbeddingsR
 
 	// Build the response
 	e := []models.Embeddings{}
-	for _, embeddings := range embeddingss {
+	for _, emb := range embeddingss {
+		embeddings, err := queries.RetrieveEmbeddings(ctx, database.RetrieveEmbeddingsParams{
+			Owner:         input.UserHandle,
+			ProjectHandle: input.ProjectHandle,
+			TextID:        pgtype.Text{String: emb.TextID.String, Valid: true},
+		})
+		if err != nil {
+			return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get embeddings for user %s, project %s, id %s. %v", input.UserHandle, input.ProjectHandle, emb.TextID.String, err))
+		}
+
 		md := map[string]interface{}{}
 		err = json.Unmarshal(embeddings.Metadata, &md)
 		if err != nil {
 			return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to unmarshal metadata for user %s, project %s, id %s. Metadata: %s. %v", input.UserHandle, input.ProjectHandle, embeddings.TextID.String, string(embeddings.Metadata), err))
 		}
 		e = append(e, models.Embeddings{
-			TextID:           embeddings.TextID.String,
-			UserHandle:       embeddings.Owner,
-			ProjectHandle:    embeddings.ProjectHandle,
-			ProjectID:        int(embeddings.ProjectID),
+			TextID:         embeddings.TextID.String,
+			UserHandle:     embeddings.Owner,
+			ProjectHandle:  embeddings.ProjectHandle,
+			ProjectID:      int(embeddings.ProjectID),
 			InstanceHandle: embeddings.InstanceHandle,
-			Vector:           embeddings.Vector.Slice(),
-			VectorDim:        embeddings.VectorDim,
-			Text:             embeddings.Text.String,
-			Metadata:         md,
+			Vector:         embeddings.Vector.Slice(),
+			VectorDim:      embeddings.VectorDim,
+			Text:           embeddings.Text.String,
+			Metadata:       md,
 		})
 	}
 	response := &models.GetProjEmbeddingsResponse{}
@@ -264,15 +282,15 @@ func getDocEmbeddingsFunc(ctx context.Context, input *models.GetDocEmbeddingsReq
 		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to unmarshal metadata for user %s, project %s, id %s. Metadata: %s. %v", input.UserHandle, input.ProjectHandle, embeddings.TextID.String, string(embeddings.Metadata), err))
 	}
 	e := models.Embeddings{
-		TextID:           embeddings.TextID.String,
-		UserHandle:       embeddings.Owner,
-		ProjectHandle:    embeddings.ProjectHandle,
-		ProjectID:        int(embeddings.ProjectID),
+		TextID:         embeddings.TextID.String,
+		UserHandle:     embeddings.Owner,
+		ProjectHandle:  embeddings.ProjectHandle,
+		ProjectID:      int(embeddings.ProjectID),
 		InstanceHandle: embeddings.InstanceHandle,
-		Vector:           embeddings.Vector.Slice(),
-		VectorDim:        embeddings.VectorDim,
-		Text:             embeddings.Text.String,
-		Metadata:         md,
+		Vector:         embeddings.Vector.Slice(),
+		VectorDim:      embeddings.VectorDim,
+		Text:           embeddings.Text.String,
+		Metadata:       md,
 	}
 	response := &models.GetDocEmbeddingsResponse{}
 	response.Body = e
@@ -280,7 +298,7 @@ func getDocEmbeddingsFunc(ctx context.Context, input *models.GetDocEmbeddingsReq
 	return response, nil
 }
 
-func deleteDocEmbeddingsFunc(ctx context.Context, input *models.DeleteDocEmbeddingsRequest) (*models.DeleteDocEmbeddingsResponse, error) {
+func deleteDocEmbeddingsFunc(ctx context.Context, input *models.DeleteEmbeddingsByDocIDRequest) (*models.DeleteEmbeddingsByDocIDResponse, error) {
 	// Check if user and project exist
 	_, _, _, err := getUserProj(ctx, input.UserHandle, input.ProjectHandle)
 	if err != nil {
@@ -309,7 +327,7 @@ func deleteDocEmbeddingsFunc(ctx context.Context, input *models.DeleteDocEmbeddi
 	}
 
 	// Build query parameters for DeleteEmbeddings
-	params := database.DeleteDocEmbeddingsParams{
+	params := database.DeleteEmbeddingsByDocIDParams{
 		Owner:         input.UserHandle,
 		ProjectHandle: input.ProjectHandle,
 		TextID:        pgtype.Text{String: textid, Valid: true},
@@ -319,13 +337,13 @@ func deleteDocEmbeddingsFunc(ctx context.Context, input *models.DeleteDocEmbeddi
 
 	// Run the query
 	queries := database.New(pool)
-	err = queries.DeleteDocEmbeddings(ctx, params)
+	err = queries.DeleteEmbeddingsByDocID(ctx, params)
 	if err != nil {
 		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to delete embeddings for text id %s in %s's project %s. %v", textid, input.UserHandle, input.ProjectHandle, err))
 	}
 
 	// Build the response
-	response := &models.DeleteDocEmbeddingsResponse{}
+	response := &models.DeleteEmbeddingsByDocIDResponse{}
 	return response, nil
 }
 

@@ -3,8 +3,7 @@
     "text_id": "test-mismatch-dims",
     "user_handle": "alice",
     "project_handle": "test1",
-    "project_id": 1,
-    "instance_handle": "openai-large",
+    "instance_handle": "embedding1",
     "text": "This is a test document",
     "vector": [
         -2.085085e-02,

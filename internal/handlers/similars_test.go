@@ -13,6 +13,9 @@ import (
 )
 
 func TestSimilarsFunc(t *testing.T) {
+
+	fmt.Printf("\n\n\n\n")
+
 	// Get the database connection pool from package variable
 	pool := connPool
 
@@ -47,8 +50,8 @@ func TestSimilarsFunc(t *testing.T) {
 	}
 
 	// Create LLM Service
-	llmServiceJSON := `{ "llm_service_handle": "test1", "endpoint": "https://api.foo.bar/v1/embed", "description": "An LLM Service just for testing if the dhamps-vdb code is working", "api_key": "0123456789", "api_standard": "openai", "model": "embed-test1", "dimensions": 5}`
-	_, err = createLLMService(t, llmServiceJSON, "alice", aliceAPIKey)
+	InstanceJSON := `{ "instance_handle": "embedding1", "endpoint": "https://api.foo.bar/v1/embed", "description": "An LLM Service just for testing if the dhamps-vdb code is working", "api_standard": "openai", "model": "embed-test1", "dimensions": 5}`
+	_, err = createInstance(t, InstanceJSON, "alice", aliceAPIKey)
 	if err != nil {
 		t.Fatalf("Error creating LLM service openai-large for testing: %v\n", err)
 	}
@@ -161,7 +164,7 @@ func TestSimilarsFunc(t *testing.T) {
 
 	// Cleanup removes items created by the put function test
 	// (deleting '/users/alice' should delete all the
-	//  projects, llmservices and embeddings connected to alice as well)
+	//  projects, instances and embeddings connected to alice as well)
 	t.Cleanup(func() {
 		fmt.Print("\n\nRunning cleanup ...\n\n")
 

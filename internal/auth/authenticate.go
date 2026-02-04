@@ -24,19 +24,19 @@ const (
 // Config is the security scheme configuration for the API.
 var Config = map[string]*huma.SecurityScheme{
 	"adminAuth": {
-		Type:   "apiKey",
+		Type:   "VDBKey",
 		In:     "header",
 		Scheme: "bearer",
 		Name:   "Authorization",
 	},
 	"ownerAuth": {
-		Type:   "apiKey",
+		Type:   "VDBKey",
 		In:     "header",
 		Scheme: "bearer",
 		Name:   "Authorization",
 	},
 	"readerAuth": {
-		Type:   "apiKey",
+		Type:   "VDBKey",
 		In:     "header",
 		Scheme: "bearer",
 		Name:   "Authorization",
@@ -76,10 +76,10 @@ func AuthTermination(api huma.API) func(ctx huma.Context, next func(huma.Context
 	}
 }
 
-// APIKey... functions return a middleware function that checks for a valid API key.
+// VDBKey... functions return a middleware function that checks for a valid API key.
 
-// APIKeyAdminAuth checks for an admin API key in the Authorization header.
-func APIKeyAdminAuth(api huma.API, options *models.Options) func(ctx huma.Context, next func(huma.Context)) {
+// VDBKeyAdminAuth checks for an admin API key in the Authorization header.
+func VDBKeyAdminAuth(api huma.API, options *models.Options) func(ctx huma.Context, next func(huma.Context)) {
 	return func(ctx huma.Context, next func(huma.Context)) {
 
 		// Check if adminAuth is applicable
@@ -110,8 +110,8 @@ func APIKeyAdminAuth(api huma.API, options *models.Options) func(ctx huma.Contex
 	}
 }
 
-// APIKeyOwnerAuth checks for an owner API key in the Authorization header.
-func APIKeyOwnerAuth(api huma.API, pool *pgxpool.Pool, options *models.Options) func(ctx huma.Context, next func(huma.Context)) {
+// VDBKeyOwnerAuth checks for an owner API key in the Authorization header.
+func VDBKeyOwnerAuth(api huma.API, pool *pgxpool.Pool, options *models.Options) func(ctx huma.Context, next func(huma.Context)) {
 	return func(ctx huma.Context, next func(huma.Context)) {
 
 		// Check if ownerAuth is applicable
@@ -158,7 +158,7 @@ func APIKeyOwnerAuth(api huma.API, pool *pgxpool.Pool, options *models.Options) 
 		}
 
 		// fmt.Printf("        check owner hash against API token: %s/%s ...\n", storedHash, token)
-		if apiKeyIsValid(token, storedHash) {
+		if VDBKeyIsValid(token, storedHash) {
 			ctx = huma.WithValue(ctx, IsOwnerKey, true)
 			ctx = huma.WithValue(ctx, AuthUserKey, owner)
 			fmt.Printf("        Owner authentication successful: %s\n", owner)
@@ -170,8 +170,8 @@ func APIKeyOwnerAuth(api huma.API, pool *pgxpool.Pool, options *models.Options) 
 	}
 }
 
-// APIKeyReaderAuth checks for a reader API key in the Authorization header.
-func APIKeyReaderAuth(api huma.API, pool *pgxpool.Pool, options *models.Options) func(ctx huma.Context, next func(huma.Context)) {
+// VDBKeyReaderAuth checks for a reader API key in the Authorization header.
+func VDBKeyReaderAuth(api huma.API, pool *pgxpool.Pool, options *models.Options) func(ctx huma.Context, next func(huma.Context)) {
 	return func(ctx huma.Context, next func(huma.Context)) {
 		// Check if readerAuth is applicable
 		isAuthorizationRequired := false
@@ -224,13 +224,13 @@ func APIKeyReaderAuth(api huma.API, pool *pgxpool.Pool, options *models.Options)
 		// The project existence check will happen in the handler
 
 		// If not public, check for authorized readers
-		getKeysParams := database.GetKeysByLinkedUsersParams{
+		getKeysByProjectParams := database.GetKeysByProjectParams{
 			Owner:         owner,
 			ProjectHandle: project,
 			Limit:         50,
 			Offset:        0,
 		}
-		allowedUsers, err := queries.GetKeysByLinkedUsers(ctx.Context(), getKeysParams)
+		allowedKeys, err := queries.GetKeysByProject(ctx.Context(), getKeysByProjectParams)
 		if err != nil && err.Error() != "no rows in result set" {
 			_ = huma.WriteErr(api, ctx, http.StatusInternalServerError, "unable to get linked users")
 			return
@@ -239,12 +239,12 @@ func APIKeyReaderAuth(api huma.API, pool *pgxpool.Pool, options *models.Options)
 			next(ctx)
 			return
 		}
-		for _, authUser := range allowedUsers {
-			storedHash := authUser.VdbAPIKey
+		for _, authKey := range allowedKeys {
+			storedHash := authKey.VDBKey
 
-			if apiKeyIsValid(token, storedHash) {
+			if VDBKeyIsValid(token, storedHash) {
 				fmt.Print("        Reader authentication successful\n")
-				ctx = huma.WithValue(ctx, AuthUserKey, authUser.UserHandle)
+				ctx = huma.WithValue(ctx, AuthUserKey, authKey.UserHandle)
 				next(ctx)
 				return
 			}
@@ -254,8 +254,8 @@ func APIKeyReaderAuth(api huma.API, pool *pgxpool.Pool, options *models.Options)
 	}
 }
 
-// apiKeyIsValid checks if the given API key is valid
-func apiKeyIsValid(rawKey string, storedHash string) bool {
+// VDBKeyIsValid checks if the given API key is valid
+func VDBKeyIsValid(rawKey string, storedHash string) bool {
 	hash := sha256.Sum256([]byte(rawKey))
 	hashedKey := hex.EncodeToString(hash[:])
 

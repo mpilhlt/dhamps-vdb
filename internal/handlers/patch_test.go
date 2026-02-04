@@ -12,6 +12,9 @@ import (
 )
 
 func TestPatchProjects(t *testing.T) {
+
+	fmt.Printf("\n\n\n\n")
+
 	// Get the database connection pool from package variable
 	pool := connPool
 
@@ -198,7 +201,7 @@ func TestPatchProjects(t *testing.T) {
 		assert.True(t, ok, "authorizedReaders field should be an array")
 		// Should contain alice (owner) and bob
 		assert.GreaterOrEqual(t, len(authorizedReaders), 1, "should have at least one authorized reader")
-		
+
 		// Check if bob is in the list
 		foundBob := false
 		for _, reader := range authorizedReaders {

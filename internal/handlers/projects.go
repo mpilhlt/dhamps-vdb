@@ -141,7 +141,7 @@ func getProjectsFunc(ctx context.Context, input *models.GetProjectsRequest) (*mo
 	queries := database.New(pool)
 
 	// Get the list of projects
-	p, err := queries.GetProjectsByUser(ctx, database.GetProjectsByUserParams{UserHandle: input.UserHandle, Limit: int32(input.Limit), Offset: int32(input.Offset)})
+	projectHandles, err := queries.GetProjectsByUser(ctx, database.GetProjectsByUserParams{UserHandle: input.UserHandle, Limit: int32(input.Limit), Offset: int32(input.Offset)})
 	if err != nil {
 		if err.Error() == "no rows in result set" {
 			return nil, huma.Error404NotFound(fmt.Sprintf("no projects found for user %s", input.UserHandle))
@@ -151,7 +151,12 @@ func getProjectsFunc(ctx context.Context, input *models.GetProjectsRequest) (*mo
 
 	// Get the details for each project
 	projects := []models.Project{}
-	for _, project := range p {
+	for _, p := range projectHandles {
+		// Get the project details
+		project, err := queries.RetrieveProject(ctx, database.RetrieveProjectParams{Owner: input.UserHandle, ProjectHandle: p.ProjectHandle})
+		if err != nil {
+			return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get details for %s's project %s. %v", input.UserHandle, p.ProjectHandle, err))
+		}
 		// Get the authorized reader accounts for the project
 		readers := []string{}
 		// If the project is publicly readable, show "*" in authorizedReaders
@@ -168,8 +173,8 @@ func getProjectsFunc(ctx context.Context, input *models.GetProjectsRequest) (*mo
 		}
 
 		// Get the LLM Service Instance for the project (1:1 relationship)
-		llmservices := []models.LLMService{}
-		llmRow, err := queries.GetLLMInstanceByProject(ctx, database.GetLLMInstanceByProjectParams{
+		instances := []models.Instance{}
+		instRow, err := queries.RetrieveInstanceByProject(ctx, database.RetrieveInstanceByProjectParams{
 			Owner:         input.UserHandle,
 			ProjectHandle: project.ProjectHandle,
 		})
@@ -179,21 +184,21 @@ func getProjectsFunc(ctx context.Context, input *models.GetProjectsRequest) (*mo
 			}
 			// Project has no LLM service instance assigned yet
 		} else {
-			llmservice := models.LLMService{
-				Owner:            llmRow.Owner,
-				LLMServiceID:     int(llmRow.InstanceID),
-				LLMServiceHandle: llmRow.InstanceHandle,
-				Endpoint:         llmRow.Endpoint,
-				Description:      llmRow.Description.String,
-				APIStandard:      llmRow.APIStandard,
-				Model:            llmRow.Model,
-				Dimensions:       llmRow.Dimensions,
+			Instance := models.Instance{
+				Owner:          instRow.Owner,
+				InstanceID:     int(instRow.InstanceID),
+				InstanceHandle: instRow.InstanceHandle,
+				Endpoint:       instRow.Endpoint,
+				Description:    instRow.Description.String,
+				APIStandard:    instRow.APIStandard,
+				Model:          instRow.Model,
+				Dimensions:     instRow.Dimensions,
 			}
-			llmservices = append(llmservices, llmservice)
+			instances = append(instances, Instance)
 		}
 
 		// Get the (number of) embeddings for the project
-		count, err := queries.GetNumberOfEmbeddingsByProject(ctx, database.GetNumberOfEmbeddingsByProjectParams{Owner: input.UserHandle, ProjectHandle: project.ProjectHandle})
+		count, err := queries.CountEmbeddingsByProject(ctx, database.CountEmbeddingsByProjectParams{Owner: input.UserHandle, ProjectHandle: project.ProjectHandle})
 		if err != nil {
 			if err.Error() == "no rows in result set" {
 				count = 0
@@ -209,7 +214,7 @@ func getProjectsFunc(ctx context.Context, input *models.GetProjectsRequest) (*mo
 			MetadataScheme:     project.MetadataScheme.String,
 			NumberOfEmbeddings: int(count),
 			Owner:              project.Owner,
-			LLMServices:        llmservices,
+			Instances:          instances,
 			AuthorizedReaders:  readers,
 		})
 	}
@@ -266,8 +271,8 @@ func getProjectFunc(ctx context.Context, input *models.GetProjectRequest) (*mode
 	}
 
 	// Get the LLM Service Instance for the project (1:1 relationship)
-	llmservices := []models.LLMService{}
-	llmRow, err := queries.GetLLMInstanceByProject(ctx, database.GetLLMInstanceByProjectParams{
+	instances := []models.Instance{}
+	llmRow, err := queries.RetrieveInstanceByProject(ctx, database.RetrieveInstanceByProjectParams{
 		Owner:         input.UserHandle,
 		ProjectHandle: input.ProjectHandle,
 	})
@@ -277,21 +282,21 @@ func getProjectFunc(ctx context.Context, input *models.GetProjectRequest) (*mode
 		}
 		// Project has no LLM service instance assigned yet
 	} else {
-		llmservice := models.LLMService{
-			Owner:            llmRow.Owner,
-			LLMServiceID:     int(llmRow.InstanceID),
-			LLMServiceHandle: llmRow.InstanceHandle,
-			Endpoint:         llmRow.Endpoint,
-			Description:      llmRow.Description.String,
-			APIStandard:      llmRow.APIStandard,
-			Model:            llmRow.Model,
-			Dimensions:       llmRow.Dimensions,
+		Instance := models.Instance{
+			Owner:          llmRow.Owner,
+			InstanceID:     int(llmRow.InstanceID),
+			InstanceHandle: llmRow.InstanceHandle,
+			Endpoint:       llmRow.Endpoint,
+			Description:    llmRow.Description.String,
+			APIStandard:    llmRow.APIStandard,
+			Model:          llmRow.Model,
+			Dimensions:     llmRow.Dimensions,
 		}
-		llmservices = append(llmservices, llmservice)
+		instances = append(instances, Instance)
 	}
 
 	// Get the (number of) embeddings for the project
-	count, err := queries.GetNumberOfEmbeddingsByProject(ctx, database.GetNumberOfEmbeddingsByProjectParams{Owner: input.UserHandle, ProjectHandle: input.ProjectHandle})
+	count, err := queries.CountEmbeddingsByProject(ctx, database.CountEmbeddingsByProjectParams{Owner: input.UserHandle, ProjectHandle: input.ProjectHandle})
 	if err != nil {
 		if err.Error() == "no rows in result set" {
 			count = 0
@@ -309,7 +314,7 @@ func getProjectFunc(ctx context.Context, input *models.GetProjectRequest) (*mode
 		Description:        p.Description.String,
 		MetadataScheme:     p.MetadataScheme.String,
 		AuthorizedReaders:  readers,
-		LLMServices:        llmservices,
+		Instances:          instances,
 		NumberOfEmbeddings: int(count),
 	}
 

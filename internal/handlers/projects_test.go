@@ -13,6 +13,9 @@ import (
 )
 
 func TestProjectsFunc(t *testing.T) {
+
+	fmt.Printf("\n\n\n\n")
+
 	// Get the database connection pool from package variable
 	pool := connPool
 
@@ -252,6 +255,9 @@ func TestProjectsFunc(t *testing.T) {
 // TestProjectTransactionRollback verifies that transactions are properly rolled back
 // when an error occurs during project creation, ensuring no orphaned records.
 func TestProjectTransactionRollback(t *testing.T) {
+
+	fmt.Printf("\n\n")
+
 	// Get the database connection pool from package variable
 	pool := connPool
 
@@ -273,7 +279,7 @@ func TestProjectTransactionRollback(t *testing.T) {
 
 	fmt.Printf("\nRunning project transaction rollback tests ...\n\n")
 
-	t.Run("Project creation with invalid reader should rollback completely", func(t *testing.T) {
+	t.Run("Project creation, invalid reader (full rollback)", func(t *testing.T) {
 		// Attempt to create a project with a non-existent reader
 		// This should fail during user validation and not even reach the transaction
 		f, err := os.Open("../../testdata/project_with_invalid_reader.json")
@@ -297,6 +303,7 @@ func TestProjectTransactionRollback(t *testing.T) {
 		assert.Equal(t, http.StatusInternalServerError, resp.StatusCode,
 			"Expected 500 error when creating project with invalid reader")
 
+		// TODO: Test against actual JSON body
 		respBody, err := io.ReadAll(resp.Body)
 		assert.NoError(t, err)
 		assert.Contains(t, string(respBody), "unable to get user nonexistent_user",
@@ -320,7 +327,7 @@ func TestProjectTransactionRollback(t *testing.T) {
 		t.Log("Transaction rollback verified: no orphaned project record")
 	})
 
-	t.Run("Successful project creation commits all changes", func(t *testing.T) {
+	t.Run("Project creation, commit all", func(t *testing.T) {
 		// Create a second user to be a reader
 		bobJSON := `{"user_handle": "bob", "name": "Bob Smith", "email": "bob@foo.bar"}`
 		_, err := createUser(t, bobJSON)

@@ -14,6 +14,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// TODO: Allow to get similars to a submission that includes ready-made embeddings
+
 // Define handler functions for each route
 func getSimilarFunc(ctx context.Context, input *models.GetSimilarRequest) (*models.SimilarResponse, error) {
 	// Check if only one of input.MetadataField and input.MetadataValue are given

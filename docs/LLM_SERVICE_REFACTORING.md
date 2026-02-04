@@ -38,7 +38,7 @@ This refactoring separates LLM services into two distinct concepts:
    - API standards (openai, cohere, gemini) created before definitions
 
 2. **Users can list all accessible instances**
-   - `GetAllAccessibleLLMInstances` query returns owned + shared instances
+   - `GetAllAccessibleInstances` query returns owned + shared instances
    - Users see all instances they own or have been granted access to
 
 3. **Handle-based instance references**
@@ -72,7 +72,7 @@ This refactoring separates LLM services into two distinct concepts:
 ### Database Schema
 
 ```
-llm_service_definitions (templates)
+definitions (templates)
 ├── definition_id (PK)
 ├── definition_handle
 ├── owner (FK → users, can be '_system')
@@ -80,31 +80,30 @@ llm_service_definitions (templates)
 └── UNIQUE(owner, definition_handle)
 └── Indexes: (owner, definition_handle), (definition_handle)
 
-llm_service_instances (user-specific)
+instances (user-specific)
 ├── instance_id (PK)
 ├── instance_handle
 ├── owner (FK → users)
-├── definition_id (FK → llm_service_definitions, nullable)
+├── definition_id (FK → definitions, nullable)
 ├── endpoint, description, model, dimensions, api_standard
-├── api_key (TEXT, for backward compatibility)
 ├── api_key_encrypted (BYTEA, AES-256-GCM encrypted)
 └── UNIQUE(owner, instance_handle)
 
-llm_service_instances_shared_with (n:m sharing)
+instances_shared_with (n:m sharing)
 ├── user_handle (FK → users)
-├── instance_id (FK → llm_service_instances)
+├── instance_id (FK → instances)
 ├── role (reader/writer/owner)
 └── PRIMARY KEY(user_handle, instance_id)
 
 projects (1:1 with instances)
 ├── project_id (PK)
-├── llm_service_instance_id (FK → llm_service_instances)
+├── instance_id (FK → instances)
 └── One project → One instance
 ```
 
 ### Key Tables Removed
 
-- `users_llm_services` - Redundant (ownership tracked via `llm_service_instances.owner`)
+- `users_llm_services` - Redundant (ownership tracked via `instances.owner`)
 - `projects_llm_services` - Replaced by 1:1 FK in projects table
 
 ## Completed Work
@@ -114,13 +113,13 @@ projects (1:1 with instances)
 **File:** `internal/database/migrations/004_refactor_llm_services_architecture.sql`
 
 **Changes:**
-- Created `llm_service_definitions` table
-- Renamed `llm_services` → `llm_service_instances`
+- Created `definitions` table
+- Renamed `instances` → `instances`
 - Added `api_key_encrypted` BYTEA column
 - Created `_system` user
 - Dropped `users_llm_services` table (redundant)
-- Modified `projects` table: removed many-to-many, added `llm_service_instance_id` FK
-- Created `llm_service_instances_shared_with` table
+- Modified `projects` table: removed many-to-many, added `instance_id` FK
+- Created `instances_shared_with` table
 - Seeded 3 API standards with documentation URLs:
   - openai: https://platform.openai.com/docs/api-reference/embeddings
   - cohere: https://docs.cohere.com/reference/embed
@@ -132,7 +131,7 @@ projects (1:1 with instances)
   - gemini-embedding-001 (3072 dimensions, default size)
 
 **Data Migration:**
-- First linked LLM service per project → `project.llm_service_instance_id`
+- First linked LLM service per project → `project.instance_id`
 - Rollback support included
 
 ### 2. Encryption Module
@@ -158,53 +157,53 @@ projects (1:1 with instances)
 **File:** `internal/database/queries/queries.sql`
 
 **Definitions:**
-- `UpsertLLMDefinition` - Create/update definition
-- `DeleteLLMDefinition` - Delete definition
-- `RetrieveLLMDefinition` - Get single definition
-- `GetLLMDefinitionsByUser` - List user's definitions
-- `GetAllLLMDefinitions` - List all definitions
-- `GetSystemLLMDefinitions` - List _system definitions
+- `UpsertDefinition` - Create/update definition
+- `DeleteDefinition` - Delete definition
+- `RetrieveDefinition` - Get single definition
+- `GetDefinitionsByUser` - List user's definitions
+- `GetAllDefinitions` - List all definitions
+- `GetSystemDefinitions` - List _system definitions
 
 **Instances:**
-- `UpsertLLMInstance` - Create/update instance (with encryption support)
-- `CreateLLMInstanceFromDefinition` - Create instance from definition template
-- `DeleteLLMInstance` - Delete instance
-- `RetrieveLLMInstance` - Get single instance
-- `RetrieveLLMInstanceByID` - Get instance by ID
-- `RetrieveLLMInstanceByOwnerHandle` - Get by owner/handle (supports both formats)
-- `ShareLLMInstance` - Share instance with another user
-- `UnshareLLMInstance` - Remove instance sharing
+- `UpsertInstance` - Create/update instance (with encryption support)
+- `CreateInstanceFromDefinition` - Create instance from definition template
+- `DeleteInstance` - Delete instance
+- `RetrieveInstance` - Get single instance
+- `RetrieveInstanceByID` - Get instance by ID
+- `RetrieveInstanceByOwnerHandle` - Get by owner/handle (supports both formats)
+- `ShareInstance` - Share instance with another user
+- `UnshareInstance` - Remove instance sharing
 - `GetSharedUsersForInstance` - List users instance is shared with
-- `GetLLMInstanceByProject` - Get instance for project (1:1, renamed from plural)
-- `GetLLMInstancesByUser` - List user's owned instances
-- `GetAllAccessibleLLMInstances` - List owned + shared instances
-- `GetSharedLLMInstances` - List instances shared with user (sorted by role, owner, handle)
+- `GetInstanceByProject` - Get instance for project (1:1, renamed from plural)
+- `GetInstancesByUser` - List user's owned instances
+- `GetAllAccessibleInstances` - List owned + shared instances
+- `GetSharedInstances` - List instances shared with user (sorted by role, owner, handle)
 
 **Updated Queries:**
-- `UpsertProject` - Includes `llm_service_instance_id`
-- `UpsertEmbeddings` - Uses `llm_service_instance_id`
+- `UpsertProject` - Includes `instance_id`
+- `UpsertEmbeddings` - Uses `instance_id`
 - All embeddings queries - Updated to use instances table
 
 **SQLC Code Generated:** ✅ (`internal/database/models.go`, `internal/database/queries.sql.go`)
 
 ### 4. Go Models
 
-**File:** `internal/models/llm_services.go`
+**File:** `internal/models/instances.go`
 
 **Models:**
-- `LLMServiceDefinition` - For definitions
-- `LLMServiceInstance` - For instances
+- `Definition` - For definitions
+- `Instance` - For instances
 - `LLMService` - Kept for backward API compatibility (maps to Instance)
 
 **Field Updates:**
-- `InstanceHandle` (was `LLMServiceHandle`)
+- `InstanceHandle` (was `InstanceHandle`)
 - `InstanceOwner` (was `LLMServiceOwner`)
 - API keys marked as write-only (never returned in responses)
 
 ### 5. Handlers
 
 **Updated Files:**
-- `internal/handlers/llm_services.go` - All functions renamed with "Instance" suffix
+- `internal/handlers/instances.go` - All functions renamed with "Instance" suffix
 - `internal/handlers/projects.go` - 1:1 instance relationship
 - `internal/handlers/embeddings.go` - Uses instance from project
 - `internal/handlers/admin.go` - Updated field names
@@ -212,9 +211,9 @@ projects (1:1 with instances)
 - `internal/handlers/validation.go` - Updated to InstanceHandle
 
 **Function Naming:**
-- `putLLMInstanceFunc` (was `putLLMFunc`)
-- `getLLMInstanceFunc` (was `getLLMFunc`)
-- `deleteLLMInstanceFunc` (was `deleteLLMFunc`)
+- `putInstanceFunc` (was `putLLMFunc`)
+- `getInstanceFunc` (was `getLLMFunc`)
+- `deleteInstanceFunc` (was `deleteLLMFunc`)
 - `getUserLLMsFunc` - Now returns all accessible instances (own + shared)
 
 **API Key Handling:**
@@ -244,19 +243,19 @@ PUT /v1/llm-services/jdoe/my-openai
   "api_standard": "openai",
   "model": "text-embedding-3-large",
   "dimensions": 3072,
-  "api_key": "sk-..."
+  "api_key_encypted": "sk-..."
 }
 ```
 
 **Option B: From _system definition**
 ```bash
-# Use CreateLLMInstanceFromDefinition query
+# Use CreateInstanceFromDefinition query
 # Handler would accept:
 POST /v1/llm-services/jdoe/my-openai-instance
 {
   "definition_owner": "_system",
   "definition_handle": "openai-large",
-  "api_key": "sk-..."
+  "api_key_encrypted": "sk-..."
 }
 ```
 
@@ -267,7 +266,7 @@ POST /v1/llm-services/jdoe/my-custom-instance
 {
   "definition_owner": "jdoe",
   "definition_handle": "my-custom-config",
-  "api_key": "sk-..."
+  "api_key_encrypted": "sk-..."
 }
 ```
 
@@ -284,7 +283,7 @@ GET /v1/llm-services/jdoe
 ```bash
 POST /v1/projects/jdoe/my-project
 {
-  "llm_service_instance_id": 123,  # or use handle-based reference
+  "instance_id": 123,  # or use handle-based reference
   "description": "My project"
 }
 ```
@@ -297,7 +296,6 @@ POST /v1/projects/jdoe/my-project
 - **Key Source:** `ENCRYPTION_KEY` environment variable
 - **Key Derivation:** SHA256 hash of environment variable
 - **Storage:** `api_key_encrypted` BYTEA column
-- **Fallback:** `api_key` TEXT column (for backward compatibility)
 
 ### 2. Write-Only API Keys
 
@@ -311,7 +309,7 @@ GET /v1/llm-services/jdoe/my-openai
   "endpoint": "...",
   "model": "text-embedding-3-large",
   "dimensions": 3072
-  // Note: "api_key" field is NOT present
+  // Note: "api_key_encrypted" field is NOT present
 }
 ```
 
@@ -321,7 +319,7 @@ When an instance is shared:
 - Shared users can USE the instance (e.g., for projects, embeddings)
 - Shared users CANNOT see the API key
 - Shared users CANNOT modify the instance (owner-only operation)
-- Sharing is tracked in `llm_service_instances_shared_with` table with role
+- Sharing is tracked in `instances_shared_with` table with role
 
 ### 4. Admin-Only System Definitions
 
@@ -343,33 +341,16 @@ When an instance is shared:
 The migration (004) handles data migration automatically:
 
 **Automatic Changes:**
-- `llm_services` table renamed to `llm_service_instances`
+- `instances` table renamed to `instances`
 - `users_llm_services` table dropped (ownership via owner column)
 - `projects_llm_services` table dropped (replaced by FK)
-- First linked instance per project → `project.llm_service_instance_id`
-- API keys remain in plaintext initially (in `api_key` column)
+- First linked instance per project → `project.instance_id`
 
 **Post-Migration Steps:**
 
 1. **Set Environment Variable:**
    ```bash
    export ENCRYPTION_KEY="your-secure-random-string-at-least-32-chars"
-   ```
-
-2. **Restart Service:**
-   - New API keys will be automatically encrypted
-   - Old plaintext keys continue to work
-
-3. **Optional - Migrate Old Keys:**
-   ```sql
-   -- Run a script to re-encrypt all plaintext API keys
-   -- (Not implemented yet, but recommended for production)
-   ```
-
-4. **Optional - Remove Plaintext Column:**
-   ```sql
-   -- After all keys are encrypted
-   ALTER TABLE llm_service_instances DROP COLUMN api_key;
    ```
 
 ### Breaking Changes
@@ -380,7 +361,7 @@ The migration (004) handles data migration automatically:
 - Projects now require single instance (many-to-many removed)
 
 **Database:**
-- `llm_services` → `llm_service_instances`
+- `instances` → `instances`
 - `users_llm_services` table removed
 - `projects_llm_services` table removed
 
@@ -396,9 +377,8 @@ This section explains what API clients need to change after the refactoring.
 ### Summary of Changes for Clients
 
 **Good News:** Most API endpoints remain unchanged! The main changes are:
-1. API keys are no longer returned in responses (security improvement)
-2. Projects must be created with a valid LLM service instance (1:1 relationship)
-3. Embeddings JSON uses `instance_handle` instead of `llm_service_handle`
+1. Projects must be created with a valid LLM service instance (1:1 relationship)
+2. Embeddings JSON uses `instance_handle` instead of `llm_service_handle`
 
 ### API Endpoints - No Changes Required
 
@@ -418,35 +398,6 @@ All existing API endpoints continue to work with the same paths:
 ✅ GET    /v1/embeddings/{user}/{project}            # List embeddings
 ✅ DELETE /v1/embeddings/{user}/{project}            # Delete embeddings
 ```
-
-### Change #1: API Keys No Longer Returned (Security)
-
-**Before:** API keys were returned in GET responses
-```json
-GET /v1/llm-services/alice/my-openai
-Response: {
-  "instance_handle": "my-openai",
-  "owner": "alice",
-  "endpoint": "https://api.openai.com/v1/embeddings",
-  "api_key": "sk-proj-..."  ← Was visible
-}
-```
-
-**After:** API keys are write-only (never returned)
-```json
-GET /v1/llm-services/alice/my-openai
-Response: {
-  "instance_handle": "my-openai",
-  "owner": "alice",
-  "endpoint": "https://api.openai.com/v1/embeddings"
-  // Note: No api_key field
-}
-```
-
-**Action Required:**
-- ⚠️ If your client code reads API keys from GET responses, update it to store keys locally
-- ✅ You can still SET api_key in PUT/POST requests
-- ✅ The server will use the stored (encrypted) key when needed
 
 ### Change #2: Embeddings Field Name Update
 
@@ -486,18 +437,18 @@ PUT /v1/projects/alice/my-project
 }
 ```
 
-**After:** Projects require a valid `llm_service_instance_id`
+**After:** Projects require a valid `instance_id`
 ```json
 PUT /v1/projects/alice/my-project
 {
   "description": "My project",
-  "llm_service_instance_id": 123  ← Required
+  "instance_id": 123  ← Required
 }
 ```
 
 **Action Required:**
 - ⚠️ Create an LLM service instance BEFORE creating projects
-- ⚠️ Include `llm_service_instance_id` in project creation requests
+- ⚠️ Include `instance_id` in project creation requests
 - ℹ️ You can find the instance_id from the GET instances response
 
 ### Complete Migration Workflow
@@ -519,7 +470,7 @@ Content-Type: application/json
   "api_standard": "openai",
   "model": "text-embedding-3-large",
   "dimensions": 3072,
-  "api_key": "sk-proj-your-key-here"
+  "api_key_encrypted": "sk-proj-your-key-here"
 }
 
 # Response includes instance_id
@@ -531,7 +482,7 @@ Content-Type: application/json
   "api_standard": "openai",
   "model": "text-embedding-3-large",
   "dimensions": 3072
-  // Note: api_key not returned
+  // Note: api_key_encrypted not returned
 }
 ```
 
@@ -543,7 +494,7 @@ Content-Type: application/json
 
 {
   "description": "My research project",
-  "llm_service_instance_id": 123  // From step 1
+  "instance_id": 123  // From step 1
 }
 ```
 
@@ -592,7 +543,6 @@ Use this checklist to ensure your client is fully migrated:
 
 - [ ] **Stop reading API keys from GET responses**
   - Update code to store API keys locally instead
-  - Remove any code that expects `api_key` field in responses
 
 - [ ] **Update embedding field names**
   - Change `llm_service_handle` → `instance_handle` in upload code
@@ -600,7 +550,7 @@ Use this checklist to ensure your client is fully migrated:
 
 - [ ] **Update project creation workflow**
   - Create LLM service instance first
-  - Include `llm_service_instance_id` in project creation
+  - Include `instance_id` in project creation
   - Get instance_id from instance creation/list response
 
 - [ ] **Update environment configuration**
@@ -613,7 +563,7 @@ Use this checklist to ensure your client is fully migrated:
 
 ### Troubleshooting
 
-**Problem:** "Project must have llm_service_instance_id" error
+**Problem:** "Project must have instance_id" error
 
 **Solution:** Create an LLM service instance first, then use its ID when creating the project.
 
@@ -655,10 +605,10 @@ curl -X PUT "http://localhost:8000/v1/llm-services/testuser/test-instance" \
     "api_standard": "openai",
     "model": "text-embedding-3-large",
     "dimensions": 3072,
-    "api_key": "test-key"
+    "api_key_encryped": "test-key"
   }'
 
-# 2. List instances (verify api_key is NOT returned)
+# 2. List instances (verify api_key_encrypted is NOT returned)
 curl -X GET "http://localhost:8000/v1/llm-services/testuser" \
   -H "Authorization: Bearer your-api-key"
 
@@ -668,7 +618,7 @@ curl -X PUT "http://localhost:8000/v1/projects/testuser/test-project" \
   -H "Content-Type: application/json" \
   -d '{
     "description": "Test project",
-    "llm_service_instance_id": 123
+    "instance_id": 123
   }'
 
 # 4. Upload embeddings with instance_handle
@@ -690,7 +640,7 @@ curl -X POST "http://localhost:8000/v1/embeddings/testuser/test-project" \
 | **API Endpoints** | Same paths | Same paths | ✅ No change |
 | **API Keys in GET** | Returned in response | NOT returned | ⚠️ Stop reading, store locally |
 | **Embeddings field** | `llm_service_handle` | `instance_handle` | ⚠️ Update field name |
-| **Project creation** | Optional instance | Required `llm_service_instance_id` | ⚠️ Create instance first |
+| **Project creation** | Optional instance | Required `instance_id` | ⚠️ Create instance first |
 | **Project-instance** | Many-to-many | 1:1 relationship | ⚠️ One instance per project |
 | **Environment vars** | No encryption key | `ENCRYPTION_KEY` needed | ⚠️ Add to .env (new installs) |
 
@@ -710,7 +660,7 @@ curl -X POST "http://localhost:8000/v1/embeddings/testuser/test-project" \
 
 ### Test Fixes Applied
 
-1. **Query Bug Fixed:** `GetAllAccessibleLLMInstances` had user_handle filter in JOIN ON clause, preventing owned instances from being returned
+1. **Query Bug Fixed:** `GetAllAccessibleInstances` had user_handle filter in JOIN ON clause, preventing owned instances from being returned
 2. **Test Expectations Updated:** Removed API key from expected responses (security)
 
 ### Test Coverage
@@ -728,8 +678,8 @@ curl -X POST "http://localhost:8000/v1/embeddings/testuser/test-project" \
 ### Potential Enhancements (~7 hours total)
 
 #### 1. Split Test Files (1 hour)
-- Create `llm_service_definitions_test.go` for Definition tests
-- Create `llm_service_instances_test.go` for Instance tests
+- Create `definitions_test.go` for Definition tests
+- Create `instances_test.go` for Instance tests
 - Better organization and clarity
 
 #### 2. Add Definition Tests (2 hours)
@@ -762,9 +712,9 @@ Consider adding these endpoints in the future:
 - `GET /v1/llm-service-definitions` - List all available definitions
 - `GET /v1/llm-service-definitions/_system` - List system definitions
 - `POST /v1/llm-service-definitions/{user}` - Create user definition
-- `POST /v1/llm-service-instances/{user}/from-definition/{handle}` - Create from definition
-- `POST /v1/llm-service-instances/{user}/{instance}/share/{target}` - Share instance
-- `DELETE /v1/llm-service-instances/{user}/{instance}/share/{target}` - Revoke sharing
+- `POST /v1/llm-instances/{user}/from-definition/{handle}` - Create from definition
+- `POST /v1/llm-instances/{user}/{instance}/share/{target}` - Share instance
+- `DELETE /v1/llm-instances/{user}/{instance}/share/{target}` - Revoke sharing
 
 ### API Key Migration Tool (Not Implemented)
 

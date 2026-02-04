@@ -66,7 +66,7 @@ func AddRoutes(pool *pgxpool.Pool, keyGen RandomKeyGenerator, api huma.API) erro
 		fmt.Printf("    Unable to register API standards routes: %v\n", err)
 		return err
 	}
-	err = RegisterLLMServicesRoutes(pool, api)
+	err = RegisterInstancesRoutes(pool, api)
 	if err != nil {
 		fmt.Printf("    Unable to register Embeddings routes: %v\n", err)
 		return err
@@ -81,7 +81,6 @@ func AddRoutes(pool *pgxpool.Pool, keyGen RandomKeyGenerator, api huma.API) erro
 		fmt.Printf("    Unable to register Admin routes: %v\n", err)
 		return err
 	}
-	// err = handlers.RegisterLLMProcessRoutes(pool, api)
 	return nil
 }
 

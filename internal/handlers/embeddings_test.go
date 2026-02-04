@@ -14,6 +14,9 @@ import (
 )
 
 func TestEmbeddingsFunc(t *testing.T) {
+
+	fmt.Printf("\n\n\n\n")
+
 	// Get the database connection pool from package variable
 	pool := connPool
 
@@ -47,9 +50,9 @@ func TestEmbeddingsFunc(t *testing.T) {
 		t.Fatalf("Error creating API standard openai for testing: %v\n", err)
 	}
 
-	// Create LLM Service to be used in embeddings tests
-	llmServiceJSON := `{ "llm_service_handle": "test1", "endpoint": "https://api.foo.bar/v1/embed", "description": "An LLM Service just for testing if the dhamps-vdb code is working", "api_key": "0123456789", "api_standard": "openai", "model": "embed-test1", "dimensions": 5}`
-	_, err = createLLMService(t, llmServiceJSON, "alice", aliceAPIKey)
+	// Create LLM Service Instance to be used in embeddings tests
+	instanceJSON := `{ "instance_handle": "embedding1", "endpoint": "https://api.foo.bar/v1/embed", "description": "An LLM Service just for testing if the dhamps-vdb code is working", "api_standard": "openai", "model": "embed-test1", "dimensions": 5}`
+	_, err = createInstance(t, instanceJSON, "alice", aliceAPIKey)
 	if err != nil {
 		t.Fatalf("Error creating LLM service openai-large for testing: %v\n", err)
 	}
@@ -72,7 +75,7 @@ func TestEmbeddingsFunc(t *testing.T) {
 			requestPath:  "/v1/embeddings/alice/test1",
 			bodyPath:     "../../testdata/invalid_embeddings.json",
 			apiKeyHeader: aliceAPIKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Unprocessable Entity\",\n  \"status\": 422,\n  \"detail\": \"validation failed\",\n  \"errors\": [\n    {\n      \"message\": \"expected required property text_id to be present\",\n      \"location\": \"body.embeddings[0]\",\n      \"value\": {\n        \"foo\": \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.1.1.1.1\",\n        \"instance_handle\": \"openai-large\",\n        \"metadata\": {\n          \"author\": \"Immanuel Kant\"\n        },\n        \"project_handle\": \"test1\",\n        \"project_id\": 1,\n        \"text\": \"This is a test document\",\n        \"user_handle\": \"alice\",\n        \"vector\": [],\n        \"vector_dim\": 10\n      }\n    },\n    {\n      \"message\": \"unexpected property\",\n      \"location\": \"body.embeddings[0].foo\",\n      \"value\": {\n        \"foo\": \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.1.1.1.1\",\n        \"instance_handle\": \"openai-large\",\n        \"metadata\": {\n          \"author\": \"Immanuel Kant\"\n        },\n        \"project_handle\": \"test1\",\n        \"project_id\": 1,\n        \"text\": \"This is a test document\",\n        \"user_handle\": \"alice\",\n        \"vector\": [],\n        \"vector_dim\": 10\n      }\n    }\n  ]\n}\n",
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Unprocessable Entity\",\n  \"status\": 422,\n  \"detail\": \"validation failed\",\n  \"errors\": [\n    {\n      \"message\": \"expected required property text_id to be present\",\n      \"location\": \"body.embeddings[0]\",\n      \"value\": {\n        \"foo\": \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.1.1.1.1\",\n        \"instance_handle\": \"embedding1\",\n        \"metadata\": {\n          \"author\": \"Immanuel Kant\"\n        },\n        \"project_handle\": \"test1\",\n        \"text\": \"This is a test document\",\n        \"user_handle\": \"alice\",\n        \"vector\": [],\n        \"vector_dim\": 10\n      }\n    },\n    {\n      \"message\": \"unexpected property\",\n      \"location\": \"body.embeddings[0].foo\",\n      \"value\": {\n        \"foo\": \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.1.1.1.1\",\n        \"instance_handle\": \"embedding1\",\n        \"metadata\": {\n          \"author\": \"Immanuel Kant\"\n        },\n        \"project_handle\": \"test1\",\n        \"text\": \"This is a test document\",\n        \"user_handle\": \"alice\",\n        \"vector\": [],\n        \"vector_dim\": 10\n      }\n    }\n  ]\n}\n",
 			expectStatus: http.StatusUnprocessableEntity,
 		},
 		{
@@ -117,7 +120,7 @@ func TestEmbeddingsFunc(t *testing.T) {
 			requestPath:  "/v1/embeddings/alice/test1",
 			bodyPath:     "",
 			apiKeyHeader: aliceAPIKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/GetProjEmbeddingsResponseBody.json\",\n  \"embeddings\": [\n    {\n      \"text_id\": \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.1.1.1.1\",\n      \"user_handle\": \"alice\",\n      \"project_handle\": \"test1\",\n      \"project_id\": 1,\n      \"instance_handle\": \"test1\",\n      \"text\": \"This is a test document\",\n      \"vector\": [\n        -0.020843506,\n        0.01852417,\n        0.05328369,\n        0.07141113,\n        0.020004272\n      ],\n      \"vector_dim\": 5,\n      \"metadata\": {\n        \"author\": \"Immanuel Kant\"\n      }\n    },\n    {\n      \"text_id\": \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.2\",\n      \"user_handle\": \"alice\",\n      \"project_handle\": \"test1\",\n      \"project_id\": 1,\n      \"instance_handle\": \"test1\",\n      \"text\": \"This is a similar test document\",\n      \"vector\": [\n        -0.020843506,\n        0.01852417,\n        0.05328369,\n        0.07141113,\n        0.020004272\n      ],\n      \"vector_dim\": 5,\n      \"metadata\": {\n        \"author\": \"Immanuel Kant\"\n      }\n    },\n    {\n      \"text_id\": \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol2\",\n      \"user_handle\": \"alice\",\n      \"project_handle\": \"test1\",\n      \"project_id\": 1,\n      \"instance_handle\": \"test1\",\n      \"text\": \"This is a similar test document\",\n      \"vector\": [\n        -0.020843506,\n        0.01852417,\n        0.05328369,\n        0.07141113,\n        0.020004272\n      ],\n      \"vector_dim\": 5,\n      \"metadata\": {\n        \"author\": \"Immanuel Other\"\n      }\n    }\n  ]\n}\n",
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/GetProjEmbeddingsResponseBody.json\",\n  \"embeddings\": [\n    {\n      \"text_id\": \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.1.1.1.1\",\n      \"user_handle\": \"alice\",\n      \"project_handle\": \"test1\",\n      \"project_id\": 1,\n      \"instance_handle\": \"embedding1\",\n      \"text\": \"This is a test document\",\n      \"vector\": [\n        -0.020843506,\n        0.01852417,\n        0.05328369,\n        0.07141113,\n        0.020004272\n      ],\n      \"vector_dim\": 5,\n      \"metadata\": {\n        \"author\": \"Immanuel Kant\"\n      }\n    },\n    {\n      \"text_id\": \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.2\",\n      \"user_handle\": \"alice\",\n      \"project_handle\": \"test1\",\n      \"project_id\": 1,\n      \"instance_handle\": \"embedding1\",\n      \"text\": \"This is a similar test document\",\n      \"vector\": [\n        -0.020843506,\n        0.01852417,\n        0.05328369,\n        0.07141113,\n        0.020004272\n      ],\n      \"vector_dim\": 5,\n      \"metadata\": {\n        \"author\": \"Immanuel Kant\"\n      }\n    },\n    {\n      \"text_id\": \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol2\",\n      \"user_handle\": \"alice\",\n      \"project_handle\": \"test1\",\n      \"project_id\": 1,\n      \"instance_handle\": \"embedding1\",\n      \"text\": \"This is a similar test document\",\n      \"vector\": [\n        -0.020843506,\n        0.01852417,\n        0.05328369,\n        0.07141113,\n        0.020004272\n      ],\n      \"vector_dim\": 5,\n      \"metadata\": {\n        \"author\": \"Immanuel Other\"\n      }\n    }\n  ]\n}\n",
 			expectStatus: http.StatusOK,
 		},
 		{
@@ -144,7 +147,7 @@ func TestEmbeddingsFunc(t *testing.T) {
 			requestPath:  "/v1/embeddings/alice/test1/https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.1.1.1.1",
 			bodyPath:     "",
 			apiKeyHeader: aliceAPIKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/Embeddings.json\",\n  \"text_id\": \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.1.1.1.1\",\n  \"user_handle\": \"alice\",\n  \"project_handle\": \"test1\",\n  \"project_id\": 1,\n  \"instance_handle\": \"test1\",\n  \"text\": \"This is a test document\",\n  \"vector\": [\n    -0.020843506,\n    0.01852417,\n    0.05328369,\n    0.07141113,\n    0.020004272\n  ],\n  \"vector_dim\": 5,\n  \"metadata\": {\n    \"author\": \"Immanuel Kant\"\n  }\n}\n",
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/Embeddings.json\",\n  \"text_id\": \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.1.1.1.1\",\n  \"user_handle\": \"alice\",\n  \"project_handle\": \"test1\",\n  \"project_id\": 1,\n  \"instance_handle\": \"embedding1\",\n  \"text\": \"This is a test document\",\n  \"vector\": [\n    -0.020843506,\n    0.01852417,\n    0.05328369,\n    0.07141113,\n    0.020004272\n  ],\n  \"vector_dim\": 5,\n  \"metadata\": {\n    \"author\": \"Immanuel Kant\"\n  }\n}\n",
 			expectStatus: http.StatusOK,
 		},
 		{
@@ -315,7 +318,7 @@ func TestEmbeddingsFunc(t *testing.T) {
 
 	// Cleanup removes items created by the put function test
 	// (deleting '/users/alice' should delete all the
-	//  projects, llmservices and embeddings connected to alice as well)
+	//  projects, instances and embeddings connected to alice as well)
 	t.Cleanup(func() {
 		fmt.Print("\n\nRunning cleanup ...\n\n")
 

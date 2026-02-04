@@ -25,9 +25,9 @@ func getEncryptionKey() *crypto.EncryptionKey {
 	return crypto.NewEncryptionKey(keyStr)
 }
 
-func putLLMInstanceFunc(ctx context.Context, input *models.PutLLMRequest) (*models.UploadLLMResponse, error) {
-	if input.LLMServiceHandle != input.Body.LLMServiceHandle {
-		return nil, huma.Error400BadRequest(fmt.Sprintf("llm-service handle in URL (\"%s\") does not match llm-service handle in body (\"%s\")", input.LLMServiceHandle, input.Body.LLMServiceHandle))
+func putInstanceFunc(ctx context.Context, input *models.PutInstanceRequest) (*models.UploadInstanceResponse, error) {
+	if input.InstanceHandle != input.Body.InstanceHandle {
+		return nil, huma.Error400BadRequest(fmt.Sprintf("instance handle in URL (\"%s\") does not match instance handle in body (\"%s\")", input.InstanceHandle, input.Body.InstanceHandle))
 	}
 
 	// Check if user exists
@@ -57,23 +57,22 @@ func putLLMInstanceFunc(ctx context.Context, input *models.PutLLMRequest) (*mode
 		queries := database.New(tx)
 
 		// Prepare API key encryption
-		var apiKeyEncrypted []byte
+		var APIKeyEncrypted []byte
 		if input.Body.APIKey != "" && encKey != nil {
-			apiKeyEncrypted, err = encKey.Encrypt(input.Body.APIKey)
+			APIKeyEncrypted, err = encKey.Encrypt(input.Body.APIKey)
 			if err != nil {
 				return fmt.Errorf("unable to encrypt API key: %v", err)
 			}
 		}
 
 		// 1. Upsert LLM service instance
-		llm, err := queries.UpsertLLMInstance(ctx, database.UpsertLLMInstanceParams{
+		llm, err := queries.UpsertInstance(ctx, database.UpsertInstanceParams{
 			Owner:           input.UserHandle,
-			InstanceHandle:  input.LLMServiceHandle,
+			InstanceHandle:  input.InstanceHandle,
 			DefinitionID:    pgtype.Int4{Valid: false}, // Standalone instance (no definition reference)
 			Endpoint:        input.Body.Endpoint,
 			Description:     pgtype.Text{String: input.Body.Description, Valid: true},
-			APIKey:          pgtype.Text{String: input.Body.APIKey, Valid: true},
-			ApiKeyEncrypted: apiKeyEncrypted,
+			APIKeyEncrypted: APIKeyEncrypted,
 			APIStandard:     input.Body.APIStandard,
 			Model:           input.Body.Model,
 			Dimensions:      int32(input.Body.Dimensions),
@@ -86,7 +85,7 @@ func putLLMInstanceFunc(ctx context.Context, input *models.PutLLMRequest) (*mode
 		instanceHandle = llm.InstanceHandle
 		owner = llm.Owner
 
-		// Ownership is tracked via the owner column in llm_service_instances
+		// Ownership is tracked via the owner column in instances
 		// No need for separate linking table
 
 		return nil
@@ -97,20 +96,20 @@ func putLLMInstanceFunc(ctx context.Context, input *models.PutLLMRequest) (*mode
 	}
 
 	// Build response
-	response := &models.UploadLLMResponse{}
+	response := &models.UploadInstanceResponse{}
 	response.Body.Owner = owner
-	response.Body.LLMServiceHandle = instanceHandle
-	response.Body.LLMServiceID = int(instanceID)
+	response.Body.InstanceHandle = instanceHandle
+	response.Body.InstanceID = int(instanceID)
 
 	return response, nil
 }
 
 // Create a llm service (without a handle being present in the URL)
-func postLLMInstanceFunc(ctx context.Context, input *models.PostLLMRequest) (*models.UploadLLMResponse, error) {
-	return putLLMInstanceFunc(ctx, &models.PutLLMRequest{UserHandle: input.UserHandle, LLMServiceHandle: input.Body.LLMServiceHandle, Body: input.Body})
+func postInstanceFunc(ctx context.Context, input *models.PostInstanceRequest) (*models.UploadInstanceResponse, error) {
+	return putInstanceFunc(ctx, &models.PutInstanceRequest{UserHandle: input.UserHandle, InstanceHandle: input.Body.InstanceHandle, Body: input.Body})
 }
 
-func getLLMInstanceFunc(ctx context.Context, input *models.GetLLMRequest) (*models.GetLLMResponse, error) {
+func getInstanceFunc(ctx context.Context, input *models.GetInstanceRequest) (*models.GetInstanceResponse, error) {
 	// Check if user exists
 	u, err := getUserFunc(ctx, &models.GetUserRequest{UserHandle: input.UserHandle})
 	if err != nil {
@@ -128,39 +127,39 @@ func getLLMInstanceFunc(ctx context.Context, input *models.GetLLMRequest) (*mode
 
 	// Run the query
 	queries := database.New(pool)
-	llm, err := queries.RetrieveLLMInstance(ctx, database.RetrieveLLMInstanceParams{
+	llm, err := queries.RetrieveInstance(ctx, database.RetrieveInstanceParams{
 		Owner:          input.UserHandle,
-		InstanceHandle: input.LLMServiceHandle,
+		InstanceHandle: input.InstanceHandle,
 	})
 	if err != nil {
 		if err.Error() == "no rows in result set" {
-			return nil, huma.Error404NotFound(fmt.Sprintf("llm service %s for user %s not found", input.LLMServiceHandle, input.UserHandle))
+			return nil, huma.Error404NotFound(fmt.Sprintf("llm service %s for user %s not found", input.InstanceHandle, input.UserHandle))
 		}
-		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to retrieve llm service %s for user %s: %v", input.LLMServiceHandle, input.UserHandle, err))
+		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to retrieve llm service %s for user %s: %v", input.InstanceHandle, input.UserHandle, err))
 	}
-	if llm.InstanceHandle != input.LLMServiceHandle {
-		return nil, huma.Error404NotFound(fmt.Sprintf("llm service %s for user %s not found", input.LLMServiceHandle, input.UserHandle))
+	if llm.InstanceHandle != input.InstanceHandle {
+		return nil, huma.Error404NotFound(fmt.Sprintf("llm service %s for user %s not found", input.InstanceHandle, input.UserHandle))
 	}
 
 	// Build response (never return API key in plaintext)
-	ls := models.LLMService{
-		Owner:            llm.Owner,
-		LLMServiceHandle: llm.InstanceHandle,
-		LLMServiceID:     int(llm.InstanceID),
-		Endpoint:         llm.Endpoint,
-		Description:      llm.Description.String,
-		APIKey:           "", // Never return API key
-		APIStandard:      llm.APIStandard,
-		Model:            llm.Model,
-		Dimensions:       int32(llm.Dimensions),
+	ls := models.Instance{
+		InstanceID:     int(llm.InstanceID),
+		Owner:          llm.Owner,
+		InstanceHandle: llm.InstanceHandle,
+		Endpoint:       llm.Endpoint,
+		Description:    llm.Description.String,
+		// APIKey:         "", // Never return API key
+		APIStandard: llm.APIStandard,
+		Model:       llm.Model,
+		Dimensions:  int32(llm.Dimensions),
 	}
-	response := &models.GetLLMResponse{}
+	response := &models.GetInstanceResponse{}
 	response.Body = ls
 
 	return response, nil
 }
 
-func getUserLLMInstancesFunc(ctx context.Context, input *models.GetUserLLMsRequest) (*models.GetUserLLMsResponse, error) {
+func getUserInstancesFunc(ctx context.Context, input *models.GetUserInstancesRequest) (*models.GetUserInstancesResponse, error) {
 	// Check if user exists
 	u, err := getUserFunc(ctx, &models.GetUserRequest{UserHandle: input.UserHandle})
 	if err != nil {
@@ -178,7 +177,7 @@ func getUserLLMInstancesFunc(ctx context.Context, input *models.GetUserLLMsReque
 
 	// Run the query - get all accessible instances (own + shared)
 	queries := database.New(pool)
-	llms, err := queries.GetAllAccessibleLLMInstances(ctx, database.GetAllAccessibleLLMInstancesParams{
+	llms, err := queries.GetAccessibleInstancesByUser(ctx, database.GetAccessibleInstancesByUserParams{
 		Owner:  input.UserHandle,
 		Limit:  int32(input.Limit),
 		Offset: int32(input.Offset),
@@ -186,35 +185,29 @@ func getUserLLMInstancesFunc(ctx context.Context, input *models.GetUserLLMsReque
 	if err != nil {
 		if err.Error() == "no rows in result set" {
 			// Return empty list instead of error
-			response := &models.GetUserLLMsResponse{}
-			response.Body.LLMServices = []models.LLMService{}
+			response := &models.GetUserInstancesResponse{}
+			response.Body.Instances = []models.InstanceOutput{}
 			return response, nil
 		}
 		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to retrieve llm services: %v", err))
 	}
 
 	// Build response (hide API keys for shared instances)
-	ls := []models.LLMService{}
+	ls := []models.InstanceOutput{}
 	for _, llm := range llms {
-		ls = append(ls, models.LLMService{
-			Owner:            llm.Owner,
-			LLMServiceHandle: llm.InstanceHandle,
-			LLMServiceID:     int(llm.InstanceID),
-			Endpoint:         llm.Endpoint,
-			Description:      llm.Description.String,
-			APIKey:           "", // Never return API key in list
-			APIStandard:      llm.APIStandard,
-			Model:            llm.Model,
-			Dimensions:       int32(llm.Dimensions),
+		ls = append(ls, models.InstanceOutput{
+			Owner:          llm.Owner,
+			InstanceHandle: llm.InstanceHandle,
+			InstanceID:     int(llm.InstanceID),
 		})
 	}
-	response := &models.GetUserLLMsResponse{}
-	response.Body.LLMServices = ls
+	response := &models.GetUserInstancesResponse{}
+	response.Body.Instances = ls
 
 	return response, nil
 }
 
-func deleteLLMInstanceFunc(ctx context.Context, input *models.DeleteLLMRequest) (*models.DeleteLLMResponse, error) {
+func deleteInstanceFunc(ctx context.Context, input *models.DeleteInstanceRequest) (*models.DeleteInstanceResponse, error) {
 	// Check if user exists
 	u, err := getUserFunc(ctx, &models.GetUserRequest{UserHandle: input.UserHandle})
 	if err != nil {
@@ -225,7 +218,7 @@ func deleteLLMInstanceFunc(ctx context.Context, input *models.DeleteLLMRequest) 
 	}
 
 	// Check if llm service instance exists
-	_, err = getLLMInstanceFunc(ctx, &models.GetLLMRequest{UserHandle: input.UserHandle, LLMServiceHandle: input.LLMServiceHandle})
+	_, err = getInstanceFunc(ctx, &models.GetInstanceRequest{UserHandle: input.UserHandle, InstanceHandle: input.InstanceHandle})
 	if err != nil {
 		return nil, err
 	}
@@ -238,88 +231,88 @@ func deleteLLMInstanceFunc(ctx context.Context, input *models.DeleteLLMRequest) 
 
 	// Run the query
 	queries := database.New(pool)
-	err = queries.DeleteLLMInstance(ctx, database.DeleteLLMInstanceParams{
+	err = queries.DeleteInstance(ctx, database.DeleteInstanceParams{
 		Owner:          input.UserHandle,
-		InstanceHandle: input.LLMServiceHandle,
+		InstanceHandle: input.InstanceHandle,
 	})
 	if err != nil {
-		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to delete llm service %s for user %s: %v", input.LLMServiceHandle, input.UserHandle, err))
+		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to delete llm service %s for user %s: %v", input.InstanceHandle, input.UserHandle, err))
 	}
 
 	// Build response
-	response := &models.DeleteLLMResponse{}
+	response := &models.DeleteInstanceResponse{}
 
 	return response, nil
 }
 
-// RegisterLLMServiceRoutes registers the routes for the management of LLM services
-func RegisterLLMServicesRoutes(pool *pgxpool.Pool, api huma.API) error {
+// RegisterInstancesRoutes registers the routes for the management of LLM service instances
+func RegisterInstancesRoutes(pool *pgxpool.Pool, api huma.API) error {
 	// Define huma.Operations for each route
-	postLLMServiceOp := huma.Operation{
-		OperationID:   "postLLMService",
+	postInstanceOp := huma.Operation{
+		OperationID:   "postInstance",
 		Method:        http.MethodPost,
-		Path:          "/v1/llm-services/{user_handle}",
+		Path:          "/v1/llm-instances/{user_handle}",
 		DefaultStatus: http.StatusCreated,
-		Summary:       "Create llm service",
+		Summary:       "Create llm service instance",
 		Security: []map[string][]string{
 			{"adminAuth": []string{"admin"}},
 			{"ownerAuth": []string{"owner"}},
 		},
-		Tags: []string{"llm-services"},
+		Tags: []string{"llm-instances"},
 	}
-	putLLMServiceOp := huma.Operation{
-		OperationID:   "putLLMService",
+	putInstanceOp := huma.Operation{
+		OperationID:   "putInstance",
 		Method:        http.MethodPut,
-		Path:          "/v1/llm-services/{user_handle}/{llm_service_handle}",
+		Path:          "/v1/llm-instances/{user_handle}/{instance_handle}",
 		DefaultStatus: http.StatusCreated,
-		Summary:       "Create or update llm service",
+		Summary:       "Create or update llm service instance",
 		Security: []map[string][]string{
 			{"adminAuth": []string{"admin"}},
 			{"ownerAuth": []string{"owner"}},
 		},
-		Tags: []string{"llm-services"},
+		Tags: []string{"llm-instances"},
 	}
-	getUserLLMServicesOp := huma.Operation{
-		OperationID: "getUserLLMServices",
+	getUserInstancesOp := huma.Operation{
+		OperationID: "getUserInstances",
 		Method:      http.MethodGet,
-		Path:        "/v1/llm-services/{user_handle}",
-		Summary:     "Get all llm services for a user",
+		Path:        "/v1/llm-instances/{user_handle}",
+		Summary:     "Get all llm service instances for a user",
 		Security: []map[string][]string{
 			{"adminAuth": []string{"admin"}},
 			{"ownerAuth": []string{"owner"}},
 			{"readerAuth": []string{"reader"}},
 		},
-		Tags: []string{"llm-services"},
+		Tags: []string{"llm-instances"},
 	}
-	getLLMServiceOp := huma.Operation{
-		OperationID: "getLLMService",
+	getInstanceOp := huma.Operation{
+		OperationID: "getInstance",
 		Method:      http.MethodGet,
-		Path:        "/v1/llm-services/{user_handle}/{llm_service_handle}",
-		Summary:     "Get a specific llm service for a user",
+		Path:        "/v1/llm-instances/{user_handle}/{instance_handle}",
+		Summary:     "Get a specific llm service instance for a user",
 		Security: []map[string][]string{
 			{"adminAuth": []string{"admin"}},
 			{"ownerAuth": []string{"owner"}},
 			{"readerAuth": []string{"reader"}},
 		},
-		Tags: []string{"llm-services"},
+		Tags: []string{"llm-instances"},
 	}
-	deleteLLMServiceOp := huma.Operation{
-		OperationID:   "deleteLLMService",
+	deleteInstanceOp := huma.Operation{
+		OperationID:   "deleteInstance",
 		Method:        http.MethodDelete,
-		Path:          "/v1/llm-services/{user_handle}/{llm_service_handle}",
+		Path:          "/v1/llm-instances/{user_handle}/{instance_handle}",
 		DefaultStatus: http.StatusNoContent,
-		Summary:       "Delete a user's llm_service and all embeddings associated to it",
+		Summary:       "Delete a user's llm service instance and all embeddings associated to it",
 		Security: []map[string][]string{
 			{"adminAuth": []string{"admin"}},
 			{"ownerAuth": []string{"owner"}},
 		},
-		Tags: []string{"llm-services"},
+		Tags: []string{"llm-instances"},
 	}
 
-	huma.Register(api, postLLMServiceOp, addPoolToContext(pool, postLLMInstanceFunc))
-	huma.Register(api, putLLMServiceOp, addPoolToContext(pool, putLLMInstanceFunc))
-	huma.Register(api, getUserLLMServicesOp, addPoolToContext(pool, getUserLLMInstancesFunc))
-	huma.Register(api, getLLMServiceOp, addPoolToContext(pool, getLLMInstanceFunc))
-	huma.Register(api, deleteLLMServiceOp, addPoolToContext(pool, deleteLLMInstanceFunc))
+	huma.Register(api, postInstanceOp, addPoolToContext(pool, postInstanceFunc))
+	huma.Register(api, putInstanceOp, addPoolToContext(pool, putInstanceFunc))
+	huma.Register(api, getUserInstancesOp, addPoolToContext(pool, getUserInstancesFunc))
+	huma.Register(api, getInstanceOp, addPoolToContext(pool, getInstanceFunc))
+	huma.Register(api, deleteInstanceOp, addPoolToContext(pool, deleteInstanceFunc))
 	return nil
 }

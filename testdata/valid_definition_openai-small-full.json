@@ -1,8 +1,7 @@
 {
-  "llm_service_handle": "openai-small",
+  "instance_handle": "openai-small",
   "endpoint": "https://api.openai.com/v1/embeddings",
 	"description": "My OpenAI full text-embedding-3-small service",
-  "api_key": "0123456789",
   "api_standard": "openai",
   "model": "text-embedding-3-small",
   "dimensions": 1536

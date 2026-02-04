@@ -5,17 +5,20 @@ import (
 	"net/http"
 )
 
+// TODO: Distinguish Full and Brief Outputs
+
 // Embeddings contains a single document's embeddings record with id, embeddings and possibly more information.
 type EmbeddingsInput struct {
-	TextID           string          `json:"text_id" doc:"Identifier for the document"`
-	UserHandle       string          `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
-	ProjectHandle    string          `json:"project_handle" path:"project_handle" maxLength:"20" minLength:"3" example:"my-gpt-4" doc:"Project handle"`
-	ProjectID        int             `json:"project_id,omitempty" doc:"Unique project identifier"`
-	InstanceHandle   string          `json:"instance_handle" doc:"Handle of the LLM service instance used to generate the embeddings"`
-	Text             string          `json:"text,omitempty" doc:"Text content of the document"`
-	Vector           []float32       `json:"vector" doc:"Half-precision embeddings vector for the document"`
-	VectorDim        int32           `json:"vector_dim" doc:"Dimensionality of the embeddings vector"`
-	Metadata         json.RawMessage `json:"metadata,omitempty" doc:"Metadata (json) for the document. E.g. creation year, author name or text genre." example:"{\n  \"author\": \"Immanuel Kant\"\n}\n"`
+	TextID         string          `json:"text_id" doc:"Identifier for the document"`
+	UserHandle     string          `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
+	ProjectHandle  string          `json:"project_handle" path:"project_handle" maxLength:"20" minLength:"3" example:"my-gpt-4" doc:"Project handle"`
+	ProjectID      int             `json:"project_id,omitempty" doc:"Unique project identifier"`
+	InstanceOwner  string          `json:"instance_owner,omitempty" doc:"Owner of the LLM service instance used to generate the embeddings"`
+	InstanceHandle string          `json:"instance_handle" doc:"Handle of the LLM service instance used to generate the embeddings"`
+	Text           string          `json:"text,omitempty" doc:"Text content of the document"`
+	Vector         []float32       `json:"vector" doc:"Half-precision embeddings vector for the document"`
+	VectorDim      int32           `json:"vector_dim" doc:"Dimensionality of the embeddings vector"`
+	Metadata       json.RawMessage `json:"metadata,omitempty" doc:"Metadata (json) for the document. E.g. creation year, author name or text genre." example:"{\n  \"author\": \"Immanuel Kant\"\n}\n"`
 }
 
 type Embeddings struct {
@@ -23,6 +26,7 @@ type Embeddings struct {
 	UserHandle     string                 `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
 	ProjectHandle  string                 `json:"project_handle" path:"project_handle" maxLength:"20" minLength:"3" example:"my-gpt-4" doc:"Project handle"`
 	ProjectID      int                    `json:"project_id,omitempty" doc:"Unique project identifier"`
+	InstanceOwner  string                 `json:"instance_owner,omitempty" doc:"Owner of the LLM service instance used to generate the embeddings"`
 	InstanceHandle string                 `json:"instance_handle" doc:"Handle of the LLM service instance used to generate the embeddings"`
 	Text           string                 `json:"text,omitempty" doc:"Text content of the document"`
 	Vector         []float32              `json:"vector" doc:"Half-precision embeddings vector for the document"`
@@ -126,12 +130,12 @@ type GetDocEmbeddingsResponse struct {
 // Delete document embeddings
 // Path: "/v1/embeddings/{user_handle}/{project_handle}/{text_id}"
 
-type DeleteDocEmbeddingsRequest struct {
+type DeleteEmbeddingsByDocIDRequest struct {
 	UserHandle    string `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
 	ProjectHandle string `json:"project_handle" path:"project_handle" maxLength:"20" minLength:"3" example:"my-gpt-4" doc:"Project handle"`
 	TextID        string `json:"text_id" path:"text_id" maxLength:"300" minLength:"3" example:"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0017%3Afrontmatter.1.1%0A" doc:"Document identifier"`
 }
 
-type DeleteDocEmbeddingsResponse struct {
+type DeleteEmbeddingsByDocIDResponse struct {
 	Header []http.Header `json:"header,omitempty" doc:"Response headers"`
 }

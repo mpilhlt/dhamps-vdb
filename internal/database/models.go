@@ -18,25 +18,7 @@ type APIStandard struct {
 	UpdatedAt         pgtype.Timestamp `db:"updated_at" json:"updated_at"`
 }
 
-type Embedding struct {
-	EmbeddingsID         int32                  `db:"embeddings_id" json:"embeddings_id"`
-	TextID               pgtype.Text            `db:"text_id" json:"text_id"`
-	Owner                string                 `db:"owner" json:"owner"`
-	ProjectID            int32                  `db:"project_id" json:"project_id"`
-	LlmServiceInstanceID int32                  `db:"llm_service_instance_id" json:"llm_service_instance_id"`
-	Text                 pgtype.Text            `db:"text" json:"text"`
-	Vector               pgvector_go.HalfVector `db:"vector" json:"vector"`
-	VectorDim            int32                  `db:"vector_dim" json:"vector_dim"`
-	Metadata             []byte                 `db:"metadata" json:"metadata"`
-	CreatedAt            pgtype.Timestamp       `db:"created_at" json:"created_at"`
-	UpdatedAt            pgtype.Timestamp       `db:"updated_at" json:"updated_at"`
-}
-
-type KeyMethod struct {
-	KeyMethod string `db:"key_method" json:"key_method"`
-}
-
-type LlmServiceDefinition struct {
+type Definition struct {
 	DefinitionID     int32            `db:"definition_id" json:"definition_id"`
 	DefinitionHandle string           `db:"definition_handle" json:"definition_handle"`
 	Owner            string           `db:"owner" json:"owner"`
@@ -45,27 +27,42 @@ type LlmServiceDefinition struct {
 	APIStandard      string           `db:"api_standard" json:"api_standard"`
 	Model            string           `db:"model" json:"model"`
 	Dimensions       int32            `db:"dimensions" json:"dimensions"`
+	ContextLimit     int32            `db:"context_limit" json:"context_limit"`
 	CreatedAt        pgtype.Timestamp `db:"created_at" json:"created_at"`
 	UpdatedAt        pgtype.Timestamp `db:"updated_at" json:"updated_at"`
 }
 
-type LlmServiceInstance struct {
+type Embedding struct {
+	EmbeddingsID int32                  `db:"embeddings_id" json:"embeddings_id"`
+	TextID       pgtype.Text            `db:"text_id" json:"text_id"`
+	Owner        string                 `db:"owner" json:"owner"`
+	ProjectID    int32                  `db:"project_id" json:"project_id"`
+	InstanceID   int32                  `db:"instance_id" json:"instance_id"`
+	Text         pgtype.Text            `db:"text" json:"text"`
+	Vector       pgvector_go.HalfVector `db:"vector" json:"vector"`
+	VectorDim    int32                  `db:"vector_dim" json:"vector_dim"`
+	Metadata     []byte                 `db:"metadata" json:"metadata"`
+	CreatedAt    pgtype.Timestamp       `db:"created_at" json:"created_at"`
+	UpdatedAt    pgtype.Timestamp       `db:"updated_at" json:"updated_at"`
+}
+
+type Instance struct {
 	InstanceID      int32            `db:"instance_id" json:"instance_id"`
 	InstanceHandle  string           `db:"instance_handle" json:"instance_handle"`
 	Owner           string           `db:"owner" json:"owner"`
 	Endpoint        string           `db:"endpoint" json:"endpoint"`
 	Description     pgtype.Text      `db:"description" json:"description"`
-	APIKey          pgtype.Text      `db:"api_key" json:"api_key"`
 	APIStandard     string           `db:"api_standard" json:"api_standard"`
 	Model           string           `db:"model" json:"model"`
 	Dimensions      int32            `db:"dimensions" json:"dimensions"`
 	CreatedAt       pgtype.Timestamp `db:"created_at" json:"created_at"`
 	UpdatedAt       pgtype.Timestamp `db:"updated_at" json:"updated_at"`
+	ContextLimit    int32            `db:"context_limit" json:"context_limit"`
 	DefinitionID    pgtype.Int4      `db:"definition_id" json:"definition_id"`
-	ApiKeyEncrypted []byte           `db:"api_key_encrypted" json:"api_key_encrypted"`
+	APIKeyEncrypted []byte           `db:"api_key_encrypted" json:"api_key_encrypted"`
 }
 
-type LlmServiceInstancesSharedWith struct {
+type InstancesSharedWith struct {
 	UserHandle string           `db:"user_handle" json:"user_handle"`
 	InstanceID int32            `db:"instance_id" json:"instance_id"`
 	Role       string           `db:"role" json:"role"`
@@ -73,23 +70,27 @@ type LlmServiceInstancesSharedWith struct {
 	UpdatedAt  pgtype.Timestamp `db:"updated_at" json:"updated_at"`
 }
 
+type KeyMethod struct {
+	KeyMethod string `db:"key_method" json:"key_method"`
+}
+
 type Project struct {
-	ProjectID            int32            `db:"project_id" json:"project_id"`
-	ProjectHandle        string           `db:"project_handle" json:"project_handle"`
-	Owner                string           `db:"owner" json:"owner"`
-	Description          pgtype.Text      `db:"description" json:"description"`
-	MetadataScheme       pgtype.Text      `db:"metadata_scheme" json:"metadata_scheme"`
-	CreatedAt            pgtype.Timestamp `db:"created_at" json:"created_at"`
-	UpdatedAt            pgtype.Timestamp `db:"updated_at" json:"updated_at"`
-	PublicRead           pgtype.Bool      `db:"public_read" json:"public_read"`
-	LlmServiceInstanceID pgtype.Int4      `db:"llm_service_instance_id" json:"llm_service_instance_id"`
+	ProjectID      int32            `db:"project_id" json:"project_id"`
+	ProjectHandle  string           `db:"project_handle" json:"project_handle"`
+	Owner          string           `db:"owner" json:"owner"`
+	Description    pgtype.Text      `db:"description" json:"description"`
+	MetadataScheme pgtype.Text      `db:"metadata_scheme" json:"metadata_scheme"`
+	CreatedAt      pgtype.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt      pgtype.Timestamp `db:"updated_at" json:"updated_at"`
+	PublicRead     pgtype.Bool      `db:"public_read" json:"public_read"`
+	InstanceID     pgtype.Int4      `db:"instance_id" json:"instance_id"`
 }
 
 type User struct {
 	UserHandle string           `db:"user_handle" json:"user_handle"`
 	Name       pgtype.Text      `db:"name" json:"name"`
 	Email      string           `db:"email" json:"email"`
-	VdbAPIKey  string           `db:"vdb_api_key" json:"vdb_api_key"`
+	VDBKey     string           `db:"vdb_key" json:"vdb_key"`
 	CreatedAt  pgtype.Timestamp `db:"created_at" json:"created_at"`
 	UpdatedAt  pgtype.Timestamp `db:"updated_at" json:"updated_at"`
 }
