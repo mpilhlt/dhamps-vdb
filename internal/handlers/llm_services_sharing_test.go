@@ -193,28 +193,7 @@ func TestInstanceSharingFunc(t *testing.T) {
 	})
 }
 
-// Helper function to create an instance
-func createInstance(t *testing.T, owner string, instanceJSON string, apiKey string) (string, error) {
-	requestURL := fmt.Sprintf("http://%s:%d/v1/llm-instances/%s", options.Host, options.Port, owner)
-	req, err := http.NewRequest(http.MethodPost, requestURL, bytes.NewBuffer([]byte(instanceJSON)))
-	assert.NoError(t, err)
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+apiKey)
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("error sending request: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusCreated {
-		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("expected status %d, got %s: %s", http.StatusCreated, resp.Status, string(body))
-	}
-
-	return "", nil
-}
+// Note: createInstance helper function is defined in handlers_test.go
 
 func TestDefinitionSharingFunc(t *testing.T) {
 
@@ -239,7 +218,7 @@ func TestDefinitionSharingFunc(t *testing.T) {
 	}
 
 	bobJSON := `{"user_handle": "bob", "name": "Bob Smith", "email": "bob@foo.bar"}`
-	bobAPIKey, err := createUser(t, bobJSON)
+	_, err = createUser(t, bobJSON)
 	if err != nil {
 		t.Fatalf("Error creating user bob for testing: %v\n", err)
 	}
