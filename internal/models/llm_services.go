@@ -215,4 +215,111 @@ type CreateInstanceFromDefinitionRequest struct {
 	Description      *string `json:"description,omitempty" doc:"Optional description override"`
 }
 
-// TODO: Share LLM Service Instance with user
+// === III. Sharing LLM Service Definitions ===
+
+// Share Definition with User
+// POST Path: "/v1/llm-definitions/{owner}/{definition_handle}/share"
+
+type ShareDefinitionRequest struct {
+	Owner            string `json:"owner" path:"owner" maxLength:"20" minLength:"3" example:"_system" doc:"Definition owner handle"`
+	DefinitionHandle string `json:"definition_handle" path:"definition_handle" maxLength:"20" minLength:"3" example:"openai-large" doc:"Definition handle"`
+	Body             struct {
+		UserHandle string `json:"user_handle" minLength:"3" maxLength:"20" example:"bob" doc:"User handle to share with"`
+		Role       string `json:"role" enum:"reader,editor" example:"reader" doc:"Role for shared access"`
+	}
+}
+
+type ShareDefinitionResponse struct {
+	Header []http.Header `json:"header,omitempty" doc:"Response headers"`
+	Body   struct {
+		Owner            string `json:"owner" doc:"Definition owner"`
+		DefinitionHandle string `json:"definition_handle" doc:"Definition handle"`
+		SharedWith       string `json:"shared_with" doc:"User shared with"`
+		Role             string `json:"role" doc:"Access role granted"`
+	}
+}
+
+// Unshare Definition from User
+// DELETE Path: "/v1/llm-definitions/{owner}/{definition_handle}/share/{user_handle}"
+
+type UnshareDefinitionRequest struct {
+	Owner            string `json:"owner" path:"owner" maxLength:"20" minLength:"3" example:"_system" doc:"Definition owner handle"`
+	DefinitionHandle string `json:"definition_handle" path:"definition_handle" maxLength:"20" minLength:"3" example:"openai-large" doc:"Definition handle"`
+	UserHandle       string `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"bob" doc:"User handle to unshare from"`
+}
+
+type UnshareDefinitionResponse struct {
+	Header []http.Header `json:"header,omitempty" doc:"Response headers"`
+}
+
+// Get users a Definition is shared with
+// GET Path: "/v1/llm-definitions/{owner}/{definition_handle}/shared-with"
+
+type GetDefinitionSharedUsersRequest struct {
+	Owner            string `json:"owner" path:"owner" maxLength:"20" minLength:"3" example:"_system" doc:"Definition owner handle"`
+	DefinitionHandle string `json:"definition_handle" path:"definition_handle" maxLength:"20" minLength:"3" example:"openai-large" doc:"Definition handle"`
+}
+
+type SharedUser struct {
+	UserHandle string `json:"user_handle" doc:"User handle"`
+	Role       string `json:"role" doc:"Access role"`
+}
+
+type GetDefinitionSharedUsersResponse struct {
+	Header []http.Header `json:"header,omitempty" doc:"Response headers"`
+	Body   struct {
+		SharedWith []SharedUser `json:"shared_with" doc:"List of users this definition is shared with"`
+	}
+}
+
+// === IV. Sharing LLM Service Instances ===
+
+// Share Instance with User
+// POST Path: "/v1/llm-instances/{owner}/{instance_handle}/share"
+
+type ShareInstanceRequest struct {
+	Owner          string `json:"owner" path:"owner" maxLength:"20" minLength:"3" example:"alice" doc:"Instance owner handle"`
+	InstanceHandle string `json:"instance_handle" path:"instance_handle" maxLength:"20" minLength:"3" example:"my-openai" doc:"Instance handle"`
+	Body           struct {
+		UserHandle string `json:"user_handle" minLength:"3" maxLength:"20" example:"bob" doc:"User handle to share with"`
+		Role       string `json:"role" enum:"reader,editor" example:"reader" doc:"Role for shared access"`
+	}
+}
+
+type ShareInstanceResponse struct {
+	Header []http.Header `json:"header,omitempty" doc:"Response headers"`
+	Body   struct {
+		Owner          string `json:"owner" doc:"Instance owner"`
+		InstanceHandle string `json:"instance_handle" doc:"Instance handle"`
+		SharedWith     string `json:"shared_with" doc:"User shared with"`
+		Role           string `json:"role" doc:"Access role granted"`
+	}
+}
+
+// Unshare Instance from User
+// DELETE Path: "/v1/llm-instances/{owner}/{instance_handle}/share/{user_handle}"
+
+type UnshareInstanceRequest struct {
+	Owner          string `json:"owner" path:"owner" maxLength:"20" minLength:"3" example:"alice" doc:"Instance owner handle"`
+	InstanceHandle string `json:"instance_handle" path:"instance_handle" maxLength:"20" minLength:"3" example:"my-openai" doc:"Instance handle"`
+	UserHandle     string `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"bob" doc:"User handle to unshare from"`
+}
+
+type UnshareInstanceResponse struct {
+	Header []http.Header `json:"header,omitempty" doc:"Response headers"`
+}
+
+// Get users an Instance is shared with
+// GET Path: "/v1/llm-instances/{owner}/{instance_handle}/shared-with"
+
+type GetInstanceSharedUsersRequest struct {
+	Owner          string `json:"owner" path:"owner" maxLength:"20" minLength:"3" example:"alice" doc:"Instance owner handle"`
+	InstanceHandle string `json:"instance_handle" path:"instance_handle" maxLength:"20" minLength:"3" example:"my-openai" doc:"Instance handle"`
+}
+
+type GetInstanceSharedUsersResponse struct {
+	Header []http.Header `json:"header,omitempty" doc:"Response headers"`
+	Body   struct {
+		SharedWith []SharedUser `json:"shared_with" doc:"List of users this instance is shared with"`
+	}
+}

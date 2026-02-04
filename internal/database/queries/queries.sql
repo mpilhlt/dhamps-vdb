@@ -193,6 +193,55 @@ FROM definitions
 WHERE "owner" = '_system'
 ORDER BY "definition_handle" ASC LIMIT $1 OFFSET $2;
 
+-- name: LinkDefinitionToUser :exec
+INSERT
+INTO definitions_shared_with (
+  "user_handle", "definition_id", "role", "created_at", "updated_at"
+) VALUES (
+  $1, $2, $3, NOW(), NOW()
+)
+ON CONFLICT ("user_handle", "definition_id") DO UPDATE SET
+  "role" = EXCLUDED."role",
+  "updated_at" = NOW();
+
+-- name: UnlinkDefinition :exec
+DELETE
+FROM definitions_shared_with
+WHERE "user_handle" = $1
+AND "definition_id" = $2;
+
+-- name: GetSharedUsersForDefinition :many
+SELECT  definitions_shared_with."user_handle",
+        definitions_shared_with."role"
+FROM definitions_shared_with
+JOIN definitions
+ON definitions."definition_id" = definitions_shared_with."definition_id"
+WHERE definitions."owner" = $1
+  AND definitions."definition_handle" = $2
+  AND definitions_shared_with."user_handle" != '*'
+ORDER BY "user_handle" ASC;
+
+-- name: GetAccessibleDefinitionsByUser :many
+-- Get all definitions accessible to a user (owned + shared + _system)
+-- Returns definitions with metadata indicating ownership
+SELECT  definitions."owner",
+        definitions."definition_handle",
+        definitions."definition_id",
+        CASE 
+          WHEN definitions."owner" = $1 THEN 'owner'
+          WHEN definitions."owner" = '_system' THEN 'reader'
+          ELSE definitions_shared_with."role"
+        END as "role",
+        definitions."owner" = $1 as "is_owner"
+FROM definitions
+LEFT JOIN definitions_shared_with
+  ON definitions."definition_id" = definitions_shared_with."definition_id"
+WHERE definitions."owner" = $1
+   OR definitions."owner" = '_system'
+   OR definitions_shared_with."user_handle" = $1
+ORDER BY definitions."owner" ASC, definitions."definition_handle" ASC 
+LIMIT $2 OFFSET $3;
+
 
 -- === LLM Service Instances (user-specific instances with optional API keys) ===
 

@@ -68,7 +68,12 @@ func AddRoutes(pool *pgxpool.Pool, keyGen RandomKeyGenerator, api huma.API) erro
 	}
 	err = RegisterInstancesRoutes(pool, api)
 	if err != nil {
-		fmt.Printf("    Unable to register Embeddings routes: %v\n", err)
+		fmt.Printf("    Unable to register Instances routes: %v\n", err)
+		return err
+	}
+	err = RegisterDefinitionsRoutes(pool, api)
+	if err != nil {
+		fmt.Printf("    Unable to register Definitions routes: %v\n", err)
 		return err
 	}
 	err = RegisterSimilarRoutes(pool, api)

@@ -245,6 +245,260 @@ func deleteInstanceFunc(ctx context.Context, input *models.DeleteInstanceRequest
 	return response, nil
 }
 
+// === Sharing LLM Service Instances ===
+
+func shareInstanceFunc(ctx context.Context, input *models.ShareInstanceRequest) (*models.ShareInstanceResponse, error) {
+	// Get the database connection pool from the context
+	pool, err := GetDBPool(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	queries := database.New(pool)
+
+	// Check if instance exists and belongs to owner
+	instance, err := queries.RetrieveInstance(ctx, database.RetrieveInstanceParams{
+		Owner:          input.Owner,
+		InstanceHandle: input.InstanceHandle,
+	})
+	if err != nil {
+		if err.Error() == "no rows in result set" {
+			return nil, huma.Error404NotFound(fmt.Sprintf("instance %s/%s not found", input.Owner, input.InstanceHandle))
+		}
+		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to retrieve instance: %v", err))
+	}
+
+	// Check if target user exists
+	u, err := getUserFunc(ctx, &models.GetUserRequest{UserHandle: input.Body.UserHandle})
+	if err != nil {
+		return nil, err
+	}
+	if u.Body.UserHandle != input.Body.UserHandle {
+		return nil, huma.Error404NotFound(fmt.Sprintf("user %s not found", input.Body.UserHandle))
+	}
+
+	// Share the instance
+	err = queries.LinkInstanceToUser(ctx, database.LinkInstanceToUserParams{
+		UserHandle: input.Body.UserHandle,
+		InstanceID: instance.InstanceID,
+		Role:       input.Body.Role,
+	})
+	if err != nil {
+		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to share instance: %v", err))
+	}
+
+	// Build response
+	response := &models.ShareInstanceResponse{}
+	response.Body.Owner = input.Owner
+	response.Body.InstanceHandle = input.InstanceHandle
+	response.Body.SharedWith = input.Body.UserHandle
+	response.Body.Role = input.Body.Role
+
+	return response, nil
+}
+
+func unshareInstanceFunc(ctx context.Context, input *models.UnshareInstanceRequest) (*models.UnshareInstanceResponse, error) {
+	// Get the database connection pool from the context
+	pool, err := GetDBPool(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	queries := database.New(pool)
+
+	// Check if instance exists and belongs to owner
+	instance, err := queries.RetrieveInstance(ctx, database.RetrieveInstanceParams{
+		Owner:          input.Owner,
+		InstanceHandle: input.InstanceHandle,
+	})
+	if err != nil {
+		if err.Error() == "no rows in result set" {
+			return nil, huma.Error404NotFound(fmt.Sprintf("instance %s/%s not found", input.Owner, input.InstanceHandle))
+		}
+		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to retrieve instance: %v", err))
+	}
+
+	// Unshare the instance
+	err = queries.UnlinkInstance(ctx, database.UnlinkInstanceParams{
+		UserHandle: input.UserHandle,
+		InstanceID: instance.InstanceID,
+	})
+	if err != nil {
+		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to unshare instance: %v", err))
+	}
+
+	// Build response
+	response := &models.UnshareInstanceResponse{}
+
+	return response, nil
+}
+
+func getInstanceSharedUsersFunc(ctx context.Context, input *models.GetInstanceSharedUsersRequest) (*models.GetInstanceSharedUsersResponse, error) {
+	// Get the database connection pool from the context
+	pool, err := GetDBPool(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	queries := database.New(pool)
+
+	// Get shared users
+	sharedUsers, err := queries.GetSharedUsersForInstance(ctx, database.GetSharedUsersForInstanceParams{
+		Owner:          input.Owner,
+		InstanceHandle: input.InstanceHandle,
+	})
+	if err != nil {
+		if err.Error() == "no rows in result set" {
+			// Return empty list instead of error
+			response := &models.GetInstanceSharedUsersResponse{}
+			response.Body.SharedWith = []models.SharedUser{}
+			return response, nil
+		}
+		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to retrieve shared users: %v", err))
+	}
+
+	// Build response
+	users := []models.SharedUser{}
+	for _, su := range sharedUsers {
+		users = append(users, models.SharedUser{
+			UserHandle: su.UserHandle,
+			Role:       su.Role,
+		})
+	}
+
+	response := &models.GetInstanceSharedUsersResponse{}
+	response.Body.SharedWith = users
+
+	return response, nil
+}
+
+// === Sharing LLM Service Definitions ===
+
+func shareDefinitionFunc(ctx context.Context, input *models.ShareDefinitionRequest) (*models.ShareDefinitionResponse, error) {
+	// Get the database connection pool from the context
+	pool, err := GetDBPool(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	queries := database.New(pool)
+
+	// Check if definition exists and belongs to owner
+	definition, err := queries.RetrieveDefinition(ctx, database.RetrieveDefinitionParams{
+		Owner:            input.Owner,
+		DefinitionHandle: input.DefinitionHandle,
+	})
+	if err != nil {
+		if err.Error() == "no rows in result set" {
+			return nil, huma.Error404NotFound(fmt.Sprintf("definition %s/%s not found", input.Owner, input.DefinitionHandle))
+		}
+		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to retrieve definition: %v", err))
+	}
+
+	// Check if target user exists
+	u, err := getUserFunc(ctx, &models.GetUserRequest{UserHandle: input.Body.UserHandle})
+	if err != nil {
+		return nil, err
+	}
+	if u.Body.UserHandle != input.Body.UserHandle {
+		return nil, huma.Error404NotFound(fmt.Sprintf("user %s not found", input.Body.UserHandle))
+	}
+
+	// Share the definition
+	err = queries.LinkDefinitionToUser(ctx, database.LinkDefinitionToUserParams{
+		UserHandle:   input.Body.UserHandle,
+		DefinitionID: definition.DefinitionID,
+		Role:         input.Body.Role,
+	})
+	if err != nil {
+		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to share definition: %v", err))
+	}
+
+	// Build response
+	response := &models.ShareDefinitionResponse{}
+	response.Body.Owner = input.Owner
+	response.Body.DefinitionHandle = input.DefinitionHandle
+	response.Body.SharedWith = input.Body.UserHandle
+	response.Body.Role = input.Body.Role
+
+	return response, nil
+}
+
+func unshareDefinitionFunc(ctx context.Context, input *models.UnshareDefinitionRequest) (*models.UnshareDefinitionResponse, error) {
+	// Get the database connection pool from the context
+	pool, err := GetDBPool(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	queries := database.New(pool)
+
+	// Check if definition exists and belongs to owner
+	definition, err := queries.RetrieveDefinition(ctx, database.RetrieveDefinitionParams{
+		Owner:            input.Owner,
+		DefinitionHandle: input.DefinitionHandle,
+	})
+	if err != nil {
+		if err.Error() == "no rows in result set" {
+			return nil, huma.Error404NotFound(fmt.Sprintf("definition %s/%s not found", input.Owner, input.DefinitionHandle))
+		}
+		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to retrieve definition: %v", err))
+	}
+
+	// Unshare the definition
+	err = queries.UnlinkDefinition(ctx, database.UnlinkDefinitionParams{
+		UserHandle:   input.UserHandle,
+		DefinitionID: definition.DefinitionID,
+	})
+	if err != nil {
+		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to unshare definition: %v", err))
+	}
+
+	// Build response
+	response := &models.UnshareDefinitionResponse{}
+
+	return response, nil
+}
+
+func getDefinitionSharedUsersFunc(ctx context.Context, input *models.GetDefinitionSharedUsersRequest) (*models.GetDefinitionSharedUsersResponse, error) {
+	// Get the database connection pool from the context
+	pool, err := GetDBPool(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	queries := database.New(pool)
+
+	// Get shared users
+	sharedUsers, err := queries.GetSharedUsersForDefinition(ctx, database.GetSharedUsersForDefinitionParams{
+		Owner:            input.Owner,
+		DefinitionHandle: input.DefinitionHandle,
+	})
+	if err != nil {
+		if err.Error() == "no rows in result set" {
+			// Return empty list instead of error
+			response := &models.GetDefinitionSharedUsersResponse{}
+			response.Body.SharedWith = []models.SharedUser{}
+			return response, nil
+		}
+		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to retrieve shared users: %v", err))
+	}
+
+	// Build response
+	users := []models.SharedUser{}
+	for _, su := range sharedUsers {
+		users = append(users, models.SharedUser{
+			UserHandle: su.UserHandle,
+			Role:       su.Role,
+		})
+	}
+
+	response := &models.GetDefinitionSharedUsersResponse{}
+	response.Body.SharedWith = users
+
+	return response, nil
+}
+
 // RegisterInstancesRoutes registers the routes for the management of LLM service instances
 func RegisterInstancesRoutes(pool *pgxpool.Pool, api huma.API) error {
 	// Define huma.Operations for each route
@@ -299,12 +553,48 @@ func RegisterInstancesRoutes(pool *pgxpool.Pool, api huma.API) error {
 	deleteInstanceOp := huma.Operation{
 		OperationID:   "deleteInstance",
 		Method:        http.MethodDelete,
-		Path:          "/v1/llm-instances/{user_handle}/{instance_handle}",
+		Path:          "/v1/llm-instances/{owner}/{instance_handle}",
 		DefaultStatus: http.StatusNoContent,
 		Summary:       "Delete a user's llm service instance and all embeddings associated to it",
 		Security: []map[string][]string{
 			{"adminAuth": []string{"admin"}},
 			{"ownerAuth": []string{"owner"}},
+		},
+		Tags: []string{"llm-instances"},
+	}
+	shareInstanceOp := huma.Operation{
+		OperationID:   "shareInstance",
+		Method:        http.MethodPost,
+		Path:          "/v1/llm-instances/{owner}/{instance_handle}/share",
+		DefaultStatus: http.StatusCreated,
+		Summary:       "Share an llm service instance with another user",
+		Security: []map[string][]string{
+			{"adminAuth": []string{"admin"}},
+			{"ownerAuth": []string{"owner"}},
+		},
+		Tags: []string{"llm-instances"},
+	}
+	unshareInstanceOp := huma.Operation{
+		OperationID:   "unshareInstance",
+		Method:        http.MethodDelete,
+		Path:          "/v1/llm-instances/{owner}/{instance_handle}/share/{user_handle}",
+		DefaultStatus: http.StatusNoContent,
+		Summary:       "Unshare an llm service instance from a user",
+		Security: []map[string][]string{
+			{"adminAuth": []string{"admin"}},
+			{"ownerAuth": []string{"owner"}},
+		},
+		Tags: []string{"llm-instances"},
+	}
+	getInstanceSharedUsersOp := huma.Operation{
+		OperationID: "getInstanceSharedUsers",
+		Method:      http.MethodGet,
+		Path:        "/v1/llm-instances/{owner}/{instance_handle}/shared-with",
+		Summary:     "Get list of users an instance is shared with",
+		Security: []map[string][]string{
+			{"adminAuth": []string{"admin"}},
+			{"ownerAuth": []string{"owner"}},
+			{"readerAuth": []string{"reader"}},
 		},
 		Tags: []string{"llm-instances"},
 	}
@@ -314,5 +604,54 @@ func RegisterInstancesRoutes(pool *pgxpool.Pool, api huma.API) error {
 	huma.Register(api, getUserInstancesOp, addPoolToContext(pool, getUserInstancesFunc))
 	huma.Register(api, getInstanceOp, addPoolToContext(pool, getInstanceFunc))
 	huma.Register(api, deleteInstanceOp, addPoolToContext(pool, deleteInstanceFunc))
+	huma.Register(api, shareInstanceOp, addPoolToContext(pool, shareInstanceFunc))
+	huma.Register(api, unshareInstanceOp, addPoolToContext(pool, unshareInstanceFunc))
+	huma.Register(api, getInstanceSharedUsersOp, addPoolToContext(pool, getInstanceSharedUsersFunc))
+	return nil
+}
+
+// RegisterDefinitionsRoutes registers the routes for the management of LLM service definitions
+func RegisterDefinitionsRoutes(pool *pgxpool.Pool, api huma.API) error {
+	// Define huma.Operations for each route
+	shareDefinitionOp := huma.Operation{
+		OperationID:   "shareDefinition",
+		Method:        http.MethodPost,
+		Path:          "/v1/llm-definitions/{owner}/{definition_handle}/share",
+		DefaultStatus: http.StatusCreated,
+		Summary:       "Share an llm service definition with another user",
+		Security: []map[string][]string{
+			{"adminAuth": []string{"admin"}},
+			{"ownerAuth": []string{"owner"}},
+		},
+		Tags: []string{"llm-definitions"},
+	}
+	unshareDefinitionOp := huma.Operation{
+		OperationID:   "unshareDefinition",
+		Method:        http.MethodDelete,
+		Path:          "/v1/llm-definitions/{owner}/{definition_handle}/share/{user_handle}",
+		DefaultStatus: http.StatusNoContent,
+		Summary:       "Unshare an llm service definition from a user",
+		Security: []map[string][]string{
+			{"adminAuth": []string{"admin"}},
+			{"ownerAuth": []string{"owner"}},
+		},
+		Tags: []string{"llm-definitions"},
+	}
+	getDefinitionSharedUsersOp := huma.Operation{
+		OperationID: "getDefinitionSharedUsers",
+		Method:      http.MethodGet,
+		Path:        "/v1/llm-definitions/{owner}/{definition_handle}/shared-with",
+		Summary:     "Get list of users a definition is shared with",
+		Security: []map[string][]string{
+			{"adminAuth": []string{"admin"}},
+			{"ownerAuth": []string{"owner"}},
+			{"readerAuth": []string{"reader"}},
+		},
+		Tags: []string{"llm-definitions"},
+	}
+
+	huma.Register(api, shareDefinitionOp, addPoolToContext(pool, shareDefinitionFunc))
+	huma.Register(api, unshareDefinitionOp, addPoolToContext(pool, unshareDefinitionFunc))
+	huma.Register(api, getDefinitionSharedUsersOp, addPoolToContext(pool, getDefinitionSharedUsersFunc))
 	return nil
 }
