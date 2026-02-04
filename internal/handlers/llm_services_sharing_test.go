@@ -20,8 +20,10 @@ func TestInstanceSharingFunc(t *testing.T) {
 
 	// Create a mock key generator
 	mockKeyGen := new(MockKeyGen)
-	// Set up expectations for the mock key generator
-	mockKeyGen.On("RandomKey", 32).Return("12345678901234567890123456789012", nil).Maybe()
+	// Set up expectations for the mock key generator - return different keys for each call
+	mockKeyGen.On("RandomKey", 32).Return("12345678901234567890123456789012", nil).Once()  // Alice's key
+	mockKeyGen.On("RandomKey", 32).Return("abcdefghijklmnopqrstuvwxyz123456", nil).Once()  // Bob's key
+	mockKeyGen.On("RandomKey", 32).Return("98765432109876543210987654321098", nil).Maybe() // Any additional keys
 
 	// Start the server
 	err, shutDownServer := startTestServer(t, pool, mockKeyGen)
@@ -49,7 +51,7 @@ func TestInstanceSharingFunc(t *testing.T) {
 
 	// Create an instance for alice
 	instanceJSON := `{"instance_handle": "my-openai", "endpoint": "https://api.openai.com/v1/embeddings", "description": "Alice's OpenAI instance", "api_standard": "openai", "model": "text-embedding-3-large", "dimensions": 3072}`
-	_, err = createInstance(t, "alice", instanceJSON, aliceAPIKey)
+	_, err = createInstance(t, instanceJSON, "alice", aliceAPIKey)
 	if err != nil {
 		t.Fatalf("Error creating instance for sharing tests: %v\n", err)
 	}
@@ -204,7 +206,10 @@ func TestDefinitionSharingFunc(t *testing.T) {
 
 	// Create a mock key generator
 	mockKeyGen := new(MockKeyGen)
-	mockKeyGen.On("RandomKey", 32).Return("12345678901234567890123456789012", nil).Maybe()
+	// Set up expectations for the mock key generator - return different keys for each call
+	mockKeyGen.On("RandomKey", 32).Return("11111111111111111111111111111111", nil).Once()  // Alice's key
+	mockKeyGen.On("RandomKey", 32).Return("22222222222222222222222222222222", nil).Once()  // Bob's key
+	mockKeyGen.On("RandomKey", 32).Return("33333333333333333333333333333333", nil).Maybe() // Any additional keys
 
 	// Start the server
 	err, shutDownServer := startTestServer(t, pool, mockKeyGen)
