@@ -13,10 +13,10 @@ This is an application serving an API to handle embeddings. It stores embeddings
 
 The typical use case is as a component of a Retrieval Augmented Generation (RAG) workflow: You create embeddings for a collection of text snippets and upload them to this API. For each text snippet, you upload a text identifier, the embeddings vector and, optionally, metadata or the text itself. Then, you can
 
-- `GET` the most similar texts for a text that is already in the database by specifying the text's identifier in an URL, and eventually later
-- `POST` another text and get the most similar texts in the database
+- `GET` the most similar texts for a text that is already in the database by specifying the text's identifier in a URL
+- `POST` raw embeddings to find similar texts without storing the query embeddings in the database
 
-In both cases, the service returns a list of text identifiers that you can then use in your own processing, perhaps based on other means of providing the respective texts.
+In both cases, the service returns a list of text identifiers along with their similarity scores that you can then use in your own processing, perhaps based on other means of providing the respective texts.
 
 ## Features
 
@@ -285,9 +285,126 @@ For a more detailed, and always up-to-date documentation of the endpoints, inclu
 | /embeddings/\<username\>/\<projectname\> | DELETE | Delete ***all*** embeddings for \<username\>'s project \<projectname\> | admin, \<username\> |
 | /embeddings/\<username\>/\<projectname\>/\<identifier\> | GET | Get embeddings and other information about text \<identifier\> from \<username\>'s project \<projectname\> | admin, \<username\>, authorized readers |
 | /embeddings/\<username\>/\<projectname\>/\<identifier\> | DELETE | Delete record \<identifier\> from \<username\>'s project \<projectname\> | admin, \<username\> |
-| /similars/\<username\>/\<projectname\>/\<identifier\> | GET | Get a list of identifiers for records that are similar to the text \<identifier\> in \<username\>'s project \<projectname\> | admin, \<username\>, authorized readers |
+| /similars/\<username\>/\<projectname\>/\<identifier\> | GET | Get a list of documents similar to the text \<identifier\> in \<username\>'s project \<projectname\>, with similarity scores | admin, \<username\>, authorized readers |
+| /similars/\<username\>/\<projectname\> | POST | Find similar documents using raw embeddings without storing them, with similarity scores | admin, \<username\>, authorized readers |
 
 \* API standards are definitions of how to access an LLM Service: API endpoints, authentication mechanism etc. They are referred to from LLM Service definitions. When LLM Processing will be attempted, this is what will be implemented. Examples are the Cohere Embed API, Version 2, as documented in <https://docs.cohere.com/reference/embed>, or the OpenAI Embeddings API, Version 1, as documented in <https://platform.openai.com/docs/api-reference/embeddings>. You can find these examples in the [valid_api_standard\*.json](./testdata/) files in the `testdata` directory.
+
+### Similarity Search
+
+The API provides two endpoints for finding similar documents using vector similarity:
+
+#### GET Similar Documents (from stored embeddings)
+
+Find documents similar to an already-stored document by its identifier:
+
+```bash
+GET /v1/similars/{username}/{projectname}/{identifier}
+```
+
+**Query Parameters:**
+- `count` (optional, default: 10, max: 200): Number of similar documents to return
+- `threshold` (optional, default: 0.5, range: 0-1): Minimum similarity score threshold
+- `limit` (optional, default: 10, max: 200): Maximum number of results to return
+- `offset` (optional, default: 0): Pagination offset
+- `metadata_path` (optional): Filter results by metadata field path (must be used with `metadata_value`)
+- `metadata_value` (optional): Metadata value to exclude from results (must be used with `metadata_path`)
+
+**Example:**
+```bash
+curl -X GET "https://<hostname>/v1/similars/alice/myproject/doc123?count=5&threshold=0.7" \
+  -H "Authorization: Bearer <vdb_key>"
+```
+
+#### POST Similar Documents (from raw embeddings)
+
+Find similar documents by submitting a raw embedding vector without storing it in the database:
+
+```bash
+POST /v1/similars/{username}/{projectname}
+```
+
+**Request Body:**
+```json
+{
+  "vector": [0.1, 0.2, 0.3, ...]
+}
+```
+
+The vector must be an array of float32 values with dimensions matching the project's LLM service instance configuration.
+
+**Query Parameters:** Same as GET endpoint above.
+
+**Example:**
+```bash
+curl -X POST "https://<hostname>/v1/similars/alice/myproject?count=10&threshold=0.8" \
+  -H "Authorization: Bearer <vdb_key>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "vector": [-0.020850, 0.018522, 0.053270, 0.071384, 0.020003]
+  }'
+```
+
+#### Response Format
+
+Both similarity endpoints return the same response format with document identifiers and their similarity scores:
+
+```json
+{
+  "$schema": "http://localhost:8080/schemas/SimilarResponseBody.json",
+  "user_handle": "alice",
+  "project_handle": "myproject",
+  "results": [
+    {
+      "id": "doc456",
+      "similarity": 0.95
+    },
+    {
+      "id": "doc789",
+      "similarity": 0.87
+    },
+    {
+      "id": "doc321",
+      "similarity": 0.82
+    }
+  ]
+}
+```
+
+**Response Fields:**
+- `user_handle`: The project owner's username
+- `project_handle`: The project identifier
+- `results`: Array of similar documents, ordered by similarity (highest first)
+  - `id`: Document identifier
+  - `similarity`: Cosine similarity score (0-1, where 1 is most similar)
+
+#### Dimension Validation
+
+When using the POST endpoint, the API automatically validates that:
+1. The project has an associated LLM service instance
+2. The submitted vector dimensions match the LLM service instance's configured dimensions
+3. If dimensions don't match, a `400 Bad Request` error is returned with details
+
+**Example error:**
+```json
+{
+  "title": "Bad Request",
+  "status": 400,
+  "detail": "vector dimension mismatch: expected 1536 dimensions, got 768"
+}
+```
+
+#### Metadata Filtering
+
+Both endpoints support filtering results by metadata fields. The filter uses negative matching (excludes documents where the metadata field matches the specified value):
+
+```bash
+# Exclude documents with author="John Doe"
+curl -X GET "https://<hostname>/v1/similars/alice/myproject/doc123?metadata_path=author&metadata_value=John%20Doe" \
+  -H "Authorization: Bearer <vdb_key>"
+```
+
+This is useful for excluding documents from the same source, author, or category when finding similar content.
 
 ### Partial Updates with PATCH
 

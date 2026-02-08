@@ -135,7 +135,7 @@ func postSimilarFunc(ctx context.Context, input *models.PostSimilarRequest) (*mo
 
 	queries := database.New(pool)
 
-	// Check if project exists and get the instance information
+	// Check if project exists and get the LLM service instance information
 	project, err := queries.RetrieveProject(ctx, database.RetrieveProjectParams{
 		Owner:         input.UserHandle,
 		ProjectHandle: input.ProjectHandle,
@@ -147,17 +147,17 @@ func postSimilarFunc(ctx context.Context, input *models.PostSimilarRequest) (*mo
 		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get project. %v", err))
 	}
 
-	// Get the instance to validate dimensions
+	// Get the LLM service instance to validate dimensions
 	if !project.InstanceID.Valid {
-		return nil, huma.Error400BadRequest("project does not have an associated instance")
+		return nil, huma.Error400BadRequest("project does not have an associated LLM service instance")
 	}
 
 	instance, err := queries.RetrieveInstanceByID(ctx, project.InstanceID.Int32)
 	if err != nil {
-		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to retrieve instance. %v", err))
+		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to retrieve LLM service instance. %v", err))
 	}
 
-	// Validate that the vector dimensions match the instance dimensions
+	// Validate that the vector dimensions match the LLM service instance dimensions
 	if len(input.Body.Vector) != int(instance.Dimensions) {
 		return nil, huma.Error400BadRequest(fmt.Sprintf("vector dimension mismatch: expected %d dimensions, got %d", instance.Dimensions, len(input.Body.Vector)))
 	}
