@@ -519,6 +519,17 @@ func getProjectSharedUsersFunc(ctx context.Context, input *models.GetProjectShar
 	}
 	queries := database.New(pool)
 
+	// Get the requesting user from context (set by auth middleware)
+	requestingUser := ctx.Value(auth.AuthUserKey)
+	if requestingUser == nil {
+		return nil, huma.Error500InternalServerError("unable to get requesting user from context")
+	}
+
+	// Only the project owner can see the list of shared users
+	if requestingUser.(string) != input.UserHandle {
+		return nil, huma.Error403Forbidden(fmt.Sprintf("only the project owner can view shared users list"))
+	}
+
 	// Get shared users
 	sharedUsers, err := queries.GetUsersByProject(ctx, database.GetUsersByProjectParams{
 		Owner:         input.UserHandle,

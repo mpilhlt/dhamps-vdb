@@ -154,6 +154,15 @@ func TestProjectSharingFunc(t *testing.T) {
 			expectBody:   "", // Just check status code
 			expectStatus: http.StatusOK,
 		},
+		{
+			name:         "Bob cannot see shared users list (not owner)",
+			method:       http.MethodGet,
+			requestPath:  "/v1/projects/alice/project1/shared-with",
+			bodyJSON:     "",
+			VDBKey:       bobAPIKey,
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Unauthorized\",\n  \"status\": 401,\n  \"detail\": \"Authentication failed. Perhaps a missing or incorrect API key?\"\n}\n",
+			expectStatus: http.StatusUnauthorized,
+		},
 	}
 
 	for _, v := range tt {
