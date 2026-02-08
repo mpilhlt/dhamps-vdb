@@ -3,8 +3,8 @@
     "text_id": "test-invalid-metadata",
     "user_handle": "alice",
     "project_handle": "test-schema",
-    "project_id": 1,
-    "llm_service_handle": "openai-large",
+    "instance_owner": "alice",
+    "instance_handle": "embedding1",
     "text": "This is a test document",
     "vector": [
         -2.085085e-02,

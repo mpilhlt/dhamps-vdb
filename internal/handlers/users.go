@@ -42,23 +42,25 @@ func putUserFunc(ctx context.Context, input *models.PutUserRequest) (*models.Upl
 	if err != nil && err.Error() != "no rows in result set" {
 		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to check if user %s already exists. %v", input.UserHandle, err))
 	}
+
+	// Create API key if user does not exist
 	// storeKey := make([]byte, 64)
 	var storeKey string
-	APIKey := ""
+	VDBKey := ""
 	if u.UserHandle == input.UserHandle {
 		// User exists, so don't create API key
-		storeKey = u.VdbAPIKey
+		storeKey = u.VDBKey
 		fmt.Printf("        User %s already exists, stored key hash is %s.\n", input.UserHandle, storeKey)
 		// fmt.Printf("        User %s already exists: %v.\n", input.UserHandle, u)
-		// fmt.Printf("        User %s. Stored key hash: '%s'.\n", input.UserHandle, u.VdbAPIKey)
-		APIKey = "not changed"
+		// fmt.Printf("        User %s. Stored key hash: '%s'.\n", input.UserHandle, u.VDBKey)
+		VDBKey = "not changed"
 	} else {
 		// User does not exist, so create a new API key
-		APIKey, err = keyGen.RandomKey(32)
+		VDBKey, err = keyGen.RandomKey(32)
 		if err != nil {
 			return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to create API key for user %s. %v", input.UserHandle, err))
 		}
-		hash := sha256.Sum256([]byte(APIKey))
+		hash := sha256.Sum256([]byte(VDBKey))
 		storeKey = hex.EncodeToString(hash[:])
 		// fmt.Printf("        Created user %s: API key %s (store hash: %s)\n", input.UserHandle, APIKey, storeKey)
 	}
@@ -66,19 +68,30 @@ func putUserFunc(ctx context.Context, input *models.PutUserRequest) (*models.Upl
 		UserHandle: input.UserHandle,
 		Name:       pgtype.Text{String: input.Body.Name, Valid: true},
 		Email:      input.Body.Email,
-		VdbAPIKey:  storeKey,
+		VDBKey:     storeKey,
 	}
 
 	// Run the query
-	u, err = queries.UpsertUser(ctx, user)
+	s, err := queries.UpsertUser(ctx, user)
 	if err != nil {
 		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to upload user. %v", err))
+	}
+	u, err = queries.RetrieveUser(ctx, s)
+	if err != nil && err.Error() != "no rows in result set" {
+		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to verify that user %s exists now. %v", s, err))
 	}
 
 	// Build the response
 	response := &models.UploadUserResponse{}
 	response.Body.UserHandle = u.UserHandle
-	response.Body.APIKey = APIKey
+	// Return the actual API key only if it was just created
+	// When updating an existing user, don't include the VDB key in the response
+	if VDBKey != "not changed" {
+		response.Body.VDBKey = VDBKey
+	} else {
+		response.Body.VDBKey = "not changed"
+	}
+
 	return response, nil
 }
 
@@ -103,7 +116,7 @@ func getUsersFunc(ctx context.Context, input *models.GetUsersRequest) (*models.G
 
 	// Run the query
 	queries := database.New(pool)
-	allUsers, err := queries.GetUsers(ctx, database.GetUsersParams{Limit: int32(input.Limit), Offset: int32(input.Offset)})
+	allUsers, err := queries.GetAllUsers(ctx, database.GetAllUsersParams{Limit: int32(input.Limit), Offset: int32(input.Offset)})
 	if err != nil {
 		if err.Error() == "no rows in result set" {
 			return nil, huma.Error404NotFound("no users found.")
@@ -165,32 +178,51 @@ func getUserFunc(ctx context.Context, input *models.GetUserRequest) (*models.Get
 		})
 	}
 
-	// Get LLM services the user is a member of
-	llmservices := models.LLMMemberships{}
-	ls, err := queries.GetLLMsByUser(ctx, database.GetLLMsByUserParams{UserHandle: input.UserHandle})
+	// Get LLM service instances the user is a member of
+	imemberships := models.InstanceMemberships{}
+	instances, err := queries.GetAccessibleInstancesByUser(ctx, database.GetAccessibleInstancesByUserParams{
+		Owner:  input.UserHandle,
+		Limit:  999,
+		Offset: 0,
+	})
 	if err != nil {
 		if err.Error() == "no rows in result set" {
-			fmt.Printf("Warning: No projects registered for user %s.", input.UserHandle)
+			fmt.Printf("Warning: No LLM service instances registered for user %s.", input.UserHandle)
 		} else {
-			fmt.Printf("Warning: Unable to get list of projects for user %s. %v", input.UserHandle, err)
+			fmt.Printf("Warning: Unable to get list of LLM service instances for user %s: %v", input.UserHandle, err)
 		}
 	}
-	for _, llmservice := range ls {
-		llmservices = append(llmservices, models.LLMMembership{
-			LLMServiceHandle: llmservice.LLMServiceHandle,
-			LLMServiceOwner:  llmservice.Owner,
-			Role:             llmservice.Role,
+	for _, i := range instances {
+		instance, err := queries.RetrieveInstance(ctx, database.RetrieveInstanceParams{
+			Owner:          i.Owner,
+			InstanceHandle: i.InstanceHandle,
+		})
+		if err != nil {
+			fmt.Printf("Warning: Unable to get details of LLM service instance %s for user %s: %v", i.InstanceHandle, input.UserHandle, err)
+			continue
+		}
+		// Handle the case where Role might be nil (when instance is owned by user)
+		role := "owner"
+		if i.Role != nil {
+			if r, ok := i.Role.(string); ok {
+				role = r
+			}
+		}
+		imemberships = append(imemberships, models.InstanceMembership{
+			InstanceHandle: instance.InstanceHandle,
+			InstanceOwner:  instance.Owner,
+			Role:           role,
 		})
 	}
 
 	// Build the response
 	returnUser := &models.User{
-		UserHandle:  u.UserHandle,
-		Name:        u.Name.String,
-		Email:       u.Email,
-		APIKey:      u.VdbAPIKey,
-		Projects:    projects,
-		LLMServices: llmservices,
+		UserHandle: u.UserHandle,
+		Name:       u.Name.String,
+		Email:      u.Email,
+		VDBKey:     u.VDBKey,
+		Projects:   projects,
+		Instances:  imemberships,
 	}
 	response := &models.GetUserResponse{}
 	response.Body = *returnUser

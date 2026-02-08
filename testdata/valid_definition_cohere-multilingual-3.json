@@ -1,0 +1,8 @@
+{
+  "instance_handle": "cohere-multi",
+  "endpoint": "https://api.cohere.com/v2/embed",
+	"description": "My Cohere embed-multilingual-v3.0 service",
+  "api_standard": "cohere",
+  "model": "embed-multilingual-v3.0",
+  "dimensions": 1024
+}

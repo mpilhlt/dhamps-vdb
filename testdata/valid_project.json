@@ -1,4 +1,6 @@
 {
   "project_handle": "test1",
+  "instance_owner": "alice",
+  "instance_handle": "embedding1",
   "description": "This is a test project"
 }

@@ -122,7 +122,7 @@ func testQuery(ctx context.Context, conn *pgxpool.Conn) error {
 	defer cancel()
 
 	queries := New(conn)
-	users, err := queries.GetUsers(ctx_cancel, GetUsersParams{Limit: 10, Offset: 0})
+	users, err := queries.GetAllUsers(ctx_cancel, GetAllUsersParams{Limit: 10, Offset: 0})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "EEE Unable to get users: %v\n", err)
 		return err

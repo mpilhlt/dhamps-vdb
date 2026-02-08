@@ -1,9 +1,0 @@
-{
-  "llm_service_handle": "test1",
-  "endpoint": "https://api.foo.bar/v1/embed",
-	"description": "An LLM Service just for testing if the dhamps-vdb code is working",
-  "api_key": "0123456789",
-  "api_standard": "openai",
-  "model": "embed-test1",
-  "dimensions": 5
-}

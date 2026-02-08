@@ -21,17 +21,22 @@ sql:
           - db_type: "jsonb"
             go_type:
               type: "map[string]interface{}"
-        rename:
-          llm_service_id: "LLMServiceID"
-          llm_service_handle: "LLMServiceHandle"
+        rename: # if our desired fieldnames have acronyms with multiple capital letters,
+                # (like "ID" or "LLM"), PascalCase does not work automatically, so we
+                # specify naming rules for these here.
+          instance_id: "InstanceID"
+          instance_handle: "InstanceHandle"
+          definition_id: "DefinitionID"
+          definition_handle: "DefinitionHandle"
           project_id: "ProjectID"
           text_id: "TextID"
-          api_standard_handle: "APIStandardHandle"
           api_standard: "APIStandard"
-          api_key: "APIKey"
-          vdb_api_key: "VdbAPIKey"
-          # - column: "users.vdb_api_key"
+          api_standard_handle: "APIStandardHandle"
+          api_key_encrypted: "APIKeyEncrypted"
+          has_api_key: "HasAPIKey"
+          vdb_key: "VDBKey"
+          # - column: "users.vdb_key"
           #   go_type:
           #     type: "[]byte"
         # rename:
-        #   decode: "VdbAPIKey"
+        #   decode: "VDBKey"

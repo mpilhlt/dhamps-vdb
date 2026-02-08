@@ -14,6 +14,7 @@ import (
 )
 
 func TestAPIStandardFunc(t *testing.T) {
+
 	// Get the database connection pool from package variable
 	pool := connPool
 
@@ -29,7 +30,7 @@ func TestAPIStandardFunc(t *testing.T) {
 		method       string
 		requestPath  string
 		bodyPath     string
-		apiKey       string
+		VDBKey       string
 		expectBody   string
 		expectStatus int16
 	}{
@@ -38,7 +39,7 @@ func TestAPIStandardFunc(t *testing.T) {
 			method:       http.MethodPut,
 			requestPath:  "/v1/api-standards/error1",
 			bodyPath:     "../../testdata/invalid_api_standard.json",
-			apiKey:       options.AdminKey,
+			VDBKey:       options.AdminKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Unprocessable Entity\",\n  \"status\": 422,\n  \"detail\": \"validation failed\",\n  \"errors\": [\n    {\n      \"message\": \"expected required property key_field to be present\",\n      \"location\": \"body\",\n      \"value\": {\n        \"api_standard_handle\": \"error1\",\n        \"description\": \"Erroneous definition of an APi standard\",\n        \"keX_method\": \"auth_bearer\"\n      }\n    },\n    {\n      \"message\": \"expected required property key_method to be present\",\n      \"location\": \"body\",\n      \"value\": {\n        \"api_standard_handle\": \"error1\",\n        \"description\": \"Erroneous definition of an APi standard\",\n        \"keX_method\": \"auth_bearer\"\n      }\n    },\n    {\n      \"message\": \"unexpected property\",\n      \"location\": \"body.keX_method\",\n      \"value\": {\n        \"api_standard_handle\": \"error1\",\n        \"description\": \"Erroneous definition of an APi standard\",\n        \"keX_method\": \"auth_bearer\"\n      }\n    }\n  ]\n}\n",
 			expectStatus: http.StatusUnprocessableEntity,
 		},
@@ -47,47 +48,47 @@ func TestAPIStandardFunc(t *testing.T) {
 			method:       http.MethodPut,
 			requestPath:  "/v1/api-standards/wrongpath",
 			bodyPath:     "../../testdata/valid_api_standard_openai_v1.json",
-			apiKey:       options.AdminKey,
+			VDBKey:       options.AdminKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Bad Request\",\n  \"status\": 400,\n  \"detail\": \"API standard handle in URL (wrongpath) does not match handle in body (openai).\"\n}\n",
 			expectStatus: http.StatusBadRequest,
 		},
 		{
 			name:         "Valid Put API standard",
 			method:       http.MethodPut,
-			requestPath:  "/v1/api-standards/openai",
-			bodyPath:     "../../testdata/valid_api_standard_openai_v1.json",
-			apiKey:       options.AdminKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/UploadAPIStandardResponseBody.json\",\n  \"api_standard_handle\": \"openai\"\n}\n",
+			requestPath:  "/v1/api-standards/test",
+			bodyPath:     "../../testdata/valid_api_standard_test.json",
+			VDBKey:       options.AdminKey,
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/UploadAPIStandardResponseBody.json\",\n  \"api_standard_handle\": \"test\"\n}\n",
 			expectStatus: http.StatusCreated,
 		},
 		{
 			name:         "get all API standards",
 			method:       http.MethodGet,
 			requestPath:  "/v1/api-standards",
-			apiKey:       "",
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/GetAPIStandardsResponseBody.json\",\n  \"api_standards\": [\n    {\n      \"api_standard_handle\": \"openai\",\n      \"description\": \"OpenAI Embeddings API, Version 1, as documented in https://platform.openai.com/docs/api-reference/embeddings\",\n      \"key_method\": \"auth_bearer\",\n      \"key_field\": \"Authorization\"\n    }\n  ]\n}\n",
+			VDBKey:       "",
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/GetAPIStandardsResponseBody.json\",\n  \"api_standards\": [\n    {\n      \"api_standard_handle\": \"cohere\",\n      \"description\": \"Cohere Embed API, Version 2, as documented in https://docs.cohere.com/reference/embed\",\n      \"key_method\": \"auth_bearer\",\n      \"key_field\": \"Authorization\"\n    },\n    {\n      \"api_standard_handle\": \"gemini\",\n      \"description\": \"Gemini Embeddings API, as documented in https://ai.google.dev/gemini-api/docs/embeddings\",\n      \"key_method\": \"auth_bearer\",\n      \"key_field\": \"x-goog-api-key\"\n    },\n    {\n      \"api_standard_handle\": \"openai\",\n      \"description\": \"OpenAI Embeddings API, Version 1, as documented in https://platform.openai.com/docs/api-reference/embeddings\",\n      \"key_method\": \"auth_bearer\",\n      \"key_field\": \"Authorization\"\n    },\n    {\n      \"api_standard_handle\": \"test\",\n      \"description\": \"OpenAI Embeddings API, Version 1, as documented in https://platform.openai.com/docs/api-reference/embeddings\",\n      \"key_method\": \"auth_bearer\",\n      \"key_field\": \"Authorization\"\n    }\n  ]\n}\n",
 			expectStatus: http.StatusOK,
 		},
 		{
 			name:         "get single API standard",
 			method:       http.MethodGet,
-			requestPath:  "/v1/api-standards/openai",
-			apiKey:       "",
-			expectBody:   "{\n  \"api_standard_handle\": \"openai\",\n  \"description\": \"OpenAI Embeddings API, Version 1, as documented in https://platform.openai.com/docs/api-reference/embeddings\",\n  \"key_method\": \"auth_bearer\",\n  \"key_field\": \"Authorization\"\n}\n",
+			requestPath:  "/v1/api-standards/test",
+			VDBKey:       "",
+			expectBody:   "{\n  \"api_standard_handle\": \"test\",\n  \"description\": \"OpenAI Embeddings API, Version 1, as documented in https://platform.openai.com/docs/api-reference/embeddings\",\n  \"key_method\": \"auth_bearer\",\n  \"key_field\": \"Authorization\"\n}\n",
 			expectStatus: http.StatusOK,
 		},
 		{
 			name:         "Delete nonexistent path",
 			method:       http.MethodDelete,
 			requestPath:  "/v1/api-standards/wrongpath",
-			apiKey:       options.AdminKey,
+			VDBKey:       options.AdminKey,
 			expectStatus: http.StatusNotFound,
 		},
 		{
 			name:         "delete API standard",
 			method:       http.MethodDelete,
-			requestPath:  "/v1/api-standards/openai",
-			apiKey:       options.AdminKey,
+			requestPath:  "/v1/api-standards/test",
+			VDBKey:       options.AdminKey,
 			expectStatus: http.StatusNoContent,
 		},
 		{
@@ -95,7 +96,7 @@ func TestAPIStandardFunc(t *testing.T) {
 			method:       http.MethodPut,
 			requestPath:  "/v1/api-standards/openai",
 			bodyPath:     "../../testdata/valid_api_standard_openai_v1.json",
-			apiKey:       options.AdminKey,
+			VDBKey:       options.AdminKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/UploadAPIStandardResponseBody.json\",\n  \"api_standard_handle\": \"openai\"\n}\n",
 			expectStatus: http.StatusCreated,
 		},
@@ -125,8 +126,8 @@ func TestAPIStandardFunc(t *testing.T) {
 			requestURL := fmt.Sprintf("http://%v:%d%v", options.Host, options.Port, v.requestPath)
 			req, err := http.NewRequest(v.method, requestURL, reqBody)
 			assert.NoError(t, err)
-			if v.apiKey != "" {
-				req.Header.Set("Authorization", "Bearer "+v.apiKey)
+			if v.VDBKey != "" {
+				req.Header.Set("Authorization", "Bearer "+v.VDBKey)
 			}
 			resp, err := http.DefaultClient.Do(req)
 			if err != nil {
@@ -174,4 +175,5 @@ func TestAPIStandardFunc(t *testing.T) {
 		shutDownServer()
 	})
 
+	fmt.Printf("\n\n\n\n")
 }

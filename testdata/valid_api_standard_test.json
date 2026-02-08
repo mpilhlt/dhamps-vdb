@@ -1,0 +1,6 @@
+{
+  "api_standard_handle": "test",
+  "description": "OpenAI Embeddings API, Version 1, as documented in https://platform.openai.com/docs/api-reference/embeddings",
+  "key_method": "auth_bearer",
+  "key_field": "Authorization"
+}

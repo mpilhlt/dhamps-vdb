@@ -12,7 +12,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestLLMServicesFunc(t *testing.T) {
+func TestInstancesFunc(t *testing.T) {
+
+	fmt.Printf("\n\n\n\n")
+
 	// Get the database connection pool from package variable
 	pool := connPool
 
@@ -25,21 +28,21 @@ func TestLLMServicesFunc(t *testing.T) {
 	err, shutDownServer := startTestServer(t, pool, mockKeyGen)
 	assert.NoError(t, err)
 
-	// Create user to be used in llm-service tests
+	// Create user to be used in instance tests
 	aliceJSON := `{"user_handle": "alice", "name": "Alice Doe", "email": "alice@foo.bar"}`
 	aliceAPIKey, err := createUser(t, aliceJSON)
 	if err != nil {
 		t.Fatalf("Error creating user alice for testing: %v\n", err)
 	}
 
-	// Create API standard to be used in llm-service tests
+	// Create API standard to be used in instance tests
 	openaiJSON := `{"api_standard_handle": "openai", "description": "OpenAI Embeddings API", "key_method": "auth_bearer", "key_field": "Authorization" }`
 	_, err = createAPIStandard(t, openaiJSON, options.AdminKey)
 	if err != nil {
 		t.Fatalf("Error creating API standard openai for testing: %v\n", err)
 	}
 
-	fmt.Printf("\nRunning llm-services tests ...\n\n")
+	fmt.Printf("\nRunning llm-instances tests ...\n\n")
 
 	// Define test cases
 	tt := []struct {
@@ -47,151 +50,151 @@ func TestLLMServicesFunc(t *testing.T) {
 		method       string
 		requestPath  string
 		bodyPath     string
-		apiKey       string
+		VDBKey       string
 		expectBody   string
 		expectStatus int16
 	}{
 		{
-			name:         "Put llm-service, invalid json",
+			name:         "Put instance, invalid json",
 			method:       http.MethodPut,
-			requestPath:  "/v1/llm-services/alice/openai-large",
-			bodyPath:     "../../testdata/invalid_llm_service.json",
-			apiKey:       aliceAPIKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Unprocessable Entity\",\n  \"status\": 422,\n  \"detail\": \"validation failed\",\n  \"errors\": [\n    {\n      \"message\": \"expected required property model to be present\",\n      \"location\": \"body\",\n      \"value\": {\n        \"api_keX\": \"0123456789\",\n        \"api_standard\": \"openai\",\n        \"description\": \"My OpenAI reduced text-embedding-3-large service\",\n        \"dimensions\": 1024,\n        \"endpoint\": \"https://api.openai.com/v1/embeddings\",\n        \"llm_service_handle\": \"openai-error\"\n      }\n    },\n    {\n      \"message\": \"unexpected property\",\n      \"location\": \"body.api_keX\",\n      \"value\": {\n        \"api_keX\": \"0123456789\",\n        \"api_standard\": \"openai\",\n        \"description\": \"My OpenAI reduced text-embedding-3-large service\",\n        \"dimensions\": 1024,\n        \"endpoint\": \"https://api.openai.com/v1/embeddings\",\n        \"llm_service_handle\": \"openai-error\"\n      }\n    }\n  ]\n}\n",
+			requestPath:  "/v1/llm-instances/alice/embedding1",
+			bodyPath:     "../../testdata/invalid_instance.json",
+			VDBKey:       aliceAPIKey,
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Unprocessable Entity\",\n  \"status\": 422,\n  \"detail\": \"validation failed\",\n  \"errors\": [\n    {\n      \"message\": \"unexpected property\",\n      \"location\": \"body.api_keX\",\n      \"value\": {\n        \"api_keX\": \"0123456789\",\n        \"api_standard\": \"openai\",\n        \"description\": \"My OpenAI reduced text-embedding-3-large service\",\n        \"dimensions\": 99,\n        \"endpoint\": \"https://api.openai.com/v1/embeddings\",\n        \"instance_handle\": \"embedding1\"\n      }\n    }\n  ]\n}\n",
 			expectStatus: http.StatusUnprocessableEntity,
 		},
 		{
-			name:         "Put llm-service, wrong path",
+			name:         "Put instance, wrong path",
 			method:       http.MethodPut,
-			requestPath:  "/v1/llm-services/alice/nonexistent",
-			bodyPath:     "../../testdata/valid_llm_service_test1.json",
-			apiKey:       aliceAPIKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Bad Request\",\n  \"status\": 400,\n  \"detail\": \"llm-service handle in URL (\\\"nonexistent\\\") does not match llm-service handle in body (\\\"test1\\\")\"\n}\n",
+			requestPath:  "/v1/llm-instances/alice/nonexistent",
+			bodyPath:     "../../testdata/valid_instance_embedding1.json",
+			VDBKey:       aliceAPIKey,
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Bad Request\",\n  \"status\": 400,\n  \"detail\": \"instance handle in URL (\\\"nonexistent\\\") does not match instance handle in body (\\\"embedding1\\\")\"\n}\n",
 			expectStatus: http.StatusBadRequest,
 		},
 		{
-			name:         "Valid put llm-service",
+			name:         "Valid put instance",
 			method:       http.MethodPut,
-			requestPath:  "/v1/llm-services/alice/test1",
-			bodyPath:     "../../testdata/valid_llm_service_test1.json",
-			apiKey:       aliceAPIKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/UploadLLMResponseBody.json\",\n  \"owner\": \"alice\",\n  \"llm_service_handle\": \"test1\",\n  \"llm_service_id\": 1\n}\n",
+			requestPath:  "/v1/llm-instances/alice/embedding1",
+			bodyPath:     "../../testdata/valid_instance_embedding1.json",
+			VDBKey:       aliceAPIKey,
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/UploadInstanceResponseBody.json\",\n  \"owner\": \"alice\",\n  \"instance_handle\": \"embedding1\",\n  \"instance_id\": 1\n}\n",
 			expectStatus: http.StatusCreated,
 		},
 		{
-			name:         "Post llm-service, invalid json",
+			name:         "Post instance, invalid json",
 			method:       http.MethodPost,
-			requestPath:  "/v1/llm-services/alice",
-			bodyPath:     "../../testdata/invalid_llm_service.json",
-			apiKey:       aliceAPIKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Unprocessable Entity\",\n  \"status\": 422,\n  \"detail\": \"validation failed\",\n  \"errors\": [\n    {\n      \"message\": \"expected required property model to be present\",\n      \"location\": \"body\",\n      \"value\": {\n        \"api_keX\": \"0123456789\",\n        \"api_standard\": \"openai\",\n        \"description\": \"My OpenAI reduced text-embedding-3-large service\",\n        \"dimensions\": 1024,\n        \"endpoint\": \"https://api.openai.com/v1/embeddings\",\n        \"llm_service_handle\": \"openai-error\"\n      }\n    },\n    {\n      \"message\": \"unexpected property\",\n      \"location\": \"body.api_keX\",\n      \"value\": {\n        \"api_keX\": \"0123456789\",\n        \"api_standard\": \"openai\",\n        \"description\": \"My OpenAI reduced text-embedding-3-large service\",\n        \"dimensions\": 1024,\n        \"endpoint\": \"https://api.openai.com/v1/embeddings\",\n        \"llm_service_handle\": \"openai-error\"\n      }\n    }\n  ]\n}\n",
+			requestPath:  "/v1/llm-instances/alice",
+			bodyPath:     "../../testdata/invalid_instance.json",
+			VDBKey:       aliceAPIKey,
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Unprocessable Entity\",\n  \"status\": 422,\n  \"detail\": \"validation failed\",\n  \"errors\": [\n    {\n      \"message\": \"unexpected property\",\n      \"location\": \"body.api_keX\",\n      \"value\": {\n        \"api_keX\": \"0123456789\",\n        \"api_standard\": \"openai\",\n        \"description\": \"My OpenAI reduced text-embedding-3-large service\",\n        \"dimensions\": 99,\n        \"endpoint\": \"https://api.openai.com/v1/embeddings\",\n        \"instance_handle\": \"embedding1\"\n      }\n    }\n  ]\n}\n",
 			expectStatus: http.StatusUnprocessableEntity,
 		},
 		{
-			name:         "Valid post llm-service",
+			name:         "Valid post instance",
 			method:       http.MethodPost,
-			requestPath:  "/v1/llm-services/alice",
-			bodyPath:     "../../testdata/valid_llm_service_test1.json",
-			apiKey:       aliceAPIKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/UploadLLMResponseBody.json\",\n  \"owner\": \"alice\",\n  \"llm_service_handle\": \"test1\",\n  \"llm_service_id\": 1\n}\n",
+			requestPath:  "/v1/llm-instances/alice",
+			bodyPath:     "../../testdata/valid_instance_embedding1.json",
+			VDBKey:       aliceAPIKey,
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/UploadInstanceResponseBody.json\",\n  \"owner\": \"alice\",\n  \"instance_handle\": \"embedding1\",\n  \"instance_id\": 1\n}\n",
 			expectStatus: http.StatusCreated,
 		},
 		{
-			name:         "Get all llm-services, admin's api key",
+			name:         "Get all of alice's instances, admin's api key",
 			method:       http.MethodGet,
-			requestPath:  "/v1/llm-services/alice",
+			requestPath:  "/v1/llm-instances/alice",
 			bodyPath:     "",
-			apiKey:       options.AdminKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/GetUserLLMsResponseBody.json\",\n  \"llm_service\": [\n    {\n      \"llm_service_id\": 1,\n      \"llm_service_handle\": \"test1\",\n      \"owner\": \"alice\",\n      \"endpoint\": \"https://api.foo.bar/v1/embed\",\n      \"description\": \"An LLM Service just for testing if the dhamps-vdb code is working\",\n      \"api_key\": \"0123456789\",\n      \"api_standard\": \"openai\",\n      \"model\": \"embed-test1\",\n      \"dimensions\": 5\n    }\n  ]\n}\n",
+			VDBKey:       options.AdminKey,
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/GetUserInstancesResponseBody.json\",\n  \"instances\": [\n    {\n      \"owner\": \"alice\",\n      \"instance_handle\": \"embedding1\",\n      \"instance_id\": 1\n    }\n  ]\n}\n",
 			expectStatus: http.StatusOK,
 		},
 		{
-			name:         "Get all llm-services, alice's api key",
+			name:         "Get all of alice's instances, alice's api key",
 			method:       http.MethodGet,
-			requestPath:  "/v1/llm-services/alice",
+			requestPath:  "/v1/llm-instances/alice",
 			bodyPath:     "",
-			apiKey:       aliceAPIKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/GetUserLLMsResponseBody.json\",\n  \"llm_service\": [\n    {\n      \"llm_service_id\": 1,\n      \"llm_service_handle\": \"test1\",\n      \"owner\": \"alice\",\n      \"endpoint\": \"https://api.foo.bar/v1/embed\",\n      \"description\": \"An LLM Service just for testing if the dhamps-vdb code is working\",\n      \"api_key\": \"0123456789\",\n      \"api_standard\": \"openai\",\n      \"model\": \"embed-test1\",\n      \"dimensions\": 5\n    }\n  ]\n}\n",
+			VDBKey:       aliceAPIKey,
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/GetUserInstancesResponseBody.json\",\n  \"instances\": [\n    {\n      \"owner\": \"alice\",\n      \"instance_handle\": \"embedding1\",\n      \"instance_id\": 1\n    }\n  ]\n}\n",
 			expectStatus: http.StatusOK,
 		},
 		{
-			name:         "Get all llm-services, unauthorized",
+			name:         "Get all llm-instances, unauthorized",
 			method:       http.MethodGet,
-			requestPath:  "/v1/llm-services/alice",
+			requestPath:  "/v1/llm-instances/alice",
 			bodyPath:     "",
-			apiKey:       "",
+			VDBKey:       "",
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Unauthorized\",\n  \"status\": 401,\n  \"detail\": \"Authentication failed. Perhaps a missing or incorrect API key?\"\n}\n",
 			expectStatus: http.StatusUnauthorized,
 		},
 		{
-			name:         "Get all llm-services, nonexistent user",
+			name:         "Get all llm-instances, nonexistent user",
 			method:       http.MethodGet,
-			requestPath:  "/v1/llm-services/john",
+			requestPath:  "/v1/llm-instances/john",
 			bodyPath:     "",
-			apiKey:       options.AdminKey,
+			VDBKey:       options.AdminKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Not Found\",\n  \"status\": 404,\n  \"detail\": \"user john not found\"\n}\n",
 			expectStatus: http.StatusNotFound,
 		},
 		{
-			name:         "Get nonexistent llm-service",
+			name:         "Get nonexistent instance",
 			method:       http.MethodGet,
-			requestPath:  "/v1/llm-services/alice/nonexistent",
+			requestPath:  "/v1/llm-instances/alice/nonexistent",
 			bodyPath:     "",
-			apiKey:       aliceAPIKey,
+			VDBKey:       aliceAPIKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Not Found\",\n  \"status\": 404,\n  \"detail\": \"llm service nonexistent for user alice not found\"\n}\n",
 			expectStatus: http.StatusNotFound,
 		},
 		{
-			name:         "Get single llm-service, nonexistent path",
+			name:         "Get single instance, nonexistent path",
 			method:       http.MethodGet,
-			requestPath:  "/v1/llm-services/alice/nonexistant",
+			requestPath:  "/v1/llm-instances/alice/nonexistant",
 			bodyPath:     "",
-			apiKey:       aliceAPIKey,
+			VDBKey:       aliceAPIKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Not Found\",\n  \"status\": 404,\n  \"detail\": \"llm service nonexistant for user alice not found\"\n}\n",
 			expectStatus: http.StatusNotFound,
 		},
 		{
-			name:         "Valid get single llm-service",
+			name:         "Valid get single instance",
 			method:       http.MethodGet,
-			requestPath:  "/v1/llm-services/alice/test1",
+			requestPath:  "/v1/llm-instances/alice/embedding1",
 			bodyPath:     "",
-			apiKey:       aliceAPIKey,
-			expectBody:   "{\n  \"llm_service_id\": 1,\n  \"llm_service_handle\": \"test1\",\n  \"owner\": \"alice\",\n  \"endpoint\": \"https://api.foo.bar/v1/embed\",\n  \"description\": \"An LLM Service just for testing if the dhamps-vdb code is working\",\n  \"api_key\": \"0123456789\",\n  \"api_standard\": \"openai\",\n  \"model\": \"embed-test1\",\n  \"dimensions\": 5\n}\n",
+			VDBKey:       aliceAPIKey,
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/InstanceFull.json\",\n  \"owner\": \"alice\",\n  \"instance_handle\": \"embedding1\",\n  \"instance_id\": 1,\n  \"access_role\": \"owner\",\n  \"endpoint\": \"https://api.foo.bar/v1/embed\",\n  \"description\": \"An LLM Service just for testing if the dhamps-vdb code is working\",\n  \"has_api_key\": true,\n  \"api_standard\": \"openai\",\n  \"model\": \"embed-test1\",\n  \"dimensions\": 5\n}\n",
 			expectStatus: http.StatusOK,
 		},
 		{
-			name:         "Delete nonexistent llm-service",
+			name:         "Delete nonexistent instance",
 			method:       http.MethodDelete,
-			requestPath:  "/v1/llm-services/alice/nonexistent",
+			requestPath:  "/v1/llm-instances/alice/nonexistent",
 			bodyPath:     "",
-			apiKey:       aliceAPIKey,
+			VDBKey:       aliceAPIKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Not Found\",\n  \"status\": 404,\n  \"detail\": \"llm service nonexistent for user alice not found\"\n}\n",
 			expectStatus: http.StatusNotFound,
 		},
 		{
-			name:         "Delete llm-service, invalid user",
+			name:         "Delete instance, invalid user",
 			method:       http.MethodDelete,
-			requestPath:  "/v1/llm-services/john/test1",
+			requestPath:  "/v1/llm-instances/john/embedding1",
 			bodyPath:     "",
-			apiKey:       options.AdminKey,
+			VDBKey:       options.AdminKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Not Found\",\n  \"status\": 404,\n  \"detail\": \"user john not found\"\n}\n",
 			expectStatus: http.StatusNotFound,
 		},
 		{
-			name:         "Delete llm-service, unauthorized",
+			name:         "Delete instance, unauthorized",
 			method:       http.MethodDelete,
-			requestPath:  "/v1/llm-services/alice/test1",
+			requestPath:  "/v1/llm-instances/alice/embedding1",
 			bodyPath:     "",
-			apiKey:       "",
+			VDBKey:       "",
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Unauthorized\",\n  \"status\": 401,\n  \"detail\": \"Authentication failed. Perhaps a missing or incorrect API key?\"\n}\n",
 			expectStatus: http.StatusUnauthorized,
 		},
 		{
-			name:         "Valid delete llm-service",
+			name:         "Valid delete instance",
 			method:       http.MethodDelete,
-			requestPath:  "/v1/llm-services/alice/test1",
+			requestPath:  "/v1/llm-instances/alice/embedding1",
 			bodyPath:     "",
-			apiKey:       aliceAPIKey,
+			VDBKey:       aliceAPIKey,
 			expectBody:   "",
 			expectStatus: http.StatusNoContent,
 		},
@@ -221,7 +224,7 @@ func TestLLMServicesFunc(t *testing.T) {
 			requestURL := fmt.Sprintf("http://%v:%d%v", options.Host, options.Port, v.requestPath)
 			req, err := http.NewRequest(v.method, requestURL, reqBody)
 			assert.NoError(t, err)
-			req.Header.Set("Authorization", "Bearer "+v.apiKey)
+			req.Header.Set("Authorization", "Bearer "+v.VDBKey)
 			resp, err := http.DefaultClient.Do(req)
 			if err != nil {
 				t.Errorf("Error sending request: %v\n", err)

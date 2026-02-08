@@ -1,9 +1,0 @@
-{
-  "llm_service_handle": "openai-large",
-  "endpoint": "https://api.openai.com/v1/embeddings",
-	"description": "My OpenAI full text-embedding-3-large service",
-  "api_key": "0123456789",
-  "api_standard": "openai",
-  "model": "text-embedding-3-large",
-  "dimensions": 3072
-}

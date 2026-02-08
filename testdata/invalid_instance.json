@@ -1,0 +1,8 @@
+{
+  "instance_handle": "embedding1",
+  "endpoint": "https://api.openai.com/v1/embeddings",
+	"description": "My OpenAI reduced text-embedding-3-large service",
+  "api_keX": "0123456789",
+  "api_standard": "openai",
+  "dimensions": 99
+}

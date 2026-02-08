@@ -1,0 +1,8 @@
+{
+  "instance_handle": "gemini",
+  "endpoint": "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent",
+	"description": "My OpenAI full text-embedding-3-small service",
+  "api_standard": "gemini",
+  "model": "gemini-embedding-001",
+  "dimensions": 1536
+}

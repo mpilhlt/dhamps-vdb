@@ -13,6 +13,7 @@ import (
 )
 
 func resetDbFunc(ctx context.Context, input *models.ResetDbRequest) (*models.ResetDbResponse, error) {
+
 	// Get the database connection pool from the context
 	pool, err := GetDBPool(ctx)
 	if err != nil {
@@ -22,7 +23,6 @@ func resetDbFunc(ctx context.Context, input *models.ResetDbRequest) (*models.Res
 		fmt.Print("    Resetting Database: database connection pool is nil\n")
 		return nil, huma.Error500InternalServerError("database connection pool is nil")
 	}
-
 	queries := database.New(pool)
 
 	// delete all records
@@ -53,7 +53,7 @@ func sanityCheckFunc(ctx context.Context, input *models.SanityCheckRequest) (*mo
 	}
 
 	queries := database.New(pool)
-	
+
 	// Get all projects with their metadata schemes
 	projects, err := queries.GetAllProjects(ctx)
 	if err != nil {
@@ -64,32 +64,33 @@ func sanityCheckFunc(ctx context.Context, input *models.SanityCheckRequest) (*mo
 	var warnings []string
 
 	// Check each project
-	for _, project := range projects {
+	for _, p := range projects {
+		project, err := queries.RetrieveProject(ctx, database.RetrieveProjectParams(p))
+		if err != nil {
+			issues = append(issues, fmt.Sprintf("Project %s/%s: unable to retrieve project: %v", p.Owner, p.ProjectHandle, err))
+			continue
+		}
 		projectName := fmt.Sprintf("%s/%s", project.Owner, project.ProjectHandle)
-		
-		// Get all LLM services for this project
-		llmServices, err := queries.GetLLMsByProject(ctx, database.GetLLMsByProjectParams{
+
+		// Get the LLM service instance for this project (1:1 relationship)
+		instance, err := queries.RetrieveInstanceByProject(ctx, database.RetrieveInstanceByProjectParams{
 			Owner:         project.Owner,
 			ProjectHandle: project.ProjectHandle,
-			Limit:         999,
-			Offset:        0,
 		})
 		if err != nil {
-			issues = append(issues, fmt.Sprintf("Project %s: unable to get LLM services: %v", projectName, err))
+			issues = append(issues, fmt.Sprintf("Project %s: unable to get LLM service instance: %v", projectName, err))
 			continue
 		}
 
-		// Create a map of LLM service dimensions
+		// Create a map with the single LLM service instance
 		llmDimensions := make(map[int32]int32)
-		for _, llm := range llmServices {
-			llmDimensions[llm.LLMServiceID] = llm.Dimensions
-		}
+		llmDimensions[instance.InstanceID] = instance.Dimensions
 
 		// Get all embeddings for this project
 		embeddings, err := queries.GetEmbeddingsByProject(ctx, database.GetEmbeddingsByProjectParams{
 			Owner:         project.Owner,
 			ProjectHandle: project.ProjectHandle,
-			Limit:         99999,
+			Limit:         9999999,
 			Offset:        0,
 		})
 		if err != nil {
@@ -98,14 +99,20 @@ func sanityCheckFunc(ctx context.Context, input *models.SanityCheckRequest) (*mo
 		}
 
 		// Check each embedding
-		for _, embedding := range embeddings {
+		for _, e := range embeddings {
+			embedding, err := queries.RetrieveEmbeddingsByID(ctx, e.EmbeddingsID)
+			if err != nil {
+				issues = append(issues, fmt.Sprintf("Project %s, embedding ID %d: unable to retrieve embedding: %v",
+					projectName, e.EmbeddingsID, err))
+				continue
+			}
 			textID := embedding.TextID.String
-			
+
 			// Check dimension consistency
-			expectedDim, ok := llmDimensions[embedding.LLMServiceID]
+			expectedDim, ok := llmDimensions[embedding.InstanceID]
 			if !ok {
-				issues = append(issues, fmt.Sprintf("Project %s, text_id '%s': LLM service ID %d not found", 
-					projectName, textID, embedding.LLMServiceID))
+				issues = append(issues, fmt.Sprintf("Project %s, text_id '%s': LLM service ID %d not found",
+					projectName, textID, embedding.InstanceID))
 				continue
 			}
 
@@ -124,7 +131,7 @@ func sanityCheckFunc(ctx context.Context, input *models.SanityCheckRequest) (*mo
 
 		// Warn if project has embeddings but no metadata scheme defined
 		if len(embeddings) > 0 && (!project.MetadataScheme.Valid || project.MetadataScheme.String == "") {
-			warnings = append(warnings, fmt.Sprintf("Project %s has %d embeddings but no metadata schema defined", 
+			warnings = append(warnings, fmt.Sprintf("Project %s has %d embeddings but no metadata schema defined",
 				projectName, len(embeddings)))
 		}
 	}
@@ -165,7 +172,6 @@ func RegisterAdminRoutes(pool *pgxpool.Pool, api huma.API) error {
 		// Middlewares Middlewares `yaml:"-"` // Middleware to run before the operation, useful for logging, etc.
 		Tags: []string{"admin"},
 	}
-
 	sanityCheckOp := huma.Operation{
 		OperationID: "sanityCheck",
 		Method:      http.MethodGet,

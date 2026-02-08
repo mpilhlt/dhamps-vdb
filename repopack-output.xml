@@ -444,7 +444,7 @@ components:
         description:
           type: string
           maxLength: 255
-        authorizedReaders:
+        shared_with:
           type: array
           items:
             type: string
@@ -452,7 +452,7 @@ components:
             maxLength: 20
           uniqueItems: true
           default: ["*"]
-        llmservices:
+        instances:
           type: array
           items:
             type: string
@@ -1124,7 +1124,7 @@ CREATE TABLE IF NOT EXISTS users(
   "handle" VARCHAR(20) PRIMARY KEY,
   "name" TEXT,
   "email" TEXT UNIQUE NOT NULL,
-  "vdb_api_key" CHAR(32) UNIQUE NOT NULL,
+  "vdb_key" CHAR(32) UNIQUE NOT NULL,
   "created_at" TIMESTAMP NOT NULL,
   "updated_at" TIMESTAMP NOT NULL
 );
@@ -1183,7 +1183,7 @@ CREATE TABLE IF NOT EXISTS api_standards(
   "updated_at" TIMESTAMP NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS llmservices(
+CREATE TABLE IF NOT EXISTS instances(
   "llmservice_id" SERIAL PRIMARY KEY,
   "handle" VARCHAR(20) NOT NULL,
   "owner" VARCHAR(20) NOT NULL REFERENCES "users"("handle") ON DELETE CASCADE,
@@ -1196,13 +1196,13 @@ CREATE TABLE IF NOT EXISTS llmservices(
   UNIQUE ("handle", "owner")
 );
 
-CREATE INDEX IF NOT EXISTS llmservices_handle ON "llmservices"("handle");
+CREATE INDEX IF NOT EXISTS llmservices_handle ON "instances"("handle");
 
 -- This creates the users_llmservices associations table.
 
 CREATE TABLE IF NOT EXISTS users_llmservices(
   "user" VARCHAR(20) NOT NULL REFERENCES "users"("handle") ON DELETE CASCADE,
-  "llmservice" SERIAL NOT NULL REFERENCES "llmservices"("llmservice_id") ON DELETE CASCADE,
+  "llmservice" SERIAL NOT NULL REFERENCES "instances"("llmservice_id") ON DELETE CASCADE,
   "role" VARCHAR(20) NOT NULL REFERENCES "vdb_roles"("vdb_role"),
   "created_at" TIMESTAMP NOT NULL,
   "updated_at" TIMESTAMP NOT NULL,
@@ -1213,7 +1213,7 @@ CREATE TABLE IF NOT EXISTS users_llmservices(
 
 CREATE TABLE IF NOT EXISTS projects_llmservices(
   "project" SERIAL NOT NULL REFERENCES "projects"("project_id") ON DELETE CASCADE,
-  "llmservice" SERIAL NOT NULL REFERENCES "llmservices"("llmservice_id") ON DELETE CASCADE,
+  "llmservice" SERIAL NOT NULL REFERENCES "instances"("llmservice_id") ON DELETE CASCADE,
   "created_at" TIMESTAMP NOT NULL,
   "updated_at" TIMESTAMP NOT NULL,
   PRIMARY KEY ("project", "llmservice")
@@ -1228,7 +1228,7 @@ CREATE TABLE IF NOT EXISTS embeddings(
   "text_id" TEXT,
   "embedding" halfvec NOT NULL,
   "embedding_dim" INTEGER NOT NULL,
-  "llmservice" SERIAL NOT NULL REFERENCES "llmservices"("llmservice_id"),
+  "llmservice" SERIAL NOT NULL REFERENCES "instances"("llmservice_id"),
   "text" TEXT,
   -- TODO: add metadata handling
   -- "metadata" jsonb,
@@ -1262,7 +1262,7 @@ DROP TABLE IF EXISTS vdb_roles;
 
 -- This removes the LLM Services table.
 
-DROP TABLE IF EXISTS llmservices;
+DROP TABLE IF EXISTS instances;
 
 DROP INDEX IF EXISTS llmservices_handle;
 
@@ -1386,14 +1386,14 @@ SET hnsw.ef_search = 40;
 
 -- name: UpsertUser :one
 INSERT INTO users (
-  "handle", "name", "email", "vdb_api_key", "created_at", "updated_at"
+  "handle", "name", "email", "vdb_key", "created_at", "updated_at"
 ) VALUES (
   $1, $2, $3, $4, NOW(), NOW()
 )
 ON CONFLICT ("handle") DO UPDATE SET
   "name" = $2,
   "email" = $3,
-  "vdb_api_key" = $4,
+  "vdb_key" = $4,
   "updated_at" = NOW()
 RETURNING *;
 
@@ -1463,7 +1463,7 @@ RETURNING *;
 
 
 -- name: UpsertLLM :one
-INSERT INTO llmservices (
+INSERT INTO instances (
   "handle", "owner", "description", "endpoint", "api_key", "api_standard", "created_at", "updated_at"
 ) VALUES (
   $1, $2, $3, $4, $5, $6, NOW(), NOW()
@@ -1477,12 +1477,12 @@ ON CONFLICT ("handle", "owner") DO UPDATE SET
 RETURNING "llmservice_id", "handle", "owner";
 
 -- name: DeleteLLM :exec
-DELETE FROM llmservices
+DELETE FROM instances
 WHERE "owner" = $1
   AND "handle" = $2;
 
 -- name: RetrieveLLM :one
-SELECT * FROM llmservices
+SELECT * FROM instances
 WHERE "owner" = $1
   AND "handle" = $2
 LIMIT 1;
@@ -1508,25 +1508,25 @@ ON CONFLICT ("project", "llmservice") DO NOTHING
 RETURNING *;
 
 -- name: GetLLMsByProject :many
-SELECT llmservices.* FROM llmservices
+SELECT instances.* FROM instances
 JOIN (
   projects_llmservices JOIN projects
   ON projects_llmservices."project" = projects."project_id"
 )
-ON llmservices."llmservice_id" = projects_llmservices."llmservice"
+ON instances."llmservice_id" = projects_llmservices."llmservice"
 WHERE projects."owner" = $1
   AND projects."handle" = $2
-ORDER BY llmservices."handle" ASC LIMIT $3 OFFSET $4;
+ORDER BY instances."handle" ASC LIMIT $3 OFFSET $4;
 
 -- name: GetLLMsByUser :many
-SELECT llmservices.* FROM llmservices
+SELECT instances.* FROM instances
 JOIN (
   projects_llmservices JOIN users_projects
   ON projects_llmservices."project" = users_projects."project_id"
 )
-ON llmservices."llmservice_id" = projects_llmservices."llmservice"
+ON instances."llmservice_id" = projects_llmservices."llmservice"
 WHERE users_projects."user_handle" = $1
-ORDER BY llmservices."handle" ASC LIMIT $2 OFFSET $3;
+ORDER BY instances."handle" ASC LIMIT $2 OFFSET $3;
 
 
 -- TODO: Add metadata field
@@ -1556,17 +1556,17 @@ DELETE FROM embeddings
 WHERE "owner" = $1
   AND "project" = $2;
 
--- name: DeleteDocEmbeddings :exec
+-- name: DeleteEmbeddingsByDocID :exec
 DELETE FROM embeddings
 WHERE "owner" = $1
   AND "project" = $2
   AND "text_id" = $3;
 
 -- name: RetrieveEmbeddings :one
-SELECT embeddings.*, projects."handle" AS "project", llmservices."handle"
+SELECT embeddings.*, projects."handle" AS "project", instances."handle"
 FROM embeddings
-JOIN llmservices
-  ON embeddings."llmservice" = llmservices."llmservice_id"
+JOIN instances
+  ON embeddings."llmservice" = instances."llmservice_id"
 JOIN projects
   ON projects."project_id" = embeddings."project"
 WHERE embeddings."owner" = $1
@@ -1575,10 +1575,10 @@ WHERE embeddings."owner" = $1
 LIMIT 1;
 
 -- name: GetEmbeddingsByProject :many
-SELECT embeddings.*, projects."handle" AS "project", llmservices."handle" AS "llmservice"
+SELECT embeddings.*, projects."handle" AS "project", instances."handle" AS "llmservice"
 FROM embeddings
-JOIN llmservices
-  ON llmservices."llmservice_id" = embeddings."llmservice"
+JOIN instances
+  ON instances."llmservice_id" = embeddings."llmservice"
 JOIN projects
   ON projects."project_id" = embeddings."project"
 WHERE embeddings."owner" = $1
@@ -1615,9 +1615,9 @@ ORDER BY "handle" ASC LIMIT $1 OFFSET $2;
 
 
 -- name: GetSimilarsByVector :many
-SELECT embeddings."id", embeddings."text_id", llmservices."owner", llmservices."handle"
-FROM embeddings JOIN llmservices
-ON embeddings."llmservice" = llmservices."llmservice_id"
+SELECT embeddings."id", embeddings."text_id", instances."owner", instances."handle"
+FROM embeddings JOIN instances
+ON embeddings."llmservice" = instances."llmservice_id"
 ORDER BY "embedding" <=> $1
 LIMIT $2 OFFSET $3;
 
@@ -1949,7 +1949,7 @@ type User struct {
 	Handle    string           `db:"handle" json:"handle"`
 	Name      pgtype.Text      `db:"name" json:"name"`
 	Email     string           `db:"email" json:"email"`
-	VdbApiKey string           `db:"vdb_api_key" json:"vdb_api_key"`
+	VDBKey string           `db:"vdb_key" json:"vdb_key"`
 	CreatedAt pgtype.Timestamp `db:"created_at" json:"created_at"`
 	UpdatedAt pgtype.Timestamp `db:"updated_at" json:"updated_at"`
 }
@@ -2000,20 +2000,20 @@ func (q *Queries) DeleteAPI(ctx context.Context, handle string) error {
 	return err
 }
 
-const deleteDocEmbeddings = `-- name: DeleteDocEmbeddings :exec
+const deleteDocEmbeddings = `-- name: DeleteEmbeddingsByDocID :exec
 DELETE FROM embeddings
 WHERE "owner" = $1
   AND "project" = $2
   AND "text_id" = $3
 `
 
-type DeleteDocEmbeddingsParams struct {
+type DeleteEmbeddingsByDocIDParams struct {
 	Owner   string      `db:"owner" json:"owner"`
 	Project int32       `db:"project" json:"project"`
 	TextID  pgtype.Text `db:"text_id" json:"text_id"`
 }
 
-func (q *Queries) DeleteDocEmbeddings(ctx context.Context, arg DeleteDocEmbeddingsParams) error {
+func (q *Queries) DeleteEmbeddingsByDocID(ctx context.Context, arg DeleteEmbeddingsByDocIDParams) error {
 	_, err := q.db.Exec(ctx, deleteDocEmbeddings, arg.Owner, arg.Project, arg.TextID)
 	return err
 }
@@ -2045,7 +2045,7 @@ func (q *Queries) DeleteEmbeddingsByProject(ctx context.Context, arg DeleteEmbed
 }
 
 const deleteLLM = `-- name: DeleteLLM :exec
-DELETE FROM llmservices
+DELETE FROM instances
 WHERE "owner" = $1
   AND "handle" = $2
 `
@@ -2125,10 +2125,10 @@ func (q *Queries) GetAPIs(ctx context.Context, arg GetAPIsParams) ([]ApiStandard
 }
 
 const getEmbeddingsByProject = `-- name: GetEmbeddingsByProject :many
-SELECT embeddings.id, embeddings.owner, embeddings.project, embeddings.text_id, embeddings.embedding, embeddings.embedding_dim, embeddings.llmservice, embeddings.text, embeddings.created_at, embeddings.updated_at, projects."handle" AS "project", llmservices."handle" AS "llmservice"
+SELECT embeddings.id, embeddings.owner, embeddings.project, embeddings.text_id, embeddings.embedding, embeddings.embedding_dim, embeddings.llmservice, embeddings.text, embeddings.created_at, embeddings.updated_at, projects."handle" AS "project", instances."handle" AS "llmservice"
 FROM embeddings
-JOIN llmservices
-  ON llmservices."llmservice_id" = embeddings."llmservice"
+JOIN instances
+  ON instances."llmservice_id" = embeddings."llmservice"
 JOIN projects
   ON projects."project_id" = embeddings."project"
 WHERE embeddings."owner" = $1
@@ -2197,15 +2197,15 @@ func (q *Queries) GetEmbeddingsByProject(ctx context.Context, arg GetEmbeddingsB
 }
 
 const getLLMsByProject = `-- name: GetLLMsByProject :many
-SELECT llmservices.llmservice_id, llmservices.handle, llmservices.owner, llmservices.description, llmservices.endpoint, llmservices.api_key, llmservices.api_standard, llmservices.created_at, llmservices.updated_at FROM llmservices
+SELECT instances.llmservice_id, instances.handle, instances.owner, instances.description, instances.endpoint, instances.api_key, instances.api_standard, instances.created_at, instances.updated_at FROM instances
 JOIN (
   projects_llmservices JOIN projects
   ON projects_llmservices."project" = projects."project_id"
 )
-ON llmservices."llmservice_id" = projects_llmservices."llmservice"
+ON instances."llmservice_id" = projects_llmservices."llmservice"
 WHERE projects."owner" = $1
   AND projects."handle" = $2
-ORDER BY llmservices."handle" ASC LIMIT $3 OFFSET $4
+ORDER BY instances."handle" ASC LIMIT $3 OFFSET $4
 `
 
 type GetLLMsByProjectParams struct {
@@ -2251,14 +2251,14 @@ func (q *Queries) GetLLMsByProject(ctx context.Context, arg GetLLMsByProjectPara
 }
 
 const getLLMsByUser = `-- name: GetLLMsByUser :many
-SELECT llmservices.llmservice_id, llmservices.handle, llmservices.owner, llmservices.description, llmservices.endpoint, llmservices.api_key, llmservices.api_standard, llmservices.created_at, llmservices.updated_at FROM llmservices
+SELECT instances.llmservice_id, instances.handle, instances.owner, instances.description, instances.endpoint, instances.api_key, instances.api_standard, instances.created_at, instances.updated_at FROM instances
 JOIN (
   projects_llmservices JOIN users_projects
   ON projects_llmservices."project" = users_projects."project_id"
 )
-ON llmservices."llmservice_id" = projects_llmservices."llmservice"
+ON instances."llmservice_id" = projects_llmservices."llmservice"
 WHERE users_projects."user_handle" = $1
-ORDER BY llmservices."handle" ASC LIMIT $2 OFFSET $3
+ORDER BY instances."handle" ASC LIMIT $2 OFFSET $3
 `
 
 type GetLLMsByUserParams struct {
@@ -2394,9 +2394,9 @@ func (q *Queries) GetSimilarsByID(ctx context.Context, arg GetSimilarsByIDParams
 }
 
 const getSimilarsByVector = `-- name: GetSimilarsByVector :many
-SELECT embeddings."id", embeddings."text_id", llmservices."owner", llmservices."handle"
-FROM embeddings JOIN llmservices
-ON embeddings."llmservice" = llmservices."llmservice_id"
+SELECT embeddings."id", embeddings."text_id", instances."owner", instances."handle"
+FROM embeddings JOIN instances
+ON embeddings."llmservice" = instances."llmservice_id"
 ORDER BY "embedding" <=> $1
 LIMIT $2 OFFSET $3
 `
@@ -2609,10 +2609,10 @@ func (q *Queries) RetrieveAPI(ctx context.Context, handle string) (ApiStandard, 
 }
 
 const retrieveEmbeddings = `-- name: RetrieveEmbeddings :one
-SELECT embeddings.id, embeddings.owner, embeddings.project, embeddings.text_id, embeddings.embedding, embeddings.embedding_dim, embeddings.llmservice, embeddings.text, embeddings.created_at, embeddings.updated_at, projects."handle" AS "project", llmservices."handle"
+SELECT embeddings.id, embeddings.owner, embeddings.project, embeddings.text_id, embeddings.embedding, embeddings.embedding_dim, embeddings.llmservice, embeddings.text, embeddings.created_at, embeddings.updated_at, projects."handle" AS "project", instances."handle"
 FROM embeddings
-JOIN llmservices
-  ON embeddings."llmservice" = llmservices."llmservice_id"
+JOIN instances
+  ON embeddings."llmservice" = instances."llmservice_id"
 JOIN projects
   ON projects."project_id" = embeddings."project"
 WHERE embeddings."owner" = $1
@@ -2663,7 +2663,7 @@ func (q *Queries) RetrieveEmbeddings(ctx context.Context, arg RetrieveEmbeddings
 }
 
 const retrieveLLM = `-- name: RetrieveLLM :one
-SELECT llmservice_id, handle, owner, description, endpoint, api_key, api_standard, created_at, updated_at FROM llmservices
+SELECT llmservice_id, handle, owner, description, endpoint, api_key, api_standard, created_at, updated_at FROM instances
 WHERE "owner" = $1
   AND "handle" = $2
 LIMIT 1
@@ -2719,7 +2719,7 @@ func (q *Queries) RetrieveProject(ctx context.Context, arg RetrieveProjectParams
 }
 
 const retrieveUser = `-- name: RetrieveUser :one
-SELECT handle, name, email, vdb_api_key, created_at, updated_at FROM users
+SELECT handle, name, email, vdb_key, created_at, updated_at FROM users
 WHERE "handle" = $1 LIMIT 1
 `
 
@@ -2730,7 +2730,7 @@ func (q *Queries) RetrieveUser(ctx context.Context, handle string) (User, error)
 		&i.Handle,
 		&i.Name,
 		&i.Email,
-		&i.VdbApiKey,
+		&i.VDBKey,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -2830,7 +2830,7 @@ const upsertLLM = `-- name: UpsertLLM :one
 
 
 
-INSERT INTO llmservices (
+INSERT INTO instances (
   "handle", "owner", "description", "endpoint", "api_key", "api_standard", "created_at", "updated_at"
 ) VALUES (
   $1, $2, $3, $4, $5, $6, NOW(), NOW()
@@ -2915,23 +2915,23 @@ func (q *Queries) UpsertProject(ctx context.Context, arg UpsertProjectParams) (U
 const upsertUser = `-- name: UpsertUser :one
 
 INSERT INTO users (
-  "handle", "name", "email", "vdb_api_key", "created_at", "updated_at"
+  "handle", "name", "email", "vdb_key", "created_at", "updated_at"
 ) VALUES (
   $1, $2, $3, $4, NOW(), NOW()
 )
 ON CONFLICT ("handle") DO UPDATE SET
   "name" = $2,
   "email" = $3,
-  "vdb_api_key" = $4,
+  "vdb_key" = $4,
   "updated_at" = NOW()
-RETURNING handle, name, email, vdb_api_key, created_at, updated_at
+RETURNING handle, name, email, vdb_key, created_at, updated_at
 `
 
 type UpsertUserParams struct {
 	Handle    string      `db:"handle" json:"handle"`
 	Name      pgtype.Text `db:"name" json:"name"`
 	Email     string      `db:"email" json:"email"`
-	VdbApiKey string      `db:"vdb_api_key" json:"vdb_api_key"`
+	VDBKey string      `db:"vdb_key" json:"vdb_key"`
 }
 
 // Generate go code with: sqlc generate
@@ -2940,14 +2940,14 @@ func (q *Queries) UpsertUser(ctx context.Context, arg UpsertUserParams) (User, e
 		arg.Handle,
 		arg.Name,
 		arg.Email,
-		arg.VdbApiKey,
+		arg.VDBKey,
 	)
 	var i User
 	err := row.Scan(
 		&i.Handle,
 		&i.Name,
 		&i.Email,
-		&i.VdbApiKey,
+		&i.VDBKey,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -3348,7 +3348,7 @@ func getDocEmbeddingsFunc(ctx context.Context, input *models.GetDocEmbeddingsReq
 	return response, nil
 }
 
-func deleteDocEmbeddingsFunc(ctx context.Context, input *models.DeleteDocEmbeddingsRequest) (*models.DeleteDocEmbeddingsResponse, error) {
+func deleteDocEmbeddingsFunc(ctx context.Context, input *models.DeleteEmbeddingsByDocIDRequest) (*models.DeleteEmbeddingsByDocIDResponse, error) {
 	// Check if user and project exist
 	u, p, err := getUserProj(ctx, input.User, input.Project)
 	if err != nil {
@@ -3366,7 +3366,7 @@ func deleteDocEmbeddingsFunc(ctx context.Context, input *models.DeleteDocEmbeddi
 	}
 
 	// Build query parameters (embeddings)
-	params := database.DeleteDocEmbeddingsParams{
+	params := database.DeleteEmbeddingsByDocIDParams{
 		Owner:   u,
 		Project: p,
 		TextID:  pgtype.Text{String: input.ID, Valid: true},
@@ -3374,13 +3374,13 @@ func deleteDocEmbeddingsFunc(ctx context.Context, input *models.DeleteDocEmbeddi
 
 	// Run the query
 	queries := database.New(pool)
-	err = queries.DeleteDocEmbeddings(ctx, params)
+	err = queries.DeleteEmbeddingsByDocID(ctx, params)
 	if err != nil {
 		return nil, huma.Error500InternalServerError("unable to delete embeddings")
 	}
 
 	// Build the response
-	response := &models.DeleteDocEmbeddingsResponse{}
+	response := &models.DeleteEmbeddingsByDocIDResponse{}
 	response.Body = fmt.Sprintf("Successfully deleted embeddings for document %s (%s's project %s)", input.ID, input.User, input.Project)
 	return response, nil
 }
@@ -3695,7 +3695,7 @@ func createUser(t *testing.T, userJSON string) (string, error) {
 	// get API key for user alice from response body
 	body, err := io.ReadAll(resp.Body)
 	assert.NoError(t, err)
-	userInfo := models.HandleAPIStruct{}
+	userInfo := models.UserResponse{}
 	err = json.Unmarshal(body, &userInfo)
 	assert.NoError(t, err)
 	return userInfo.APIKey, nil
@@ -4160,37 +4160,37 @@ func RegisterLLMServiceRoutes(pool *pgxpool.Pool, api huma.API) error {
   postLLMServiceOp := huma.Operation{
     OperationID: "postLLMService",
     Method:      http.MethodPost,
-    Path:        "/llmservices/{user}",
+    Path:        "/instances/{user}",
     Summary:     "Create llm service",
-    Tags:        []string{"llmservices"},
+    Tags:        []string{"instances"},
   }
   putLLMServiceOp := huma.Operation{
     OperationID: "putLLMService",
     Method:      http.MethodPut,
-    Path:        "/llmservices/{user}/{handle}",
+    Path:        "/instances/{user}/{handle}",
     Summary:     "Create or update llm service",
-    Tags:        []string{"llmservices"},
+    Tags:        []string{"instances"},
   }
   getUserLLMServicesOp := huma.Operation{
     OperationID: "getUserLLMServices",
     Method:      http.MethodGet,
-    Path:        "/llmservices/{user}",
+    Path:        "/instances/{user}",
     Summary:     "Get all llm services for a user",
-    Tags:        []string{"llmservices"},
+    Tags:        []string{"instances"},
   }
   getLLMServiceOp := huma.Operation{
     OperationID: "getLLMService",
     Method:      http.MethodGet,
-    Path:        "/llmservices/{user}/{handle}",
+    Path:        "/instances/{user}/{handle}",
     Summary:     "Get a specific llm service for a user",
-    Tags:        []string{"llmservices"},
+    Tags:        []string{"instances"},
   }
   deleteLLMServiceOp := huma.Operation{
     OperationID: "deleteLLMService",
     Method:      http.MethodDelete,
-    Path:        "/llmservices/{user}/{handle}",
+    Path:        "/instances/{user}/{handle}",
     Summary:     "Delete all embeddings for a user",
-    Tags:        []string{"llmservices"},
+    Tags:        []string{"instances"},
   }
 
   huma.Register(api, postLLMServiceOp, addPoolToContext(pool, postLLMFunc))
@@ -4307,7 +4307,7 @@ func TestProjectFunc(t *testing.T) {
 			requestPath:  "/projects/alice/test1",
 			bodyPath:     "",
 			apiKeyHeader: aliceAPIKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/GetProjectResponseBody.json\",\n  \"project\": {\n    \"project_id\": 0,\n    \"handle\": \"test1\",\n    \"description\": \"This is a test project\",\n    \"authorizedReaders\": [\n      \"alice\"\n    ]\n  }\n}\n",
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/GetProjectResponseBody.json\",\n  \"project\": {\n    \"project_id\": 0,\n    \"handle\": \"test1\",\n    \"description\": \"This is a test project\",\n    \"shared_with\": [\n      \"alice\"\n    ]\n  }\n}\n",
 			expectStatus: 200,
 		},
 		{
@@ -4316,7 +4316,7 @@ func TestProjectFunc(t *testing.T) {
 			requestPath:  "/projects/alice",
 			bodyPath:     "",
 			apiKeyHeader: aliceAPIKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/GetProjectsResponseBody.json\",\n  \"projects\": [\n    {\n      \"project_id\": 2,\n      \"handle\": \"test1\",\n      \"description\": \"This is a test project\",\n      \"authorizedReaders\": [\n        \"alice\"\n      ]\n    }\n  ]\n}\n",
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/GetProjectsResponseBody.json\",\n  \"projects\": [\n    {\n      \"project_id\": 2,\n      \"handle\": \"test1\",\n      \"description\": \"This is a test project\",\n      \"shared_with\": [\n        \"alice\"\n      ]\n    }\n  ]\n}\n",
 			expectStatus: 200,
 		},
 		{
@@ -4508,7 +4508,7 @@ func putProjectFunc(ctx context.Context, input *models.PutProjectRequest) (*mode
 
 	// Build query parameters (project)
 	readers := make(map[string]bool)
-	for _, user := range input.Body.AuthorizedReaders {
+	for _, user := range input.Body.SharedWith {
 		if user == "*" {
 			users, err := getUsersFunc(ctx, &models.GetUsersRequest{})
 			if err != nil {
@@ -4614,7 +4614,7 @@ func getProjectsFunc(ctx context.Context, input *models.GetProjectsRequest) (*mo
 			Id:                int(project.ProjectID),
 			Handle:            project.Handle,
 			Description:       project.Description.String,
-			AuthorizedReaders: readers,
+			SharedWith: readers,
 			LLMServices:       nil,
 		})
 	}
@@ -4674,7 +4674,7 @@ func getProjectFunc(ctx context.Context, input *models.GetProjectRequest) (*mode
 		Handle:            p.Handle,
 		Description:       p.Description.String,
 		MetadataScheme:    p.MetadataScheme.String,
-		AuthorizedReaders: readers,
+		SharedWith: readers,
 		LLMServices:       nil,
 	}
 
@@ -4898,7 +4898,7 @@ func TestUserFunc(t *testing.T) {
 			method:       http.MethodPut,
 			requestPath:  "/users/alice",
 			bodyPath:     "../../testdata/valid_user.json",
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/HandleAPIStruct.json\",\n  \"handle\": \"alice\",\n  \"apiKey\": \"12345678901234567890123456789012\"\n}\n",
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/UserResponse.json\",\n  \"handle\": \"alice\",\n  \"apiKey\": \"12345678901234567890123456789012\"\n}\n",
 			expectStatus: 201,
 		},
 		{
@@ -4922,7 +4922,7 @@ func TestUserFunc(t *testing.T) {
 			method:       http.MethodPost,
 			requestPath:  "/users",
 			bodyPath:     "../../testdata/valid_user.json",
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/HandleAPIStruct.json\",\n  \"handle\": \"alice\",\n  \"apiKey\": \"12345678901234567890123456789012\"\n}\n",
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/UserResponse.json\",\n  \"handle\": \"alice\",\n  \"apiKey\": \"12345678901234567890123456789012\"\n}\n",
 			expectStatus: 201,
 		},
 		{
@@ -5119,7 +5119,7 @@ func putUserFunc(ctx context.Context, input *models.PutUserRequest) (*models.Upl
 	api_key := ""
 	if u.Handle == input.Handle {
 		// User exists, so don't create API key
-		api_key = u.VdbApiKey
+		api_key = u.VDBKey
 	} else {
 		// User does not exist, so create a new API key
 		k, err := keyGen.RandomKey(64)
@@ -5132,7 +5132,7 @@ func putUserFunc(ctx context.Context, input *models.PutUserRequest) (*models.Upl
 		Handle:    input.Handle,
 		Name:      pgtype.Text{String: input.Body.Name, Valid: true},
 		Email:     input.Body.Email,
-		VdbApiKey: api_key,
+		VDBKey: api_key,
 	}
 
 	// Run the query
@@ -5144,7 +5144,7 @@ func putUserFunc(ctx context.Context, input *models.PutUserRequest) (*models.Upl
 	// Build the response
 	response := &models.UploadUserResponse{}
 	response.Body.Handle = u.Handle
-	response.Body.APIKey = u.VdbApiKey
+	response.Body.APIKey = u.VDBKey
 	return response, nil
 }
 
@@ -5207,7 +5207,7 @@ func getUserFunc(ctx context.Context, input *models.GetUserRequest) (*models.Get
 		Handle: u.Handle,
 		Name:   u.Name.String,
 		Email:  u.Email,
-		APIKey: u.VdbApiKey,
+		APIKey: u.VDBKey,
 	}
 	response := &models.GetUserResponse{}
 	response.Body = *returnUser
@@ -5425,13 +5425,13 @@ type GetDocEmbeddingsResponse struct {
 // Delete document embeddings
 // Path: "/embeddings/{user}/{project}/{id}"
 
-type DeleteDocEmbeddingsRequest struct {
+type DeleteEmbeddingsByDocIDRequest struct {
   User       string `json:"user" path:"user" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
   Project    string `json:"project" path:"project" maxLength:"20" minLength:"3" example:"my-gpt-4" doc:"Project handle"`
   ID         string `json:"id" path:"id" maxLength:"200" minLength:"3" example:"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0017%3Afrontmatter.1.1%0A" doc:"Document identifier"`
 }
 
-type DeleteDocEmbeddingsResponse struct {
+type DeleteEmbeddingsByDocIDResponse struct {
   Header []http.Header `json:"header,omitempty" doc:"Response headers"`
   Body string `json:"body" doc:"Success message"`
 }
@@ -5477,7 +5477,7 @@ type LLMService struct {
 // The response structs must be structs with fields for the output headers and body of the operation, if any.
 
 // Put/post project
-// PUT Path: "/llmservices/{user}/{handle}"
+// PUT Path: "/instances/{user}/{handle}"
 
 type PutLLMRequest struct {
   User       string `json:"user" path:"user" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
@@ -5487,7 +5487,7 @@ type PutLLMRequest struct {
   }
 }
 
-// POST Path: "/llmservices/{user}"
+// POST Path: "/instances/{user}"
 
 type PostLLMRequest struct {
   User       string `json:"user" path:"user" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
@@ -5504,7 +5504,7 @@ type UploadLLMResponse struct {
 }
 
 // Get all LLM services by user
-// Path: "/llmservices/{user}"
+// Path: "/instances/{user}"
 
 type GetUserLLMsRequest struct {
   User       string `json:"user" path:"user" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
@@ -5520,7 +5520,7 @@ type GetUserLLMsResponse struct {
 }
 
 // Get single LLM service
-// Path: "/llmservices/{user}/{handle}"
+// Path: "/instances/{user}/{handle}"
 
 type GetLLMRequest struct {
   User       string `json:"user" path:"user" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
@@ -5537,7 +5537,7 @@ type GetLLMResponse struct {
 }
 
 // Delete LLM service
-// Path: "/llmservices/{user}/{handle}"
+// Path: "/instances/{user}/{handle}"
 
 type DeleteLLMRequest struct {
   User       string `json:"user" path:"user" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
@@ -5580,7 +5580,7 @@ type Project struct {
 	Handle            string       `json:"handle" minLength:"3" maxLength:"20" example:"my-gpt-4" doc:"Project handle"`
 	Description       string       `json:"description,omitempty" maxLength:"255" doc:"Description of the project."`
 	MetadataScheme    string       `json:"metadataScheme,omitempty" doc:"Metadata json scheme used in the project."`
-	AuthorizedReaders []string     `json:"authorizedReaders,omitempty" default:"" example:"[\"jdoe\",\"foobar\"]" doc:"Account names allowed to retrieve information from the project. Defaults to everyone ([\"*\"])"`
+	SharedWith []string     `json:"shared_with,omitempty" default:"" example:"[\"jdoe\",\"foobar\"]" doc:"Account names allowed to retrieve information from the project. Defaults to everyone ([\"*\"])"`
 	LLMServices       []LLMService `json:"llmServices,omitempty" doc:"LLM services used in the project"`
 }
 
@@ -5588,7 +5588,7 @@ type ProjectSubmission struct {
 	Handle            string       `json:"handle" minLength:"3" maxLength:"20" example:"my-gpt-4" doc:"Project handle"`
 	Description       string       `json:"description,omitempty" maxLength:"255" doc:"Description of the project."`
 	MetadataScheme    string       `json:"metadataScheme,omitempty" doc:"Metadata json scheme used in the project."`
-	AuthorizedReaders []string     `json:"authorizedReaders,omitempty" default:"" example:"[\"jdoe\",\"foobar\"]" doc:"Account names allowed to retrieve information from the project. Defaults to everyone ([\"*\"])"`
+	SharedWith []string     `json:"shared_with,omitempty" default:"" example:"[\"jdoe\",\"foobar\"]" doc:"Account names allowed to retrieve information from the project. Defaults to everyone ([\"*\"])"`
 	LLMServices       []LLMService `json:"llmServices,omitempty" doc:"LLM services used in the project"`
 }
 
@@ -5734,10 +5734,10 @@ type PostUserRequest struct {
 
 type UploadUserResponse struct {
   Header []http.Header `json:"header,omitempty" doc:"Response headers"`
-  Body HandleAPIStruct
+  Body UserResponse
 }
 
-type HandleAPIStruct struct {
+type UserResponse struct {
   Handle string `json:"handle" doc:"Handle of created or updated user"`
   APIKey string `json:"apiKey" doc:"API key for the user"`
 }

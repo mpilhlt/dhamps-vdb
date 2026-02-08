@@ -34,7 +34,7 @@ paths:
                   type: string
                 email:
                   type: string
-                apiKey:
+                VDBKey:
                   type: string
       responses:
         "200":
@@ -107,7 +107,7 @@ paths:
                   type: string
                 email:
                   type: string
-                apiKey:
+                VDBKey:
                   type: string
       responses:
         "200":
@@ -308,7 +308,7 @@ components:
         email:
           type: string
           format: email
-        apiKey:
+        VDBKey:
           type: string
           minLength: 32
           maxLength: 32
@@ -321,7 +321,7 @@ components:
       required:
         - handle
         - email
-        - apiKey
+        - VDBKey
     project:
       type: object
       properties:
@@ -332,7 +332,7 @@ components:
         description:
           type: string
           maxLength: 255
-        authorizedReaders:
+        shared_with:
           type: array
           items:
             type: string
@@ -340,7 +340,7 @@ components:
             maxLength: 20
           uniqueItems: true
           default: ["*"]
-        llmservices:
+        instances:
           type: array
           items:
             type: string

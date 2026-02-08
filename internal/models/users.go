@@ -2,23 +2,18 @@ package models
 
 import "net/http"
 
+// TODO: Distinguish Full and Brief Outputs
+
 // User represents a user account.
 type User struct {
-	UserHandle  string             `json:"user_handle"      doc:"User handle" maxLength:"20"  minLength:"3" example:"jdoe"`
-	Name        string             `json:"name,omitempty"   doc:"User name"   maxLength:"50"                example:"Jane Doe"`
-	Email       string             `json:"email"            doc:"User email"  maxLength:"100" minLength:"5" example:"foo@bar.com"`
-	APIKey      string             `json:"apiKey,omitempty" readOnly:"true" doc:"User API key for dhamps-vdb API" maxLength:"64" minLength:"64" example:"1234567890123456789012345678901212345678901234567890123456789012"`
-	Projects    ProjectMemberships `json:"projects,omitempty" readOnly:"true" doc:"Projects that the user is a member of"`
-	LLMServices LLMMemberships     `json:"llm_services,omitempty" readOnly:"true" doc:"LLM services that the user is a member of"`
+	UserHandle  string              `json:"user_handle"      doc:"User handle" maxLength:"20"  minLength:"3" example:"jdoe"`
+	Name        string              `json:"name,omitempty"   doc:"User name"   maxLength:"50"                example:"Jane Doe"`
+	Email       string              `json:"email"            doc:"User email"  maxLength:"100" minLength:"5" example:"foo@bar.com"`
+	VDBKey      string              `json:"vdb_key,omitempty" readOnly:"true" doc:"User API key for dhamps-vdb API" maxLength:"64" minLength:"64" example:"1234567890123456789012345678901212345678901234567890123456789012"`
+	Projects    ProjectMemberships  `json:"projects,omitempty" readOnly:"true" doc:"Projects that the user is a member of"`
+	Definitions Definitions         `json:"definitions,omitempty" readOnly:"true" doc:"LLM Service Definitions created by the user"`
+	Instances   InstanceMemberships `json:"instances,omitempty" readOnly:"true" doc:"LLM Service Instances that the user is a member of"`
 }
-
-type LLMMembership struct {
-	LLMServiceHandle string `json:"llm_service_handle" doc:"LLM service"`
-	LLMServiceOwner  string `json:"owner" doc:"Owner of the LLM service"`
-	Role             string `json:"role" doc:"Role of the user in the LLM service"`
-}
-
-type LLMMemberships []LLMMembership
 
 type ProjectMembership struct {
 	ProjectHandle string `json:"project_handle" doc:"Project"`
@@ -26,7 +21,22 @@ type ProjectMembership struct {
 	Role          string `json:"role" doc:"Role of the user in the project"`
 }
 
+type SharedUser struct {
+	UserHandle string `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
+	Role       string `json:"role" path:"role" enum:"owner,editor,reader" example:"reader" doc:"Role of the user in the project"`
+}
+
 type ProjectMemberships []ProjectMembership
+
+type Definitions []DefinitionFull
+
+type InstanceMembership struct {
+	InstanceHandle string `json:"instance_handle" doc:"LLM service instance"`
+	InstanceOwner  string `json:"owner" doc:"Owner of the LLM service instance"`
+	Role           string `json:"role" doc:"Role of the user in the LLM service instance"`
+}
+
+type InstanceMemberships []InstanceMembership
 
 // Request and Response structs for the user administration API
 // The request structs must be structs with fields for the request path/query/header/cookie parameters and/or body.
@@ -48,12 +58,12 @@ type PostUserRequest struct {
 
 type UploadUserResponse struct {
 	Header []http.Header `json:"header,omitempty" doc:"Response headers"`
-	Body   HandleAPIStruct
+	Body   UserResponse
 }
 
-type HandleAPIStruct struct {
+type UserResponse struct {
 	UserHandle string `json:"user_handle" doc:"Handle of created or updated user"`
-	APIKey     string `json:"api_key" doc:"API key for the user"`
+	VDBKey     string `json:"vdb_key" doc:"VDB API key for the user"`
 }
 
 // Get all users

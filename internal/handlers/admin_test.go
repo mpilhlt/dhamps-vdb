@@ -14,6 +14,7 @@ import (
 )
 
 func TestAdminFunc(t *testing.T) {
+
 	// Get the database connection pool from package variable
 	pool := connPool
 
@@ -29,7 +30,7 @@ func TestAdminFunc(t *testing.T) {
 		method       string
 		requestPath  string
 		bodyPath     string
-		apiKey       string
+		VDBKey       string
 		expectBody   string
 		expectStatus int16
 	}{
@@ -38,7 +39,7 @@ func TestAdminFunc(t *testing.T) {
 			method:       http.MethodGet,
 			requestPath:  "/v1/admin/footgun",
 			bodyPath:     "",
-			apiKey:       "",
+			VDBKey:       "",
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Unauthorized\",\n  \"status\": 401,\n  \"detail\": \"Authentication failed. Perhaps a missing or incorrect API key?\"\n}\n",
 			expectStatus: http.StatusUnauthorized,
 		},
@@ -47,7 +48,7 @@ func TestAdminFunc(t *testing.T) {
 			method:       http.MethodGet,
 			requestPath:  "/v1/admin/footgun",
 			bodyPath:     "",
-			apiKey:       options.AdminKey,
+			VDBKey:       options.AdminKey,
 			expectBody:   "",
 			expectStatus: http.StatusNoContent,
 		},
@@ -77,7 +78,7 @@ func TestAdminFunc(t *testing.T) {
 			requestURL := fmt.Sprintf("http://%v:%d%v", options.Host, options.Port, v.requestPath)
 			req, err := http.NewRequest(v.method, requestURL, reqBody)
 			assert.NoError(t, err)
-			req.Header.Set("Authorization", "Bearer "+v.apiKey)
+			req.Header.Set("Authorization", "Bearer "+v.VDBKey)
 			resp, err := http.DefaultClient.Do(req)
 			if err != nil {
 				t.Errorf("Error sending request: %v\n", err)
@@ -111,5 +112,7 @@ func TestAdminFunc(t *testing.T) {
 		fmt.Print("Shutting down server\n\n")
 		shutDownServer()
 	})
+
+	fmt.Printf("\n\n\n\n")
 
 }

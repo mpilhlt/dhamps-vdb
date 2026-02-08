@@ -13,6 +13,7 @@ import (
 )
 
 func TestUserFunc(t *testing.T) {
+
 	// Get the database connection pool from package variable
 	pool := connPool
 
@@ -43,7 +44,7 @@ func TestUserFunc(t *testing.T) {
 			requestPath:  "/v1/users/alice",
 			bodyPath:     "../../testdata/valid_user.json",
 			apiKey:       options.AdminKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/HandleAPIStruct.json\",\n  \"user_handle\": \"alice\",\n  \"api_key\": \"12345678901234567890123456789012\"\n}\n",
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/UserResponse.json\",\n  \"user_handle\": \"alice\",\n  \"vdb_key\": \"12345678901234567890123456789012\"\n}\n",
 			expectStatus: http.StatusCreated,
 		},
 		{
@@ -52,7 +53,7 @@ func TestUserFunc(t *testing.T) {
 			requestPath:  "/v1/users/alice",
 			bodyPath:     "",
 			apiKey:       options.AdminKey,
-			expectBody:   "{\n  \"user_handle\": \"alice\",\n  \"name\": \"Alice Doe\",\n  \"email\": \"alice@foo.bar\",\n  \"apiKey\": \"e1b85b27d6bcb05846c18e6a48f118e89f0c0587140de9fb3359f8370d0dba08\"\n}\n",
+			expectBody:   "{\n  \"user_handle\": \"alice\",\n  \"name\": \"Alice Doe\",\n  \"email\": \"alice@foo.bar\",\n  \"vdb_key\": \"e1b85b27d6bcb05846c18e6a48f118e89f0c0587140de9fb3359f8370d0dba08\"\n}\n",
 			expectStatus: http.StatusOK,
 		},
 		{
@@ -97,7 +98,7 @@ func TestUserFunc(t *testing.T) {
 			requestPath:  "/v1/users",
 			bodyPath:     "../../testdata/valid_user.json",
 			apiKey:       options.AdminKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/HandleAPIStruct.json\",\n  \"user_handle\": \"alice\",\n  \"api_key\": \"not changed\"\n}\n",
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/UserResponse.json\",\n  \"user_handle\": \"alice\",\n  \"vdb_key\": \"not changed\"\n}\n",
 			expectStatus: http.StatusCreated,
 		},
 		{
@@ -133,7 +134,7 @@ func TestUserFunc(t *testing.T) {
 			requestPath:  "/v1/users",
 			bodyPath:     "",
 			apiKey:       options.AdminKey,
-			expectBody:   "[\n  \"alice\"\n]\n",
+			expectBody:   "[\n  \"alice\",\n  \"_system\"\n]\n",
 			expectStatus: http.StatusOK,
 		},
 		{
@@ -249,4 +250,5 @@ func TestUserFunc(t *testing.T) {
 		shutDownServer()
 	})
 
+	fmt.Printf("\n\n\n\n")
 }

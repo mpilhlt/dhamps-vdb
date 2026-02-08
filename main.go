@@ -104,9 +104,9 @@ func main() {
 
 		api := humago.New(router, config)
 		api.UseMiddleware(auth.CORSMiddleware(api))
-		api.UseMiddleware(auth.APIKeyAdminAuth(api, options))
-		api.UseMiddleware(auth.APIKeyOwnerAuth(api, pool, options))
-		api.UseMiddleware(auth.APIKeyReaderAuth(api, pool, options))
+		api.UseMiddleware(auth.VDBKeyAdminAuth(api, options))
+		api.UseMiddleware(auth.VDBKeyOwnerAuth(api, pool, options))
+		api.UseMiddleware(auth.VDBKeyReaderAuth(api, pool, options))
 		api.UseMiddleware(auth.AuthTermination(api))
 
 		// Add routes to the API

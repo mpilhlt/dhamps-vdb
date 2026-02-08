@@ -10,8 +10,7 @@ CREATE TABLE IF NOT EXISTS users(
   "user_handle" VARCHAR(20) PRIMARY KEY,
   "name" TEXT,
   "email" TEXT UNIQUE NOT NULL,
-  -- "vdb_api_key" BYTEA UNIQUE NOT NULL,
-  "vdb_api_key" CHAR(64) UNIQUE NOT NULL,
+  "vdb_key" CHAR(64) UNIQUE NOT NULL,
   "created_at" TIMESTAMP NOT NULL,
   "updated_at" TIMESTAMP NOT NULL
 );
@@ -29,8 +28,6 @@ CREATE TABLE IF NOT EXISTS projects(
   UNIQUE ("owner", "project_handle")
 );
 
-CREATE INDEX IF NOT EXISTS projects_handle ON "projects"("project_handle");
-
 -- This creates the users_projects associations table.
 
 CREATE TABLE IF NOT EXISTS vdb_roles(
@@ -38,7 +35,7 @@ CREATE TABLE IF NOT EXISTS vdb_roles(
 );
 
 INSERT INTO "vdb_roles"("vdb_role")
-VALUES ('owner'), ('writer'), ('reader');
+VALUES ('owner'), ('editor'), ('reader');
 
 CREATE TABLE IF NOT EXISTS users_projects(
   "user_handle" VARCHAR(20) REFERENCES "users"("user_handle") ON DELETE CASCADE,
@@ -49,7 +46,7 @@ CREATE TABLE IF NOT EXISTS users_projects(
   PRIMARY KEY ("user_handle", "project_id")
 );
 
--- This creates the api_standards table.
+-- This creates the api_standards table (and the key_methods table it presupposes).
 
 CREATE TABLE IF NOT EXISTS key_methods(
   "key_method" VARCHAR(20) PRIMARY KEY
@@ -75,7 +72,6 @@ CREATE TABLE IF NOT EXISTS llm_services(
   "owner" VARCHAR(20) NOT NULL REFERENCES "users"("user_handle") ON DELETE CASCADE,
   "endpoint" TEXT NOT NULL,
   "description" TEXT,
-  "api_key" TEXT,
   "api_standard" VARCHAR(20) NOT NULL REFERENCES "api_standards"("api_standard_handle"),
   "model" TEXT NOT NULL,
   "dimensions" INTEGER NOT NULL,
@@ -83,8 +79,6 @@ CREATE TABLE IF NOT EXISTS llm_services(
   "updated_at" TIMESTAMP NOT NULL,
   UNIQUE ("owner", "llm_service_handle")
 );
-
-CREATE INDEX IF NOT EXISTS llm_services_handle ON "llm_services"("llm_service_handle");
 
 -- This creates the users_llm_services associations table.
 
@@ -129,7 +123,6 @@ CREATE INDEX IF NOT EXISTS embeddings_text_id ON "embeddings"("text_id");
 -- We will create the index for the vector in a separate schema version
 -- CREATE INDEX ON embeddings USING hnsw (vector halfvec_cosine_ops) WITH (m = 16, ef_construction = 128);
 
-
 ---- create above / drop below ----
 
 -- This removes the users table.
@@ -140,8 +133,6 @@ DROP TABLE IF EXISTS users;
 
 DROP TABLE IF EXISTS projects;
 
-DROP INDEX IF EXISTS projects_handle;
-
 -- This removes the users_projects associations table.
 
 DROP TABLE IF EXISTS users_projects;
@@ -151,8 +142,6 @@ DROP TABLE IF EXISTS vdb_roles;
 -- This removes the LLM Services table.
 
 DROP TABLE IF EXISTS llm_services;
-
-DROP INDEX IF EXISTS llm_services_handle;
 
 -- This removes the users_llm_services associations table.
 

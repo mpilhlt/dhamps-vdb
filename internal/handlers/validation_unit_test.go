@@ -19,10 +19,10 @@ func TestValidateEmbeddingDimensions(t *testing.T) {
 		{
 			name: "Valid embedding",
 			embedding: models.EmbeddingsInput{
-				TextID:           "test-id",
-				LLMServiceHandle: "test-llm",
-				Vector:           []float32{1.0, 2.0, 3.0},
-				VectorDim:        3,
+				TextID:         "test-id",
+				InstanceHandle: "test-llm",
+				Vector:         []float32{1.0, 2.0, 3.0},
+				VectorDim:      3,
 			},
 			llmDimensions: 3,
 			wantErr:       false,
@@ -30,10 +30,10 @@ func TestValidateEmbeddingDimensions(t *testing.T) {
 		{
 			name: "Empty text_id",
 			embedding: models.EmbeddingsInput{
-				TextID:           "",
-				LLMServiceHandle: "test-llm",
-				Vector:           []float32{1.0, 2.0, 3.0},
-				VectorDim:        3,
+				TextID:         "",
+				InstanceHandle: "test-llm",
+				Vector:         []float32{1.0, 2.0, 3.0},
+				VectorDim:      3,
 			},
 			llmDimensions: 3,
 			wantErr:       true,
@@ -42,10 +42,10 @@ func TestValidateEmbeddingDimensions(t *testing.T) {
 		{
 			name: "Empty vector",
 			embedding: models.EmbeddingsInput{
-				TextID:           "test-id",
-				LLMServiceHandle: "test-llm",
-				Vector:           []float32{},
-				VectorDim:        3,
+				TextID:         "test-id",
+				InstanceHandle: "test-llm",
+				Vector:         []float32{},
+				VectorDim:      3,
 			},
 			llmDimensions: 3,
 			wantErr:       true,
@@ -54,10 +54,10 @@ func TestValidateEmbeddingDimensions(t *testing.T) {
 		{
 			name: "Dimension mismatch with LLM service",
 			embedding: models.EmbeddingsInput{
-				TextID:           "test-id",
-				LLMServiceHandle: "test-llm",
-				Vector:           []float32{1.0, 2.0, 3.0},
-				VectorDim:        5,
+				TextID:         "test-id",
+				InstanceHandle: "test-llm",
+				Vector:         []float32{1.0, 2.0, 3.0},
+				VectorDim:      5,
 			},
 			llmDimensions: 5,
 			wantErr:       true,
@@ -66,10 +66,10 @@ func TestValidateEmbeddingDimensions(t *testing.T) {
 		{
 			name: "Vector dim doesn't match LLM service",
 			embedding: models.EmbeddingsInput{
-				TextID:           "test-id",
-				LLMServiceHandle: "test-llm",
-				Vector:           []float32{1.0, 2.0, 3.0},
-				VectorDim:        3,
+				TextID:         "test-id",
+				InstanceHandle: "test-llm",
+				Vector:         []float32{1.0, 2.0, 3.0},
+				VectorDim:      3,
 			},
 			llmDimensions: 5,
 			wantErr:       true,

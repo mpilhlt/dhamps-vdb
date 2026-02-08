@@ -154,7 +154,7 @@ func getTestDatabase() (*pgxpool.Pool, error, func()) {
 	}
 }
 
-// setupServer sets up server, router and API for testing.
+// startTestServer sets up server, router and API for testing.
 // It returns an error value and a closure function that
 // should be called to clean up.
 // It is supposed to be called from the various tests.
@@ -179,9 +179,9 @@ func startTestServer(t *testing.T, pool *pgxpool.Pool, keyGen handlers.RandomKey
 	config.Components.SecuritySchemes = auth.Config
 	router := http.NewServeMux()
 	api := humago.New(router, config)
-	api.UseMiddleware(auth.APIKeyAdminAuth(api, &options))
-	api.UseMiddleware(auth.APIKeyOwnerAuth(api, pool, &options))
-	api.UseMiddleware(auth.APIKeyReaderAuth(api, pool, &options))
+	api.UseMiddleware(auth.VDBKeyAdminAuth(api, &options))
+	api.UseMiddleware(auth.VDBKeyOwnerAuth(api, pool, &options))
+	api.UseMiddleware(auth.VDBKeyReaderAuth(api, pool, &options))
 	api.UseMiddleware(auth.AuthTermination(api))
 
 	err := handlers.AddRoutes(pool, keyGen, api)
@@ -236,6 +236,8 @@ func startTestServer(t *testing.T, pool *pgxpool.Pool, keyGen handlers.RandomKey
 	cleanup := func() {
 		// Close the server
 		server.Close()
+		// Wait a moment to ensure the port is fully released
+		time.Sleep(100 * time.Millisecond)
 		/* Clean up transactions.
 		   _, err := conn.Exec(context.Background(), "ROLLBACK")
 		   if err != nil {
@@ -272,7 +274,7 @@ func createUser(t *testing.T, userJSON string) (string, error) {
 		return "", err
 	}
 	assert.NoError(t, err)
-	
+
 	fmt.Printf("    Creating user (\"%s\") for testing ...\n", jsonInput.UserHandle)
 	requestURL := fmt.Sprintf("http://%s:%d/v1/users/%s", options.Host, options.Port, jsonInput.UserHandle)
 	requestBody := bytes.NewReader([]byte(userJSON))
@@ -286,34 +288,38 @@ func createUser(t *testing.T, userJSON string) (string, error) {
 	// get API key for user from response body
 	body, err := io.ReadAll(resp.Body)
 	assert.NoError(t, err)
-	
+
 	// Check if response was successful
 	if resp.StatusCode != http.StatusCreated {
 		fmt.Printf("Error creating user: status code %d, body: %s\n", resp.StatusCode, string(body))
 		return "", fmt.Errorf("status code %d: %s", resp.StatusCode, string(body))
 	}
-	
+
 	// fmt.Printf("Response body: %v\n", string(body))
-	userInfo := models.HandleAPIStruct{}
+	userInfo := models.UserResponse{}
 	err = json.Unmarshal(body, &userInfo)
 	if err != nil {
 		fmt.Printf("Error unmarshalling user info: %v\nbody: %v\n", err, string(body))
 		return "", err
 	}
 	assert.NoError(t, err)
-	fmt.Printf("        Successfully created user (handle: \"%s\", apiKey: \"%s\").\n", userInfo.UserHandle, userInfo.APIKey)
+	fmt.Printf("        Successfully created user (handle: \"%s\", VDBKey: \"%s\").\n", userInfo.UserHandle, userInfo.VDBKey)
 	// fmt.Printf("        User info: %v\n", userInfo)
-	return userInfo.APIKey, nil
+	return userInfo.VDBKey, nil
 }
 
 // createProject creates a project and returns the project ID and an error value
 // it accepts a JSON string encoding the project object as input
-func createProject(t *testing.T, projectJSON string, user string, apiKey string) (int, error) {
+func createProject(t *testing.T, projectJSON string, user string, VDBKey string) (int, error) {
 	fmt.Print("    Creating project ")
 	jsonInput := &struct {
-		Handle      string `json:"project_handle" doc:"Handle of created or updated project"`
-		Description string `json:"description" doc:"Description of the project"`
+		Handle         string `json:"project_handle" doc:"Handle of created or updated project"`
+		InstanceOwner  string `json:"instance_owner,omitempty" doc:"User handle of the owner of the LLM Service Instance used in the project."`
+		InstanceHandle string `json:"instance_handle,omitempty" doc:"Handle of the LLM Service Instance used in the project"`
+		Description    string `json:"description" doc:"Description of the project"`
+		IsPublic       bool   `json:"is_public,omitempty" default:"false" doc:"Whether the project should be public or not"`
 	}{}
+
 	err := json.Unmarshal([]byte(projectJSON), jsonInput)
 	if err != nil {
 		fmt.Printf("Error unmarshalling project JSON: %v\n", err)
@@ -324,7 +330,7 @@ func createProject(t *testing.T, projectJSON string, user string, apiKey string)
 	requestURL := fmt.Sprintf("http://%s:%d/v1/projects/%s/%s", options.Host, options.Port, user, jsonInput.Handle)
 	requestBody := bytes.NewReader([]byte(projectJSON))
 	req, err := http.NewRequest(http.MethodPut, requestURL, requestBody)
-	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("Authorization", "Bearer "+VDBKey)
 	assert.NoError(t, err)
 
 	resp, err := http.DefaultClient.Do(req)
@@ -336,8 +342,11 @@ func createProject(t *testing.T, projectJSON string, user string, apiKey string)
 	assert.NoError(t, err)
 
 	projectInfo := &struct {
+		Owner         string `json:"owner" doc:"User handle of the project owner"`
 		ProjectHandle string `json:"project_handle" doc:"Handle of created or updated project"`
 		ProjectID     int    `json:"project_id" doc:"Unique project identifier"`
+		PublicRead    bool   `json:"public_read" doc:"Whether the project is public or not"`
+		Role          string `json:"role,omitempty" doc:"Role of the requesting user in the project (can be owner or some other role)"`
 	}{}
 	err = json.Unmarshal(body, &projectInfo)
 	if err != nil {
@@ -351,7 +360,7 @@ func createProject(t *testing.T, projectJSON string, user string, apiKey string)
 
 // createAPIStandard creates an API standard definition for testing and returns the handle and an error value
 // it accepts a JSON string encoding the API standard object as input
-func createAPIStandard(t *testing.T, apiStandardJSON string, apiKey string) (string, error) {
+func createAPIStandard(t *testing.T, apiStandardJSON string, VDBKey string) (string, error) {
 	fmt.Print("    Creating API standard ")
 	jsonInput := &struct {
 		APIStandardHandle string `json:"api_standard_handle" doc:"Handle of created or updated api standard"`
@@ -369,7 +378,7 @@ func createAPIStandard(t *testing.T, apiStandardJSON string, apiKey string) (str
 	requestURL := fmt.Sprintf("http://%s:%d/v1/api-standards/%s", options.Host, options.Port, jsonInput.APIStandardHandle)
 	requestBody := bytes.NewReader([]byte(apiStandardJSON))
 	req, err := http.NewRequest(http.MethodPut, requestURL, requestBody)
-	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("Authorization", "Bearer "+VDBKey)
 	assert.NoError(t, err)
 
 	resp, err := http.DefaultClient.Do(req)
@@ -393,62 +402,179 @@ func createAPIStandard(t *testing.T, apiStandardJSON string, apiKey string) (str
 	return APIStandardInfo.APIStandardHandle, nil
 }
 
-// createLLMService creates an LLM service definition for testing and returns the handle and an error value
-// it accepts a JSON string encoding the LLM service object as input
-func createLLMService(t *testing.T, llmServiceJSON string, user string, apiKey string) (string, error) {
-	fmt.Print("    Creating LLM service ")
+// createInstance creates an LLM service instance for testing and returns the handle and an error value
+// it accepts a JSON string encoding the LLM service instance object as input
+// NOTE: This function is kept for backward compatibility with existing tests
+// It creates an LLM Service Instance (not a Definition)
+func createInstance(t *testing.T, instanceJSON string, user string, VDBKey string) (string, error) {
+	fmt.Print("    Creating LLM service instance ")
+
+	// Parse JSON to extract handle - support both old and new field names
 	jsonInput := &struct {
-		LLMServiceHandle string `json:"llm_service_handle" doc:"Handle of created or updated LLM service"`
-		Owner            string `json:"owner" doc:"User handle of the service owner"`
-		Description      string `json:"description" doc:"Description of the LLM service"`
+		InstanceHandle string `json:"instance_handle" doc:"Old field name for backward compatibility"`
+		Owner          string `json:"owner" doc:"User handle of the service owner"`
+		Description    string `json:"description" doc:"Description of the LLM service"`
 	}{}
-	err := json.Unmarshal([]byte(llmServiceJSON), jsonInput)
+	err := json.Unmarshal([]byte(instanceJSON), jsonInput)
 	if err != nil {
 		fmt.Printf("Error unmarshalling LLM service JSON: %v\n", err)
 	}
 	assert.NoError(t, err)
-	fmt.Printf("(\"%s\") for testing ...\n", jsonInput.LLMServiceHandle)
+	handle := jsonInput.InstanceHandle
+	fmt.Printf("(\"%s/%s\") for testing ...\n", user, handle)
 
-	requestURL := fmt.Sprintf("http://%s:%d/v1/llm-services/%s/%s", options.Host, options.Port, user, jsonInput.LLMServiceHandle)
-	requestBody := bytes.NewReader([]byte(llmServiceJSON))
+	requestURL := fmt.Sprintf("http://%s:%d/v1/llm-instances/%s/%s", options.Host, options.Port, user, handle)
+	requestBody := bytes.NewReader([]byte(instanceJSON))
 	req, err := http.NewRequest(http.MethodPut, requestURL, requestBody)
-	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("Authorization", "Bearer "+VDBKey)
 	assert.NoError(t, err)
 
 	resp, err := http.DefaultClient.Do(req)
 	assert.NoError(t, err)
 	defer resp.Body.Close()
 
-	// get LLM service handle from response body
+	// get LLM service instance handle from response body
 	body, err := io.ReadAll(resp.Body)
 	assert.NoError(t, err)
 
-	LLMServiceInfo := &struct {
-		LLMServiceHandle string `json:"llm_service_handle" doc:"Handle of created or updated LLM service"`
-		LLMServiceID     int    `json:"llm_service_id" doc:"System identifier of created or updated LLM service"`
+	// Check if response was successful
+	if resp.StatusCode != http.StatusCreated {
+		fmt.Printf("Error creating LLM service instance: status code %d, body: %s\n", resp.StatusCode, string(body))
+		return "", fmt.Errorf("status code %d: %s", resp.StatusCode, string(body))
+	}
+
+	InstanceInfo := &struct {
+		Owner          string `json:"owner" doc:"User handle of the LLM Service Instance owner"`
+		InstanceHandle string `json:"instance_handle" doc:"Handle of created or updated LLM Service Instance"`
+		InstanceID     int    `json:"instance_id" doc:"System identifier of created or updated LLM Service Instance"`
 	}{}
-	err = json.Unmarshal(body, &LLMServiceInfo)
+	err = json.Unmarshal(body, &InstanceInfo)
 	if err != nil {
-		fmt.Printf("Error unmarshalling LLM service info: %v\nbody: %v", err, string(body))
+		fmt.Printf("Error unmarshalling LLM Service Instance info: %v\nbody: %v", err, string(body))
 	}
 	assert.NoError(t, err)
 
-	fmt.Printf("        Successfully created LLM Service (handle \"%s\", id %d).\n", LLMServiceInfo.LLMServiceHandle, LLMServiceInfo.LLMServiceID)
-	return LLMServiceInfo.LLMServiceHandle, nil
+	fmt.Printf("        Successfully created LLM Service Instance (handle \"%s\", id %d).\n", InstanceInfo.InstanceHandle, InstanceInfo.InstanceID)
+	return InstanceInfo.InstanceHandle, nil
+}
+
+// createDefinition creates an LLM service definition for testing and returns the handle and an error value
+// it accepts a JSON string encoding the LLM service definition object as input
+func createDefinition(t *testing.T, DefinitionJSON string, user string, VDBKey string) (int32, error) {
+	fmt.Print("    Creating LLM service definition ")
+	jsonInput := &struct {
+		Owner            string `json:"owner" doc:"User handle of the service definition owner"`
+		DefinitionHandle string `json:"definition_handle" doc:"Handle of created or updated LLM service definition"`
+		Description      string `json:"description,omitempty" doc:"Description of the LLM service definition"`
+		Endpoint         string `json:"endpoint,omitempty" doc:"Endpoint of the LLM service definition"`
+		APIStandard      string `json:"api_standard,omitempty" doc:"API standard followed by the LLM service definition"`
+		Model            string `json:"model,omitempty" doc:"Model name used in the LLM service definition"`
+		Dimensions       int    `json:"dimensions,omitempty" doc:"Dimensions of the embeddings used in the LLM service definition"`
+		ContextLimit     int    `json:"context_limit,omitempty" doc:"Context limit of the LLM service definition"`
+		IsPublic         bool   `json:"is_public" doc:"Whether the LLM service definition is public or not"`
+	}{}
+	err := json.Unmarshal([]byte(DefinitionJSON), jsonInput)
+	if err != nil {
+		fmt.Printf("Error unmarshalling LLM service definition JSON: %v\nJSON: %s", err, string(DefinitionJSON))
+	}
+	assert.NoError(t, err)
+	fmt.Printf("(%s/%s) for testing ...\n", user, jsonInput.DefinitionHandle)
+
+	requestURL := fmt.Sprintf("http://%s:%d/v1/llm-definitions/%s/%s", options.Host, options.Port, user, jsonInput.DefinitionHandle)
+	requestBody := bytes.NewReader([]byte(DefinitionJSON))
+	req, err := http.NewRequest(http.MethodPut, requestURL, requestBody)
+	req.Header.Set("Authorization", "Bearer "+VDBKey)
+	assert.NoError(t, err)
+
+	resp, err := http.DefaultClient.Do(req)
+	assert.NoError(t, err)
+	defer resp.Body.Close()
+
+	// get LLM service definition handle from response body
+	body, err := io.ReadAll(resp.Body)
+	assert.NoError(t, err)
+
+	DefinitionInfo := &struct {
+		Schema           string `json:"$schema" doc:"JSON schema URL for the response body"`
+		DefinitionID     int    `json:"definition_id" doc:"System identifier of created or updated LLM Service Definition"`
+		DefinitionHandle string `json:"definition_handle" doc:"Handle of created or updated LLM Service Definition"`
+		Owner            string `json:"owner" doc:"User handle of the LLM Service Definition owner"`
+		IsPublic         bool   `json:"is_public" doc:"Whether the LLM Service Definition is public or not"`
+	}{}
+	err = json.Unmarshal(body, &DefinitionInfo)
+	if err != nil {
+		fmt.Printf("Error unmarshalling LLM service definition info: %v\nbody: %v", err, string(body))
+	}
+	assert.NoError(t, err)
+
+	fmt.Printf("        Successfully created LLM Service Definition (%s/%s, id %d).\n", DefinitionInfo.Owner, DefinitionInfo.DefinitionHandle, DefinitionInfo.DefinitionID)
+	return int32(DefinitionInfo.DefinitionID), nil
+}
+
+// createLLMInstanceFromDefinition creates an LLM service instance from a definition for testing
+// it accepts the definition owner/handle, instance handle, and optional overrides
+func createInstanceFromDefinition(t *testing.T, user string, instanceHandle string, definitionOwner string, definitionHandle string, VDBKey string, endpoint *string, description *string, apiKey string) (string, error) {
+	fmt.Printf("    Creating LLM service instance from definition (\"%s/%s\" from \"%s/%s\") for testing ...\n", user, instanceHandle, definitionOwner, definitionHandle)
+
+	requestURL := fmt.Sprintf("http://%s:%d/v1/llm-instances/%s/%s/from-definition/%s/%s", options.Host, options.Port, user, instanceHandle, definitionOwner, definitionHandle)
+
+	// Build request body
+	requestBody := map[string]interface{}{}
+	if endpoint != nil {
+		requestBody["endpoint"] = *endpoint
+	}
+	if description != nil {
+		requestBody["description"] = *description
+	}
+	if apiKey != "" {
+		requestBody["api_key"] = apiKey
+	}
+
+	bodyBytes, err := json.Marshal(requestBody)
+	if err != nil {
+		return "", fmt.Errorf("error marshalling request body: %v", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, requestURL, bytes.NewReader(bodyBytes))
+	req.Header.Set("Authorization", "Bearer "+VDBKey)
+	req.Header.Set("Content-Type", "application/json")
+	assert.NoError(t, err)
+
+	resp, err := http.DefaultClient.Do(req)
+	assert.NoError(t, err)
+	defer resp.Body.Close()
+
+	// get LLM service instance handle from response body
+	body, err := io.ReadAll(resp.Body)
+	assert.NoError(t, err)
+
+	InstanceInfo := &struct {
+		Owner          string `json:"owner" doc:"User handle of the LLM Service Instance owner"`
+		InstanceHandle string `json:"instance_handle" doc:"Handle of created or updated LLM Service Instance"`
+		InstanceID     int    `json:"instance_id" doc:"System identifier of created or updated LLM Service Instance"`
+	}{}
+	err = json.Unmarshal(body, &InstanceInfo)
+	if err != nil {
+		fmt.Printf("Error unmarshalling LLM service instance info: %v\nbody: %v", err, string(body))
+	}
+	assert.NoError(t, err)
+
+	fmt.Printf("        Successfully created LLM Service Instance from definition (handle \"%s\", id %d).\n", InstanceInfo.InstanceHandle, InstanceInfo.InstanceID)
+	return InstanceInfo.InstanceHandle, nil
 }
 
 // createEmbeddings creates some embeddings entries for testing and returns an error value
 // it accepts a JSON string encording the embeddings db entries
-func createEmbeddings(t *testing.T, embeddings []byte, user string, llmService string, apiKey string) error {
+func createEmbeddings(t *testing.T, embeddings []byte, user string, Instance string, VDBKey string) error {
 	fmt.Print("    Creating Embeddings for testing ...\n")
 
 	// Upload embeddings for similars testing
-	requestURL := fmt.Sprintf("http://%s:%d/v1/embeddings/alice/test1", options.Host, options.Port)
+	requestURL := fmt.Sprintf("http://%s:%d/v1/embeddings/%s/%s", options.Host, options.Port, user, Instance)
 	req, err := http.NewRequest(http.MethodPost, requestURL, bytes.NewReader(embeddings))
 	if err != nil {
 		fmt.Printf("Error creating request for uploading embeddings: %v\n", err)
 	}
-	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("Authorization", "Bearer "+VDBKey)
 	req.Header.Set("Content-Type", "application/json")
 	assert.NoError(t, err)
 

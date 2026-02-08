@@ -4,7 +4,7 @@ import (
 	"net/http"
 )
 
-// LLMService is a service for managing LLM data.
+// Instance is a service for managing LLM data.
 type APIStandard struct {
 	APIStandardHandle string `json:"api_standard_handle" minLength:"3" maxLength:"20" example:"openai-v1" doc:"Handle for the API standard"`
 	Description       string `json:"description" doc:"Description of the API standard"`
