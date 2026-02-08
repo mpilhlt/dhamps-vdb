@@ -2,8 +2,6 @@ package models
 
 import "net/http"
 
-// TODO: Distinguish Full and Brief Outputs
-
 // User represents a user account.
 type User struct {
 	UserHandle  string              `json:"user_handle"      doc:"User handle" maxLength:"20"  minLength:"3" example:"jdoe"`

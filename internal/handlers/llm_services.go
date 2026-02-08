@@ -669,7 +669,6 @@ func getInstanceFunc(ctx context.Context, input *models.GetInstanceRequest) (*mo
 		}
 	} else {
 		// No authenticated user in context, only possible if public access is allowed (not implemented)
-		// TODO: implement public access for instances
 		return nil, huma.Error403Forbidden("no authenticated user in context")
 	}
 

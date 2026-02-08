@@ -2,10 +2,12 @@ package database
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"time"
 
+	"github.com/mpilhlt/dhamps-vdb/internal/crypto"
 	"github.com/mpilhlt/dhamps-vdb/internal/models"
 
 	"github.com/jackc/pgx/v5"
@@ -107,8 +109,22 @@ func VerifySchema(ctx context.Context, url string) error {
 			return err
 		}
 		println("    Database migration successful, schema up to date!")
+		
+		// Initialize system user key after migration
+		err = InitializeSystemUserKey(ctx, conn)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "EEE Unable to initialize system user key: %v\n", err)
+			return err
+		}
 	} else {
 		println("    Database schema up to date, no database migration needed")
+		
+		// Still check if system user key needs initialization
+		err = InitializeSystemUserKey(ctx, conn)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "EEE Unable to initialize system user key: %v\n", err)
+			return err
+		}
 	}
 
 	conn.Close(ctx)
@@ -164,6 +180,57 @@ func WithTransaction(ctx context.Context, pool *pgxpool.Pool, fn func(pgx.Tx) er
 	// Commit the transaction
 	if err := tx.Commit(txCtx); err != nil {
 		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}
+
+// InitializeSystemUserKey replaces the placeholder system user API key with a secure key
+// This should be called after migrations are complete
+func InitializeSystemUserKey(ctx context.Context, conn *pgx.Conn) error {
+	// Get the encryption key from environment
+	encKey, err := crypto.GetEncryptionKeyFromEnv()
+	if err != nil {
+		// Don't expose the key in error messages
+		return fmt.Errorf("ENCRYPTION_KEY environment variable not set")
+	}
+
+	// Check if _system user has the placeholder key
+	var currentKey string
+	err = conn.QueryRow(ctx, 
+		"SELECT vdb_key FROM users WHERE user_handle = '_system'").Scan(&currentKey)
+	if err != nil {
+		// User doesn't exist or other error, skip silently
+		return nil
+	}
+
+	// If it's the placeholder, generate a new key using the encryption key
+	if currentKey == "0000000000000000000000000000000000000000000000000000000000000000" {
+		// Generate a deterministic key from the encryption key
+		// We use the encryption key to encrypt a known string, then hash it
+		// This ensures the same key is generated each time with the same ENCRYPTION_KEY
+		knownString := "_system_user_api_key"
+		encrypted, err := encKey.Encrypt(knownString)
+		if err != nil {
+			// Don't expose the key in error messages
+			return fmt.Errorf("failed to generate system user API key")
+		}
+		
+		// Convert encrypted bytes to hex (will be more than 64 chars, so we truncate)
+		apiKey := hex.EncodeToString(encrypted)
+		if len(apiKey) > 64 {
+			apiKey = apiKey[:64]
+		}
+
+		_, err = conn.Exec(ctx, `
+			UPDATE users SET vdb_key = $1, updated_at = NOW() WHERE user_handle = '_system'
+		`, apiKey)
+		if err != nil {
+			// Don't expose the key in error messages
+			return fmt.Errorf("failed to update _system user API key in database")
+		}
+
+		fmt.Println("    Updated _system user with secure API key")
 	}
 
 	return nil

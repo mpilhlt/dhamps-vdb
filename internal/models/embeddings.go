@@ -5,8 +5,6 @@ import (
 	"net/http"
 )
 
-// TODO: Distinguish Full and Brief Outputs
-
 // Embeddings contains a single document's embeddings record with id, embeddings and possibly more information.
 type EmbeddingsInput struct {
 	TextID         string          `json:"text_id" doc:"Identifier for the document"`

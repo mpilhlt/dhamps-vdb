@@ -12,8 +12,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// TODO: Test against actual JSON body
-
 // TestPublicAccess tests the public access functionality when "*" is in shared_with
 func TestPublicAccess(t *testing.T) {
 
