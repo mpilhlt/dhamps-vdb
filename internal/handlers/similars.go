@@ -154,7 +154,8 @@ func postSimilarFunc(ctx context.Context, input *models.PostSimilarRequest) (*mo
 		return nil, huma.Error400BadRequest(fmt.Sprintf("vector dimension mismatch: expected %d dimensions, got %d", instance.Dimensions, len(input.Body.Vector)))
 	}
 
-	// Convert the vector to pgvector format
+	// Convert the vector to pgvector HalfVector format (half-precision float16)
+	// The input []float32 is converted to half-precision during serialization
 	vector := pgvector.NewHalfVector(input.Body.Vector)
 
 	// Run the query, either with or without metadata filter
@@ -169,7 +170,6 @@ func postSimilarFunc(ctx context.Context, input *models.PostSimilarRequest) (*mo
 			Limit:         min(int32(input.Limit), int32(input.Count)),
 			Offset:        int32(input.Offset),
 		}
-		fmt.Printf("getting similar items for vector with params: user=%s, project=%s, threshold=%v\n", params.Owner, params.ProjectHandle, params.Column4)
 		sim, err = queries.GetSimilarsByVectorWithProject(ctx, params)
 	} else {
 		params := database.GetSimilarsByVectorWithProjectAndFilterParams{
@@ -182,10 +182,8 @@ func postSimilarFunc(ctx context.Context, input *models.PostSimilarRequest) (*mo
 			Limit:         min(int32(input.Limit), int32(input.Count)),
 			Offset:        int32(input.Offset),
 		}
-		fmt.Printf("getting similar items for vector with params: user=%s, project=%s, threshold=%v, filter=%s=%s\n", params.Owner, params.ProjectHandle, params.Column4, params.Column5, params.Column6)
 		sim, err = queries.GetSimilarsByVectorWithProjectAndFilter(ctx, params)
 	}
-	fmt.Printf("got this response from the database: %v\n", sim)
 	if err != nil {
 		if err.Error() == "no rows in result set" {
 			return nil, huma.Error404NotFound("no similar items found")
