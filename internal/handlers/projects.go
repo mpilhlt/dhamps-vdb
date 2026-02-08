@@ -383,7 +383,7 @@ func shareProjectFunc(ctx context.Context, input *models.ShareProjectRequest) (*
 	// Get the database connection pool from the context
 	pool, err := GetDBPool(ctx)
 	if err != nil {
-		return nil, err
+		return nil, huma.Error500InternalServerError("database connection error: %v", err)
 	}
 	queries := database.New(pool)
 
@@ -461,7 +461,7 @@ func unshareProjectFunc(ctx context.Context, input *models.UnshareProjectRequest
 	// Get the database connection pool from the context
 	pool, err := GetDBPool(ctx)
 	if err != nil {
-		return nil, err
+		return nil, huma.Error500InternalServerError("database connection error: %v", err)
 	}
 	queries := database.New(pool)
 
@@ -515,7 +515,7 @@ func getProjectSharedUsersFunc(ctx context.Context, input *models.GetProjectShar
 	// Get the database connection pool from the context
 	pool, err := GetDBPool(ctx)
 	if err != nil {
-		return nil, err
+		return nil, huma.Error500InternalServerError("database connection error: %v", err)
 	}
 	queries := database.New(pool)
 
