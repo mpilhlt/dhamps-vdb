@@ -136,6 +136,24 @@ func TestProjectSharingFunc(t *testing.T) {
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/GetProjectSharedUsersResponseBody.json\",\n  \"owner\": \"alice\",\n  \"project_handle\": \"project1\",\n  \"shared_with\": []\n}\n",
 			expectStatus: http.StatusOK,
 		},
+		{
+			name:         "Share project with bob again for access test",
+			method:       http.MethodPost,
+			requestPath:  "/v1/projects/alice/project1/share",
+			bodyJSON:     `{"share_with_handle": "bob", "role": "reader"}`,
+			VDBKey:       aliceAPIKey,
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ShareProjectResponseBody.json\",\n  \"owner\": \"alice\",\n  \"project_handle\": \"project1\",\n  \"shared_with\": [\n    {\n      \"user_handle\": \"bob\",\n      \"role\": \"reader\"\n    }\n  ]\n}\n",
+			expectStatus: http.StatusCreated,
+		},
+		{
+			name:         "Bob can access shared project",
+			method:       http.MethodGet,
+			requestPath:  "/v1/projects/alice/project1",
+			bodyJSON:     "",
+			VDBKey:       bobAPIKey,
+			expectBody:   "", // Just check status code
+			expectStatus: http.StatusOK,
+		},
 	}
 
 	for _, v := range tt {
