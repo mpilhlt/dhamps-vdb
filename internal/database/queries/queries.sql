@@ -656,7 +656,7 @@ ORDER BY "vector" <=> $1
 LIMIT $2 OFFSET $3;
 
 -- name: GetSimilarsByID :many
-SELECT e2."text_id"
+SELECT e2."text_id", (1 - (e1.vector <=> e2.vector))::float8 AS similarity
 FROM embeddings e1
 CROSS JOIN embeddings e2
 JOIN projects
@@ -672,7 +672,7 @@ ORDER BY e1.vector <=> e2.vector
 LIMIT $5 OFFSET $6;
 
 -- name: GetSimilarsByIDWithFilter :many
-SELECT e2."text_id"
+SELECT e2."text_id", (1 - (e1.vector <=> e2.vector))::float8 AS similarity
 FROM embeddings e1
 CROSS JOIN embeddings e2
 JOIN projects
@@ -686,6 +686,29 @@ WHERE e2."embeddings_id" != e1."embeddings_id"
   AND 1 - (e1.vector <=> e2.vector) >= $4::double precision
   AND (e2."metadata" ->> $5::text IS NULL OR trim(e2."metadata" ->> $5::text) <> trim($6::text))
 ORDER BY e1.vector <=> e2.vector
+LIMIT $7 OFFSET $8;
+
+-- name: GetSimilarsByVectorWithProject :many
+SELECT e."text_id", (1 - (e.vector <=> $3::halfvec))::float8 AS similarity
+FROM embeddings e
+JOIN projects p
+ON e."project_id" = p."project_id"
+WHERE p."owner" = $1
+  AND p."project_handle" = $2
+  AND 1 - (e.vector <=> $3::halfvec) >= $4::double precision
+ORDER BY e.vector <=> $3::halfvec
+LIMIT $5 OFFSET $6;
+
+-- name: GetSimilarsByVectorWithProjectAndFilter :many
+SELECT e."text_id", (1 - (e.vector <=> $3::halfvec))::float8 AS similarity
+FROM embeddings e
+JOIN projects p
+ON e."project_id" = p."project_id"
+WHERE p."owner" = $1
+  AND p."project_handle" = $2
+  AND 1 - (e.vector <=> $3::halfvec) >= $4::double precision
+  AND (e."metadata" ->> $5::text IS NULL OR trim(e."metadata" ->> $5::text) <> trim($6::text))
+ORDER BY e.vector <=> $3::halfvec
 LIMIT $7 OFFSET $8;
 
 

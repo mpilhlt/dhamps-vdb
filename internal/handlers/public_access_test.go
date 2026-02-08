@@ -126,7 +126,7 @@ func TestPublicAccess(t *testing.T) {
 			requestPath:  "/v1/similars/alice/public-test/https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.1.1.1.1",
 			bodyPath:     "",
 			VDBKey:       "",
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/SimilarResponseBody.json\",\n  \"user_handle\": \"alice\",\n  \"project_handle\": \"public-test\",\n  \"ids\": [\n    \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.2\",\n    \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol2\"\n  ]\n}\n",
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/SimilarResponseBody.json\",\n  \"user_handle\": \"alice\",\n  \"project_handle\": \"public-test\",\n  \"results\": [\n    {\n      \"id\": \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.2\",\n      \"similarity\": 1\n    },\n    {\n      \"id\": \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol2\",\n      \"similarity\": 1\n    }\n  ]\n}\n",
 			expectStatus: http.StatusOK,
 		},
 		{

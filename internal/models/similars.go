@@ -15,20 +15,29 @@ type GetSimilarRequest struct {
 }
 
 type PostSimilarRequest struct {
-	UserHandle     string  `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
-	ProjectHandle  string  `json:"project_handle" path:"project_handle" maxLength:"20" minLength:"3" example:"my-gpt-4" doc:"Project handle"`
-	InstanceHandle string  `json:"instance_handle" path:"instance_handle" maxLength:"20" minLength:"3" example:"my-gpt-4" doc:"LLM service handle"`
-	Count          int     `json:"count" query:"count" minimum:"1" maximum:"200" example:"10" default:"10" doc:"Number of similar documents to return"`
-	Threshold      float64 `json:"threshold" query:"threshold" minimum:"0" maximum:"1" example:"0.5" default:"0.5" doc:"Similarity threshold"`
-	Limit          int     `json:"limit,omitempty" query:"limit" minimum:"1" maximum:"200" example:"10" default:"10" doc:"Maximum number of similar documents to return"`
-	Offset         int     `json:"offset,omitempty" query:"offset" minimum:"0" example:"0" default:"0" doc:"Offset into the list of similar documents"`
+	UserHandle    string  `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
+	ProjectHandle string  `json:"project_handle" path:"project_handle" maxLength:"20" minLength:"3" example:"my-gpt-4" doc:"Project handle"`
+	Count         int     `json:"count" query:"count" minimum:"1" maximum:"200" example:"10" default:"10" doc:"Number of similar documents to return"`
+	Threshold     float64 `json:"threshold" query:"threshold" minimum:"0" maximum:"1" example:"0.5" default:"0.5" doc:"Similarity threshold"`
+	MetadataPath  string  `json:"metadata_path,omitempty" query:"metadata_path" example:"{'author'}" doc:"Path to a field in the json metadata"`
+	MetadataValue string  `json:"metadata_value,omitempty" query:"metadata_value" example:"'Hans Mustermann'" doc:"Value to filter out in the json metadata"`
+	Limit         int     `json:"limit,omitempty" query:"limit" minimum:"1" maximum:"200" example:"10" default:"10" doc:"Maximum number of similar documents to return"`
+	Offset        int     `json:"offset,omitempty" query:"offset" minimum:"0" example:"0" default:"0" doc:"Offset into the list of similar documents"`
+	Body          struct {
+		Vector []float32 `json:"vector" doc:"Embeddings vector to find similar documents for"`
+	}
 }
 
 type SimilarResponse struct {
 	Header []http.Header `json:"header,omitempty" doc:"Response headers"`
 	Body   struct {
-		UserHandle    string   `json:"user_handle" doc:"User handle"`
-		ProjectHandle string   `json:"project_handle" doc:"Project handle"`
-		IDs           []string `json:"ids" doc:"List of similar document identifiers"`
+		UserHandle    string                 `json:"user_handle" doc:"User handle"`
+		ProjectHandle string                 `json:"project_handle" doc:"Project handle"`
+		Results       []SimilarResultItem    `json:"results" doc:"List of similar documents with similarity scores"`
 	}
+}
+
+type SimilarResultItem struct {
+	ID         string  `json:"id" doc:"Document identifier"`
+	Similarity float64 `json:"similarity" doc:"Similarity score (0-1, where 1 is most similar)"`
 }
