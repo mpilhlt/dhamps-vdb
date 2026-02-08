@@ -82,6 +82,7 @@ func TestAPIStandardFunc(t *testing.T) {
 			method:       http.MethodDelete,
 			requestPath:  "/v1/api-standards/wrongpath",
 			VDBKey:       options.AdminKey,
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Not Found\",\n  \"status\": 404,\n  \"detail\": \"API standard wrongpath not found\"\n}\n",
 			expectStatus: http.StatusNotFound,
 		},
 		{

@@ -99,7 +99,7 @@ func TestPublicAccess(t *testing.T) {
 			requestPath:  "/v1/projects/alice/public-test",
 			bodyPath:     "",
 			VDBKey:       "",
-			expectBody:   "",
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ProjectFull.json\",\n  \"project_id\": 1,\n  \"project_handle\": \"public-test\",\n  \"owner\": \"alice\",\n  \"description\": \"This is a test project\",\n  \"public_read\": false,\n  \"instance\": {\n    \"owner\": \"alice\",\n    \"instance_handle\": \"embedding1\",\n    \"instance_id\": 1\n  },\n  \"role\": \"owner\",\n  \"number_of_embeddings\": 3\n}\n",
 			expectStatus: http.StatusOK,
 		},
 		{
@@ -108,7 +108,7 @@ func TestPublicAccess(t *testing.T) {
 			requestPath:  "/v1/embeddings/alice/public-test",
 			bodyPath:     "",
 			VDBKey:       "",
-			expectBody:   "",
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/GetProjEmbeddingsResponseBody.json\",\n  \"embeddings\": [\n    {\n      \"text_id\": \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.1.1.1.1\",\n      \"user_handle\": \"alice\",\n      \"project_handle\": \"public-test\",\n      \"project_id\": 1,\n      \"instance_handle\": \"embedding1\",\n      \"text\": \"This is a test document\",\n      \"vector\": [\n        -0.020843506,\n        0.01852417,\n        0.05328369,\n        0.07141113,\n        0.020004272\n      ],\n      \"vector_dim\": 5,\n      \"metadata\": {\n        \"author\": \"Immanuel Kant\"\n      }\n    },\n    {\n      \"text_id\": \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.2\",\n      \"user_handle\": \"alice\",\n      \"project_handle\": \"public-test\",\n      \"project_id\": 1,\n      \"instance_handle\": \"embedding1\",\n      \"text\": \"This is a similar test document\",\n      \"vector\": [\n        -0.020843506,\n        0.01852417,\n        0.05328369,\n        0.07141113,\n        0.020004272\n      ],\n      \"vector_dim\": 5,\n      \"metadata\": {\n        \"author\": \"Immanuel Kant\"\n      }\n    },\n    {\n      \"text_id\": \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol2\",\n      \"user_handle\": \"alice\",\n      \"project_handle\": \"public-test\",\n      \"project_id\": 1,\n      \"instance_handle\": \"embedding1\",\n      \"text\": \"This is a similar test document\",\n      \"vector\": [\n        -0.020843506,\n        0.01852417,\n        0.05328369,\n        0.07141113,\n        0.020004272\n      ],\n      \"vector_dim\": 5,\n      \"metadata\": {\n        \"author\": \"Immanuel Other\"\n      }\n    }\n  ]\n}\n",
 			expectStatus: http.StatusOK,
 		},
 		{
@@ -117,7 +117,7 @@ func TestPublicAccess(t *testing.T) {
 			requestPath:  "/v1/embeddings/alice/public-test/https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.1.1.1.1",
 			bodyPath:     "",
 			VDBKey:       "",
-			expectBody:   "",
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/Embeddings.json\",\n  \"text_id\": \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.1.1.1.1\",\n  \"user_handle\": \"alice\",\n  \"project_handle\": \"public-test\",\n  \"project_id\": 1,\n  \"instance_handle\": \"embedding1\",\n  \"text\": \"This is a test document\",\n  \"vector\": [\n    -0.020843506,\n    0.01852417,\n    0.05328369,\n    0.07141113,\n    0.020004272\n  ],\n  \"vector_dim\": 5,\n  \"metadata\": {\n    \"author\": \"Immanuel Kant\"\n  }\n}\n",
 			expectStatus: http.StatusOK,
 		},
 		{
@@ -126,7 +126,7 @@ func TestPublicAccess(t *testing.T) {
 			requestPath:  "/v1/similars/alice/public-test/https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.1.1.1.1",
 			bodyPath:     "",
 			VDBKey:       "",
-			expectBody:   "",
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/SimilarResponseBody.json\",\n  \"user_handle\": \"alice\",\n  \"project_handle\": \"public-test\",\n  \"ids\": [\n    \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.2\",\n    \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol2\"\n  ]\n}\n",
 			expectStatus: http.StatusOK,
 		},
 		{
@@ -135,7 +135,7 @@ func TestPublicAccess(t *testing.T) {
 			requestPath:  "/v1/embeddings/alice/public-test",
 			bodyPath:     "../../testdata/valid_embeddings.json",
 			VDBKey:       "",
-			expectBody:   "",
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Unauthorized\",\n  \"status\": 401,\n  \"detail\": \"Authentication failed. Perhaps a missing or incorrect API key?\"\n}\n",
 			expectStatus: http.StatusUnauthorized,
 		},
 	}
