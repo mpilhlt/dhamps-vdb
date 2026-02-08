@@ -420,7 +420,7 @@ func shareProjectFunc(ctx context.Context, input *models.ShareProjectRequest) (*
 		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to share project: %v", err))
 	}
 
-	// Build response - retrieve all shared users from database
+	// Build response - retrieve all shared users from database (excluding owner)
 	sharedUsers := []models.SharedUser{}
 	userRows, err := queries.GetUsersByProject(ctx, database.GetUsersByProjectParams{
 		Owner:         input.UserHandle,
@@ -432,6 +432,10 @@ func shareProjectFunc(ctx context.Context, input *models.ShareProjectRequest) (*
 		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to retrieve shared users for project: %v", err))
 	}
 	for _, row := range userRows {
+		// Skip the owner - only include shared users
+		if row.UserHandle == input.UserHandle {
+			continue
+		}
 		sharedUsers = append(sharedUsers, models.SharedUser{
 			UserHandle: row.UserHandle,
 			Role:       row.Role,
@@ -531,6 +535,10 @@ func getProjectSharedUsersFunc(ctx context.Context, input *models.GetProjectShar
 	// Build response
 	users := []models.SharedUser{}
 	for _, su := range sharedUsers {
+		// Skip the owner - only include shared users
+		if su.UserHandle == input.UserHandle {
+			continue
+		}
 		users = append(users, models.SharedUser{
 			UserHandle: su.UserHandle,
 			Role:       su.Role,
