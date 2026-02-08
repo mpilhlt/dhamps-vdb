@@ -126,7 +126,7 @@ type ShareProjectResponse struct {
 
 type UnshareProjectRequest struct {
 	UserHandle        string `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"alice" doc:"Project owner handle"`
-	ProjectHandle     string `json:"project_handle" path:"project_handle" maxLength:"20" minLength:"3" example:"my-openai" doc:"Project handle"`
+	ProjectHandle     string `json:"project_handle" path:"project_handle" maxLength:"20" minLength:"3" example:"my-project" doc:"Project handle"`
 	UnshareWithHandle string `json:"unshare_with_handle" path:"unshare_with_handle" maxLength:"20" minLength:"3" example:"bob" doc:"User handle to unshare from"`
 }
 
@@ -139,7 +139,7 @@ type UnshareProjectResponse struct {
 
 type GetProjectSharedUsersRequest struct {
 	UserHandle    string `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"alice" doc:"Project owner handle"`
-	ProjectHandle string `json:"project_handle" path:"project_handle" maxLength:"20" minLength:"3" example:"my-openai" doc:"Project handle"`
+	ProjectHandle string `json:"project_handle" path:"project_handle" maxLength:"20" minLength:"3" example:"my-project" doc:"Project handle"`
 }
 
 type GetProjectSharedUsersResponse struct {

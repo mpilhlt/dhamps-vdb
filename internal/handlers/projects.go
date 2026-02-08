@@ -15,6 +15,12 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+const (
+	// maxSharedUsersPerQuery is the maximum number of shared users to retrieve in a single query
+	// This prevents memory issues when a project is shared with many users
+	maxSharedUsersPerQuery = 1000
+)
+
 // Create a new project
 func putProjectFunc(ctx context.Context, input *models.PutProjectRequest) (*models.UploadProjectResponse, error) {
 	if input.ProjectHandle != input.Body.ProjectHandle {
@@ -402,7 +408,7 @@ func shareProjectFunc(ctx context.Context, input *models.ShareProjectRequest) (*
 	}
 	// Check if project belongs to current user (only owner can share)
 	if project.Owner != ctx.Value(auth.AuthUserKey).(string) {
-		return nil, huma.Error401Unauthorized(fmt.Sprintf("Not authorized to share project %s/%s", input.UserHandle, input.ProjectHandle))
+		return nil, huma.Error401Unauthorized(fmt.Sprintf("not authorized to share project %s/%s", input.UserHandle, input.ProjectHandle))
 	}
 	// Check if target user exists
 	_, err = getUserFunc(ctx, &models.GetUserRequest{UserHandle: input.Body.ShareWithHandle})
@@ -425,7 +431,7 @@ func shareProjectFunc(ctx context.Context, input *models.ShareProjectRequest) (*
 	userRows, err := queries.GetUsersByProject(ctx, database.GetUsersByProjectParams{
 		Owner:         input.UserHandle,
 		ProjectHandle: input.ProjectHandle,
-		Limit:         999,
+		Limit:         maxSharedUsersPerQuery,
 		Offset:        0,
 	})
 	if err != nil && err.Error() != "no rows in result set" {
@@ -475,7 +481,7 @@ func unshareProjectFunc(ctx context.Context, input *models.UnshareProjectRequest
 	sharedUsers, err := queries.GetUsersByProject(ctx, database.GetUsersByProjectParams{
 		Owner:         input.UserHandle,
 		ProjectHandle: input.ProjectHandle,
-		Limit:         999,
+		Limit:         maxSharedUsersPerQuery,
 		Offset:        0,
 	})
 	if err != nil {
@@ -517,7 +523,7 @@ func getProjectSharedUsersFunc(ctx context.Context, input *models.GetProjectShar
 	sharedUsers, err := queries.GetUsersByProject(ctx, database.GetUsersByProjectParams{
 		Owner:         input.UserHandle,
 		ProjectHandle: input.ProjectHandle,
-		Limit:         999,
+		Limit:         maxSharedUsersPerQuery,
 		Offset:        0,
 	})
 	if err != nil {
