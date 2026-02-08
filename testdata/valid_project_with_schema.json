@@ -1,5 +1,7 @@
 {
   "project_handle": "test-schema",
+  "instance_owner": "alice1",
+  "instance_handle": "embedding1",
   "description": "Test project with metadata schema",
   "metadataScheme": "{\"type\":\"object\",\"properties\":{\"author\":{\"type\":\"string\"},\"year\":{\"type\":\"integer\"}},\"required\":[\"author\"]}"
 }

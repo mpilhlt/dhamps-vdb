@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/mpilhlt/dhamps-vdb/internal/auth"
 	"github.com/mpilhlt/dhamps-vdb/internal/database"
 	"github.com/mpilhlt/dhamps-vdb/internal/models"
 
@@ -20,63 +21,57 @@ func putProjectFunc(ctx context.Context, input *models.PutProjectRequest) (*mode
 		return nil, huma.Error400BadRequest(fmt.Sprintf("project handle in URL (%s) does not match project handle in body (%s)", input.ProjectHandle, input.Body.ProjectHandle))
 	}
 
-	// Check if user exists
-	if _, err := getUserFunc(ctx, &models.GetUserRequest{UserHandle: input.UserHandle}); err != nil {
-		return nil, err
-	}
-
 	// Get the database connection pool from the context
 	pool, err := GetDBPool(ctx)
 	if err != nil {
-		return nil, err
+		return nil, huma.Error500InternalServerError("database connection error: %v", err)
 	} else if pool == nil {
 		return nil, huma.Error500InternalServerError("database connection pool is nil")
 	}
+	queries := database.New(pool)
 
-	// 1. Upload project
+	// 1. Validation
 
-	// Build query parameters (project)
-	readers := make(map[string]bool)
-	publicRead := false
-	for _, user := range input.Body.AuthorizedReaders {
-		if user == "*" {
-			publicRead = true
-			// Still add existing users as readers for backwards compatibility
-			users, err := getUsersFunc(ctx, &models.GetUsersRequest{Limit: 999, Offset: 0})
-			if err != nil {
-				return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get users list: %v", err))
-			}
-			for _, uu := range users.Body {
-				if uu != input.UserHandle {
-					readers[uu] = true
-				}
-			}
-		} else {
-			u, err := getUserFunc(ctx, &models.GetUserRequest{UserHandle: user})
-			if err != nil {
-				return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get user %s", user))
-			}
-			if u.Body.UserHandle != user {
-				return nil, huma.Error404NotFound(fmt.Sprintf("user %s not found", user))
-			}
-			if user != input.UserHandle {
-				readers[user] = true
-			}
+	// - check if user exists
+	if _, err := queries.RetrieveUser(ctx, input.UserHandle); err != nil {
+		if err.Error() == "no rows in result set" {
+			return nil, huma.Error404NotFound(fmt.Sprintf("user %s not found", input.UserHandle))
 		}
+		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to access user %s. %v", input.UserHandle, err))
+	}
+	// - check if instance exists (if provided)
+	instanceID := pgtype.Int4{Valid: false}
+	if input.Body.InstanceHandle != "" {
+		instance, err := queries.RetrieveInstance(ctx, database.RetrieveInstanceParams{Owner: input.Body.InstanceOwner, InstanceHandle: input.Body.InstanceHandle})
+		if err != nil {
+			return nil, huma.Error404NotFound(fmt.Sprintf("LLM Service Instance %s owned by %s not found", input.Body.InstanceHandle, input.Body.InstanceOwner))
+		}
+		instanceID = pgtype.Int4{Int32: int32(instance.InstanceID), Valid: true}
 	}
 
-	project := database.UpsertProjectParams{
-		ProjectHandle:  input.ProjectHandle,
-		Description:    pgtype.Text{String: input.Body.Description, Valid: true},
-		MetadataScheme: pgtype.Text{String: input.Body.MetadataScheme, Valid: input.Body.MetadataScheme != ""},
-		Owner:          input.UserHandle,
-		PublicRead:     pgtype.Bool{Bool: publicRead, Valid: true},
-	}
+	// NOTE: For the time being, we establish all sharing only subsequent to project
+	//       creation. In other words, it is not possible to submit a list of users
+	//       to share the project with upon project creation. Instead, each share must
+	//       be created individually via API calls by the project owner.
 
-	// Execute all database operations within a transaction
+	// release queries so that they can be used in the transaction below (to link project to users)
+	queries = nil
+
+	// 2. Upload project
+
 	var projectID int32
 	var projectHandle string
 
+	// - build query parameters (project)
+	project := database.UpsertProjectParams{
+		ProjectHandle:  input.ProjectHandle,
+		Owner:          input.UserHandle,
+		Description:    pgtype.Text{String: input.Body.Description, Valid: true},
+		MetadataScheme: pgtype.Text{String: input.Body.MetadataScheme, Valid: input.Body.MetadataScheme != ""},
+		PublicRead:     pgtype.Bool{Bool: input.Body.PublicRead, Valid: true},
+		InstanceID:     instanceID,
+	}
+	// - execute all database operations within a transaction
 	err = database.WithTransaction(ctx, pool, func(tx pgx.Tx) error {
 		queries := database.New(tx)
 
@@ -95,26 +90,31 @@ func putProjectFunc(ctx context.Context, input *models.PutProjectRequest) (*mode
 			return fmt.Errorf("unable to link project to owner %s. %v", input.UserHandle, err)
 		}
 
-		// 3. Link project and other assigned readers
-		for reader := range readers {
-			params := database.LinkProjectToUserParams{ProjectID: projectID, UserHandle: reader, Role: "reader"}
-			_, err := queries.LinkProjectToUser(ctx, params)
-			if err != nil {
-				return fmt.Errorf("unable to upload project reader %s. %v", reader, err)
+		// 3. Link project and other shared users (if any) - we'll perhaps implement/activate this in the future
+		/*
+			for reader := range sharedUsers {
+				params := database.LinkProjectToUserParams{ProjectID: projectID, UserHandle: reader, Role: sharedUsers[reader]}
+				_, err := queries.LinkProjectToUser(ctx, params)
+				if err != nil {
+					return fmt.Errorf("unable to upload project reader %s. %v", reader, err)
+				}
 			}
-		}
+		*/
 
 		return nil
-	})
-
+	}) // end transaction
 	if err != nil {
 		return nil, huma.Error500InternalServerError(err.Error())
 	}
 
-	// 4. Build the response
+	// 3. Build the response
+
 	response := &models.UploadProjectResponse{}
+	response.Body.Owner = input.UserHandle
 	response.Body.ProjectHandle = projectHandle
 	response.Body.ProjectID = int(projectID)
+	response.Body.PublicRead = input.Body.PublicRead
+	response.Body.Role = "owner" // the user creating/updating the project is always the owner
 
 	return response, nil
 }
@@ -126,22 +126,26 @@ func postProjectFunc(ctx context.Context, input *models.PostProjectRequest) (*mo
 
 // Get all projects for a specific user
 func getProjectsFunc(ctx context.Context, input *models.GetProjectsRequest) (*models.GetProjectsResponse, error) {
-	// Check if user exists
-	if _, err := getUserFunc(ctx, &models.GetUserRequest{UserHandle: input.UserHandle}); err != nil {
-		return nil, err
-	}
 
 	// Get the database connection pool from the context
 	pool, err := GetDBPool(ctx)
 	if err != nil {
-		return nil, err
+		return nil, huma.Error500InternalServerError("database connection error: %v", err)
+	} else if pool == nil {
+		return nil, huma.Error500InternalServerError("database connection pool is nil")
 	}
-
-	// Run the queries
 	queries := database.New(pool)
 
+	// - check if user exists
+	if _, err := queries.RetrieveUser(ctx, input.UserHandle); err != nil {
+		if err.Error() == "no rows in result set" {
+			return nil, huma.Error404NotFound(fmt.Sprintf("user %s not found", input.UserHandle))
+		}
+		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to access user %s. %v", input.UserHandle, err))
+	}
+
 	// Get the list of projects
-	projectHandles, err := queries.GetProjectsByUser(ctx, database.GetProjectsByUserParams{UserHandle: input.UserHandle, Limit: int32(input.Limit), Offset: int32(input.Offset)})
+	projectHandles, err := queries.GetAccessibleProjectsByUser(ctx, database.GetAccessibleProjectsByUserParams{Owner: input.UserHandle, Limit: int32(input.Limit), Offset: int32(input.Offset)})
 	if err != nil {
 		if err.Error() == "no rows in result set" {
 			return nil, huma.Error404NotFound(fmt.Sprintf("no projects found for user %s", input.UserHandle))
@@ -149,76 +153,21 @@ func getProjectsFunc(ctx context.Context, input *models.GetProjectsRequest) (*mo
 		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get projects for user %s. %v", input.UserHandle, err))
 	}
 
-	// Get the details for each project
-	projects := []models.Project{}
+	projects := []models.ProjectBrief{}
+
+	/* Get the details for each project (for now, we only give the brief output...)
+	 */
+
+	/* Build response array with brief output */
 	for _, p := range projectHandles {
-		// Get the project details
-		project, err := queries.RetrieveProject(ctx, database.RetrieveProjectParams{Owner: input.UserHandle, ProjectHandle: p.ProjectHandle})
-		if err != nil {
-			return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get details for %s's project %s. %v", input.UserHandle, p.ProjectHandle, err))
-		}
-		// Get the authorized reader accounts for the project
-		readers := []string{}
-		// If the project is publicly readable, show "*" in authorizedReaders
-		if project.PublicRead.Valid && project.PublicRead.Bool {
-			readers = []string{"*"}
-		} else {
-			rows, err := queries.GetUsersByProject(ctx, database.GetUsersByProjectParams{Owner: input.UserHandle, ProjectHandle: project.ProjectHandle, Limit: 999, Offset: 0})
-			if err != nil {
-				return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get readers for %s's project %s. %v", input.UserHandle, project.ProjectHandle, err))
-			}
-			for _, row := range rows {
-				readers = append(readers, row.UserHandle)
-			}
-		}
-
-		// Get the LLM Service Instance for the project (1:1 relationship)
-		instances := []models.Instance{}
-		instRow, err := queries.RetrieveInstanceByProject(ctx, database.RetrieveInstanceByProjectParams{
-			Owner:         input.UserHandle,
-			ProjectHandle: project.ProjectHandle,
-		})
-		if err != nil {
-			if err.Error() != "no rows in result set" {
-				return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get LLM Service Instance for %s's project %s: %v", input.UserHandle, project.ProjectHandle, err))
-			}
-			// Project has no LLM service instance assigned yet
-		} else {
-			Instance := models.Instance{
-				Owner:          instRow.Owner,
-				InstanceID:     int(instRow.InstanceID),
-				InstanceHandle: instRow.InstanceHandle,
-				Endpoint:       instRow.Endpoint,
-				Description:    instRow.Description.String,
-				APIStandard:    instRow.APIStandard,
-				Model:          instRow.Model,
-				Dimensions:     instRow.Dimensions,
-			}
-			instances = append(instances, Instance)
-		}
-
-		// Get the (number of) embeddings for the project
-		count, err := queries.CountEmbeddingsByProject(ctx, database.CountEmbeddingsByProjectParams{Owner: input.UserHandle, ProjectHandle: project.ProjectHandle})
-		if err != nil {
-			if err.Error() == "no rows in result set" {
-				count = 0
-			} else {
-				return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get number of embeddings for %s's project %s. %v", input.UserHandle, project.ProjectHandle, err))
-			}
-		}
-
-		projects = append(projects, models.Project{
-			ProjectID:          int(project.ProjectID),
-			ProjectHandle:      project.ProjectHandle,
-			Description:        project.Description.String,
-			MetadataScheme:     project.MetadataScheme.String,
-			NumberOfEmbeddings: int(count),
-			Owner:              project.Owner,
-			Instances:          instances,
-			AuthorizedReaders:  readers,
+		projects = append(projects, models.ProjectBrief{
+			Owner:         p.Owner,
+			ProjectHandle: p.ProjectHandle,
+			ProjectID:     int(p.ProjectID),
+			PublicRead:    p.PublicRead.Bool,
+			Role:          p.Role.(string),
 		})
 	}
-
 	// Build the response
 	response := &models.GetProjectsResponse{}
 	response.Body.Projects = projects
@@ -228,71 +177,128 @@ func getProjectsFunc(ctx context.Context, input *models.GetProjectsRequest) (*mo
 
 // Retrieve a specific project
 func getProjectFunc(ctx context.Context, input *models.GetProjectRequest) (*models.GetProjectResponse, error) {
-	// Check if user exists
-	if _, err := getUserFunc(ctx, &models.GetUserRequest{UserHandle: input.UserHandle}); err != nil {
-		return nil, err
-	}
 
 	// Get the database connection pool from the context
 	pool, err := GetDBPool(ctx)
 	if err != nil {
-		return nil, err
+		return nil, huma.Error500InternalServerError("database connection error: %v", err)
+	} else if pool == nil {
+		return nil, huma.Error500InternalServerError("database connection pool is nil")
 	}
-
-	// Build the query parameters
-	params := database.RetrieveProjectParams{
-		Owner:         input.UserHandle,
-		ProjectHandle: input.ProjectHandle,
-	}
-
-	// Run the queries
 	queries := database.New(pool)
-	p, err := queries.RetrieveProject(ctx, params)
-	if err != nil {
+
+	// - check if user exists
+	if _, err := queries.RetrieveUser(ctx, input.UserHandle); err != nil {
 		if err.Error() == "no rows in result set" {
-			return nil, huma.Error404NotFound(fmt.Sprintf("user %s's project %s not found", input.UserHandle, input.ProjectHandle))
+			return nil, huma.Error404NotFound(fmt.Sprintf("user %s not found", input.UserHandle))
 		}
-		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get project %s for user %s. %v", input.ProjectHandle, input.UserHandle, err))
+		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to access user %s. %v", input.UserHandle, err))
 	}
 
-	// Get the authorized reader accounts for the project
-	readers := []string{}
-	// If the project is publicly readable, show "*" in authorizedReaders
-	if p.PublicRead.Valid && p.PublicRead.Bool {
-		readers = []string{"*"}
+	// get handle of requesting user from context (set by auth middleware)
+	requestingUser := ctx.Value(auth.AuthUserKey)
+	if requestingUser == nil {
+		return nil, huma.Error500InternalServerError("unable to get requesting user from context")
+	}
+
+	var p database.Project
+	var role pgtype.Text
+
+	// Admin users can access any project without being in users_projects
+	if requestingUser.(string) == "admin" {
+		// Use the basic RetrieveProject query for admin users
+		p, err = queries.RetrieveProject(ctx, database.RetrieveProjectParams{
+			Owner:         input.UserHandle,
+			ProjectHandle: input.ProjectHandle,
+		})
+		if err != nil {
+			if err.Error() == "no rows in result set" {
+				return nil, huma.Error404NotFound(fmt.Sprintf("user %s's project %s not found", input.UserHandle, input.ProjectHandle))
+			}
+			return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get project %s for user %s. %v", input.ProjectHandle, input.UserHandle, err))
+		}
+		// Admin users have admin role
+		role = pgtype.Text{String: "admin", Valid: true}
 	} else {
+		// For non-admin users, use RetrieveProjectForUser which checks access permissions
+		params := database.RetrieveProjectForUserParams{
+			Owner:         input.UserHandle,
+			ProjectHandle: input.ProjectHandle,
+			UserHandle:    requestingUser.(string),
+		}
+		projectRow, err := queries.RetrieveProjectForUser(ctx, params)
+		if err != nil {
+			if err.Error() == "no rows in result set" {
+				return nil, huma.Error404NotFound(fmt.Sprintf("user %s's project %s not found", input.UserHandle, input.ProjectHandle))
+			}
+			return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get project %s for user %s. %v", input.ProjectHandle, input.UserHandle, err))
+		}
+		// Convert RetrieveProjectForUserRow to Project
+		p = database.Project{
+			ProjectID:      projectRow.ProjectID,
+			ProjectHandle:  projectRow.ProjectHandle,
+			Owner:          projectRow.Owner,
+			Description:    projectRow.Description,
+			MetadataScheme: projectRow.MetadataScheme,
+			CreatedAt:      projectRow.CreatedAt,
+			UpdatedAt:      projectRow.UpdatedAt,
+			PublicRead:     projectRow.PublicRead,
+			InstanceID:     projectRow.InstanceID,
+		}
+		role = projectRow.Role
+	}
+
+	// Get the authorized reader accounts for the project (if requested by project owner)
+	sharedUsers := []models.SharedUser{}
+	if requestingUser.(string) == input.UserHandle {
+		// If the project is publicly readable, show "*" in shared_with
+		if p.PublicRead.Valid && p.PublicRead.Bool {
+			sharedUsers = append(sharedUsers, models.SharedUser{UserHandle: "*", Role: "reader"})
+		}
+		// Iterate all shared users
 		userRows, err := queries.GetUsersByProject(ctx, database.GetUsersByProjectParams{Owner: input.UserHandle, ProjectHandle: input.ProjectHandle, Limit: 999, Offset: 0})
 		if err != nil {
 			return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get authorized reader accounts for %s's project %s. %v", input.UserHandle, input.ProjectHandle, err))
 		}
 		for _, row := range userRows {
-			readers = append(readers, row.UserHandle)
+			sharedUsers = append(sharedUsers, models.SharedUser{UserHandle: row.UserHandle, Role: row.Role})
 		}
+	} else {
+		// If the requesting user is not the project owner, do not return the list of shared users (privacy reasons)
+		sharedUsers = nil
 	}
 
 	// Get the LLM Service Instance for the project (1:1 relationship)
-	instances := []models.Instance{}
-	llmRow, err := queries.RetrieveInstanceByProject(ctx, database.RetrieveInstanceByProjectParams{
-		Owner:         input.UserHandle,
-		ProjectHandle: input.ProjectHandle,
-	})
+	instance := models.InstanceBrief{}
+	llmRow, err := queries.RetrieveInstanceByID(ctx, p.InstanceID.Int32)
 	if err != nil {
 		if err.Error() != "no rows in result set" {
 			return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get LLM Service Instance for %s's project %s: %v", input.UserHandle, input.ProjectHandle, err))
 		}
-		// Project has no LLM service instance assigned yet
+		// Project has no LLM service instance assigned yet - just don't populate response's instance field
 	} else {
-		Instance := models.Instance{
+		// Get user's access role for the instance (if any) - to include in the response
+		var accessRole string
+		if llmRow.Owner == requestingUser.(string) {
+			accessRole = "owner"
+		} else {
+			sharedUsers, err := queries.GetSharedUsersForInstance(ctx, database.GetSharedUsersForInstanceParams{Owner: llmRow.Owner, InstanceHandle: llmRow.InstanceHandle})
+			if err != nil {
+				return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get shared users for LLM Service Instance %s owned by %s. %v", llmRow.InstanceHandle, llmRow.Owner, err))
+			}
+			for _, su := range sharedUsers {
+				if su.UserHandle == requestingUser.(string) {
+					accessRole = su.Role
+					break
+				}
+			}
+		}
+		instance = models.InstanceBrief{
 			Owner:          llmRow.Owner,
 			InstanceID:     int(llmRow.InstanceID),
 			InstanceHandle: llmRow.InstanceHandle,
-			Endpoint:       llmRow.Endpoint,
-			Description:    llmRow.Description.String,
-			APIStandard:    llmRow.APIStandard,
-			Model:          llmRow.Model,
-			Dimensions:     llmRow.Dimensions,
+			AccessRole:     accessRole,
 		}
-		instances = append(instances, Instance)
 	}
 
 	// Get the (number of) embeddings for the project
@@ -307,14 +313,15 @@ func getProjectFunc(ctx context.Context, input *models.GetProjectRequest) (*mode
 
 	// Build the response
 	response := &models.GetProjectResponse{}
-	response.Body = models.Project{
+	response.Body = models.ProjectFull{
 		ProjectID:          int(p.ProjectID),
 		ProjectHandle:      p.ProjectHandle,
 		Owner:              p.Owner,
 		Description:        p.Description.String,
 		MetadataScheme:     p.MetadataScheme.String,
-		AuthorizedReaders:  readers,
-		Instances:          instances,
+		SharedWith:         sharedUsers,
+		Instance:           instance,
+		Role:               role.String,
 		NumberOfEmbeddings: int(count),
 	}
 
@@ -363,6 +370,9 @@ func deleteProjectFunc(ctx context.Context, input *models.DeleteProjectRequest) 
 
 	return response, nil
 }
+
+// TODO: Add project sharing/unsharing/shares_listing routes
+// (add user to project with reader role and to instance sharedUsers if project has an instance assigned)
 
 // RegisterProjectRoutes registers all the project routes with the API
 func RegisterProjectsRoutes(pool *pgxpool.Pool, api huma.API) error {

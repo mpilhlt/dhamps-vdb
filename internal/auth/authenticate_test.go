@@ -64,6 +64,6 @@ func TestApiKeyIsValid(t *testing.T) {
 // - Admin authentication with valid/invalid keys
 // - Owner authentication for various resources
 // - Reader authentication for shared projects
-// - Public access for projects with "*" in authorizedReaders
+// - Public access for projects with "*" in shared_with
 // - Authentication failure handling
 // - Authorization checks for different operations

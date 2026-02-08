@@ -15,8 +15,6 @@ import (
 
 func TestAdminFunc(t *testing.T) {
 
-	fmt.Printf("\n\n\n\n")
-
 	// Get the database connection pool from package variable
 	pool := connPool
 
@@ -114,5 +112,7 @@ func TestAdminFunc(t *testing.T) {
 		fmt.Print("Shutting down server\n\n")
 		shutDownServer()
 	})
+
+	fmt.Printf("\n\n\n\n")
 
 }

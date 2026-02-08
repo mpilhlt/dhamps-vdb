@@ -14,8 +14,6 @@ import (
 
 func TestUserFunc(t *testing.T) {
 
-	fmt.Printf("\n\n\n\n")
-
 	// Get the database connection pool from package variable
 	pool := connPool
 
@@ -136,7 +134,7 @@ func TestUserFunc(t *testing.T) {
 			requestPath:  "/v1/users",
 			bodyPath:     "",
 			apiKey:       options.AdminKey,
-			expectBody:   "[\n  \"alice\"\n]\n",
+			expectBody:   "[\n  \"alice\",\n  \"_system\"\n]\n",
 			expectStatus: http.StatusOK,
 		},
 		{
@@ -252,4 +250,5 @@ func TestUserFunc(t *testing.T) {
 		shutDownServer()
 	})
 
+	fmt.Printf("\n\n\n\n")
 }

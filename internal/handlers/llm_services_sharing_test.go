@@ -13,8 +13,6 @@ import (
 
 func TestInstanceSharingFunc(t *testing.T) {
 
-	fmt.Printf("\n\n\n\n")
-
 	// Get the database connection pool from package variable
 	pool := connPool
 
@@ -50,7 +48,7 @@ func TestInstanceSharingFunc(t *testing.T) {
 	}
 
 	// Create an instance for alice
-	instanceJSON := `{"instance_handle": "my-openai", "endpoint": "https://api.openai.com/v1/embeddings", "description": "Alice's OpenAI instance", "api_standard": "openai", "model": "text-embedding-3-large", "dimensions": 3072}`
+	instanceJSON := `{"instance_handle": "embedding1", "endpoint": "https://api.openai.com/v1/embeddings", "description": "Alice's OpenAI instance", "api_standard": "openai", "model": "text-embedding-3-large", "dimensions": 3072}`
 	_, err = createInstance(t, instanceJSON, "alice", aliceAPIKey)
 	if err != nil {
 		t.Fatalf("Error creating instance for sharing tests: %v\n", err)
@@ -69,28 +67,19 @@ func TestInstanceSharingFunc(t *testing.T) {
 		expectStatus int16
 	}{
 		{
-			name:         "Share instance with bob - valid",
-			method:       http.MethodPost,
-			requestPath:  "/v1/llm-instances/alice/my-openai/share",
-			bodyJSON:     `{"user_handle": "bob", "role": "reader"}`,
-			VDBKey:       aliceAPIKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ShareInstanceResponseBody.json\",\n  \"owner\": \"alice\",\n  \"instance_handle\": \"my-openai\",\n  \"shared_with\": \"bob\",\n  \"role\": \"reader\"\n}\n",
-			expectStatus: http.StatusCreated,
-		},
-		{
 			name:         "Share instance with nonexistent user - should fail",
 			method:       http.MethodPost,
-			requestPath:  "/v1/llm-instances/alice/my-openai/share",
-			bodyJSON:     `{"user_handle": "charlie", "role": "reader"}`,
+			requestPath:  "/v1/llm-instances/alice/embedding1/share",
+			bodyJSON:     `{"share_with_handle": "charlie", "role": "reader"}`,
 			VDBKey:       aliceAPIKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Not Found\",\n  \"status\": 404,\n  \"detail\": \"user charlie not found\"\n}\n",
-			expectStatus: http.StatusNotFound,
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Bad Request\",\n  \"status\": 400,\n  \"detail\": \"target user charlie does not exist: user charlie not found\"\n}\n",
+			expectStatus: http.StatusBadRequest,
 		},
 		{
 			name:         "Share nonexistent instance - should fail",
 			method:       http.MethodPost,
 			requestPath:  "/v1/llm-instances/alice/nonexistent/share",
-			bodyJSON:     `{"user_handle": "bob", "role": "reader"}`,
+			bodyJSON:     `{"share_with_handle": "bob", "role": "reader"}`,
 			VDBKey:       aliceAPIKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Not Found\",\n  \"status\": 404,\n  \"detail\": \"instance alice/nonexistent not found\"\n}\n",
 			expectStatus: http.StatusNotFound,
@@ -98,25 +87,34 @@ func TestInstanceSharingFunc(t *testing.T) {
 		{
 			name:         "Bob cannot share alice's instance - should fail",
 			method:       http.MethodPost,
-			requestPath:  "/v1/llm-instances/alice/my-openai/share",
-			bodyJSON:     `{"user_handle": "alice", "role": "editor"}`,
+			requestPath:  "/v1/llm-instances/alice/embedding1/share",
+			bodyJSON:     `{"share_with_handle": "alice", "role": "editor"}`,
 			VDBKey:       bobAPIKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Forbidden\",\n  \"status\": 403,\n  \"detail\": \"you are not authorized to perform this action\"\n}\n",
-			expectStatus: http.StatusForbidden,
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Unauthorized\",\n  \"status\": 401,\n  \"detail\": \"Authentication failed. Perhaps a missing or incorrect API key?\"\n}\n",
+			expectStatus: http.StatusUnauthorized,
+		},
+		{
+			name:         "Share instance with bob - valid",
+			method:       http.MethodPost,
+			requestPath:  "/v1/llm-instances/alice/embedding1/share",
+			bodyJSON:     `{"share_with_handle": "bob", "role": "reader"}`,
+			VDBKey:       aliceAPIKey,
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ShareInstanceResponseBody.json\",\n  \"owner\": \"alice\",\n  \"instance_handle\": \"embedding1\",\n  \"shared_with\": [\n    {\n      \"user_handle\": \"bob\",\n      \"role\": \"reader\"\n    }\n  ]\n}\n",
+			expectStatus: http.StatusCreated,
 		},
 		{
 			name:         "Get shared users for instance",
 			method:       http.MethodGet,
-			requestPath:  "/v1/llm-instances/alice/my-openai/shared-with",
+			requestPath:  "/v1/llm-instances/alice/embedding1/shared-with",
 			bodyJSON:     "",
 			VDBKey:       aliceAPIKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/GetInstanceSharedUsersResponseBody.json\",\n  \"shared_with\": [\n    {\n      \"user_handle\": \"bob\",\n      \"role\": \"reader\"\n    }\n  ]\n}\n",
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/GetInstanceSharedUsersResponseBody.json\",\n  \"owner\": \"alice\",\n  \"instance_handle\": \"embedding1\",\n  \"shared_with\": [\n    {\n      \"user_handle\": \"bob\",\n      \"role\": \"reader\"\n    }\n  ]\n}\n",
 			expectStatus: http.StatusOK,
 		},
 		{
 			name:         "Unshare instance from bob",
 			method:       http.MethodDelete,
-			requestPath:  "/v1/llm-instances/alice/my-openai/share/bob",
+			requestPath:  "/v1/llm-instances/alice/embedding1/share/bob",
 			bodyJSON:     "",
 			VDBKey:       aliceAPIKey,
 			expectBody:   "",
@@ -125,10 +123,10 @@ func TestInstanceSharingFunc(t *testing.T) {
 		{
 			name:         "Get shared users after unsharing - should be empty",
 			method:       http.MethodGet,
-			requestPath:  "/v1/llm-instances/alice/my-openai/shared-with",
+			requestPath:  "/v1/llm-instances/alice/embedding1/shared-with",
 			bodyJSON:     "",
 			VDBKey:       aliceAPIKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/GetInstanceSharedUsersResponseBody.json\",\n  \"shared_with\": []\n}\n",
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/GetInstanceSharedUsersResponseBody.json\",\n  \"owner\": \"alice\",\n  \"instance_handle\": \"embedding1\",\n  \"shared_with\": []\n}\n",
 			expectStatus: http.StatusOK,
 		},
 	}
@@ -193,13 +191,11 @@ func TestInstanceSharingFunc(t *testing.T) {
 		fmt.Print("Shutting down server\n\n")
 		shutDownServer()
 	})
+
+	fmt.Printf("\n")
 }
 
-// Note: createInstance helper function is defined in handlers_test.go
-
 func TestDefinitionSharingFunc(t *testing.T) {
-
-	fmt.Printf("\n\n\n\n")
 
 	// Get the database connection pool from package variable
 	pool := connPool
@@ -223,21 +219,34 @@ func TestDefinitionSharingFunc(t *testing.T) {
 	}
 
 	bobJSON := `{"user_handle": "bob", "name": "Bob Smith", "email": "bob@foo.bar"}`
-	_, err = createUser(t, bobJSON)
+	bobAPIKey, err := createUser(t, bobJSON)
 	if err != nil {
 		t.Fatalf("Error creating user bob for testing: %v\n", err)
 	}
 
 	// Create API standard
-	openaiJSON := `{"api_standard_handle": "openai", "description": "OpenAI Embeddings API", "key_method": "auth_bearer", "key_field": "Authorization" }`
-	_, err = createAPIStandard(t, openaiJSON, options.AdminKey)
+	/*
+		openaiJSON := `{"api_standard_handle": "openai", "description": "OpenAI Embeddings API", "key_method": "auth_bearer", "key_field": "Authorization" }`
+		_, err = createAPIStandard(t, openaiJSON, options.AdminKey)
+		if err != nil {
+			t.Fatalf("Error creating API standard openai for testing: %v\n", err)
+		}
+	*/
+
+	// Create a definition for alice
+	openaiLargeJSON := `{"owner": "alice", "definition_handle": "openai-large", "endpoint": "https://api.openai.com/v1/embeddings", "description": "OpenAI instance with large model", "api_standard": "openai", "model": "text-embedding-3-large", "dimensions": 3072, "context_limit": 8192, "is_public": false}`
+	_, err = createDefinition(t, openaiLargeJSON, "alice", aliceAPIKey)
 	if err != nil {
-		t.Fatalf("Error creating API standard openai for testing: %v\n", err)
+		t.Fatalf("Error creating definition for sharing tests: %v\n", err)
 	}
 
 	// Note: _system user and definitions are created by migration 004
-	// We can test sharing _system definitions and alice's own definitions
-
+	//       They are public by default, so we can test alice creating an
+	//       instance based on it. We can also text alice creating a
+	//       definition and sharing it, since users can share their own
+	//       definitions without needing to be shared with first.
+	//       Finally, we can test admin creating and sharing a new
+	//       _system definition.
 	fmt.Printf("\nRunning llm-definitions sharing tests ...\n\n")
 
 	// Define test cases
@@ -251,49 +260,58 @@ func TestDefinitionSharingFunc(t *testing.T) {
 		expectStatus int16
 	}{
 		{
-			name:         "Admin shares _system definition with alice",
+			name:         "Bob cannot create an instance based on Alice's definition - should fail",
 			method:       http.MethodPost,
-			requestPath:  "/v1/llm-definitions/_system/openai-large/share",
-			bodyJSON:     `{"user_handle": "alice", "role": "reader"}`,
-			VDBKey:       options.AdminKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ShareDefinitionResponseBody.json\",\n  \"owner\": \"_system\",\n  \"definition_handle\": \"openai-large\",\n  \"shared_with\": \"alice\",\n  \"role\": \"reader\"\n}\n",
-			expectStatus: http.StatusCreated,
+			requestPath:  "/v1/llm-instances/bob/from-definition",
+			bodyJSON:     `{"user_handle": "bob", "instance_handle": "bob-instance1", "definition_owner": "alice", "definition_handle": "openai-large", "endpoint": "https://api.openai.com/v1/embeddings", "description": "Bob's instance based on Alice's definition"}`,
+			VDBKey:       bobAPIKey,
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Unauthorized\",\n  \"status\": 401,\n  \"detail\": \"user does not have access to definition alice/openai-large\"\n}\n",
+			expectStatus: http.StatusUnauthorized,
 		},
 		{
-			name:         "Alice cannot share _system definition - should fail",
+			name:         "Create an instance based on a nonexistent definition - should fail",
 			method:       http.MethodPost,
-			requestPath:  "/v1/llm-definitions/_system/openai-large/share",
-			bodyJSON:     `{"user_handle": "bob", "role": "reader"}`,
-			VDBKey:       aliceAPIKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Forbidden\",\n  \"status\": 403,\n  \"detail\": \"you are not authorized to perform this action\"\n}\n",
-			expectStatus: http.StatusForbidden,
+			requestPath:  "/v1/llm-instances/bob/from-definition",
+			bodyJSON:     `{"user_handle": "bob", "instance_handle": "bob-instance1", "definition_owner": "alice", "definition_handle": "nonexistant", "endpoint": "https://api.openai.com/v1/embeddings", "description": "Bob's instance based on Alice's definition"}`,
+			VDBKey:       bobAPIKey,
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Not Found\",\n  \"status\": 404,\n  \"detail\": \"definition alice/nonexistant not found\"\n}\n",
+			expectStatus: http.StatusNotFound,
 		},
 		{
-			name:         "Get shared users for _system definition",
-			method:       http.MethodGet,
-			requestPath:  "/v1/llm-definitions/_system/openai-large/shared-with",
-			bodyJSON:     "",
-			VDBKey:       options.AdminKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/GetDefinitionSharedUsersResponseBody.json\",\n  \"shared_with\": [\n    {\n      \"user_handle\": \"alice\",\n      \"role\": \"reader\"\n    }\n  ]\n}\n",
+			name:         "Bob can create an instance based on a _system definition - should succeed",
+			method:       http.MethodPost,
+			requestPath:  "/v1/llm-instances/bob/from-definition",
+			bodyJSON:     `{"user_handle": "bob", "instance_handle": "bob-instance1", "definition_owner": "_system", "definition_handle": "openai-large", "endpoint": "https://api.openai.com/v1/embeddings", "description": "Bob's instance based on _system's definition"}`,
+			VDBKey:       bobAPIKey,
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/UploadInstanceResponseBody.json\",\n  \"owner\": \"bob\",\n  \"instance_handle\": \"bob-instance1\",\n  \"instance_id\": 1\n}\n",
 			expectStatus: http.StatusOK,
 		},
 		{
-			name:         "Admin unshares _system definition from alice",
-			method:       http.MethodDelete,
-			requestPath:  "/v1/llm-definitions/_system/openai-large/share/alice",
-			bodyJSON:     "",
-			VDBKey:       options.AdminKey,
-			expectBody:   "",
-			expectStatus: http.StatusNoContent,
+			name:         "Alice shares her definition with Bob - should succeed",
+			method:       http.MethodPost,
+			requestPath:  "/v1/llm-definitions/alice/openai-large/share",
+			bodyJSON:     `{"share_with_handle": "bob"}`,
+			VDBKey:       aliceAPIKey,
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ShareDefinitionResponseBody.json\",\n  \"owner\": \"alice\",\n  \"definition_handle\": \"openai-large\",\n  \"shared_with\": [\n    \"bob\"\n  ]\n}\n",
+			expectStatus: http.StatusCreated,
 		},
 		{
-			name:         "Share with nonexistent user - should fail",
-			method:       http.MethodPost,
-			requestPath:  "/v1/llm-definitions/_system/openai-large/share",
-			bodyJSON:     `{"user_handle": "charlie", "role": "reader"}`,
-			VDBKey:       options.AdminKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Not Found\",\n  \"status\": 404,\n  \"detail\": \"user charlie not found\"\n}\n",
-			expectStatus: http.StatusNotFound,
+			name:         "Get shared users for alice's definition - should succeed when called by alice",
+			method:       http.MethodGet,
+			requestPath:  "/v1/llm-definitions/alice/openai-large/shared-with",
+			bodyJSON:     "",
+			VDBKey:       aliceAPIKey,
+			expectBody:   "[\n  \"bob\"\n]\n",
+			expectStatus: http.StatusOK,
+		},
+		{
+			name:         "Alice unshares her definition from Bob - should succeed",
+			method:       http.MethodDelete,
+			requestPath:  "/v1/llm-definitions/alice/openai-large/share/bob",
+			bodyJSON:     "",
+			VDBKey:       aliceAPIKey,
+			expectBody:   "",
+			expectStatus: http.StatusNoContent,
 		},
 	}
 
@@ -357,4 +375,6 @@ func TestDefinitionSharingFunc(t *testing.T) {
 		fmt.Print("Shutting down server\n\n")
 		shutDownServer()
 	})
+
+	fmt.Printf("\n\n\n\n")
 }

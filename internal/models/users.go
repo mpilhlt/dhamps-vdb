@@ -21,9 +21,14 @@ type ProjectMembership struct {
 	Role          string `json:"role" doc:"Role of the user in the project"`
 }
 
+type SharedUser struct {
+	UserHandle string `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
+	Role       string `json:"role" path:"role" enum:"owner,editor,reader" example:"reader" doc:"Role of the user in the project"`
+}
+
 type ProjectMemberships []ProjectMembership
 
-type Definitions []Definition
+type Definitions []DefinitionFull
 
 type InstanceMembership struct {
 	InstanceHandle string `json:"instance_handle" doc:"LLM service instance"`

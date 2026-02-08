@@ -14,8 +14,6 @@ import (
 
 func TestProjectsFunc(t *testing.T) {
 
-	fmt.Printf("\n\n\n\n")
-
 	// Get the database connection pool from package variable
 	pool := connPool
 
@@ -33,6 +31,20 @@ func TestProjectsFunc(t *testing.T) {
 	aliceAPIKey, err := createUser(t, aliceJSON)
 	if err != nil {
 		t.Fatalf("Error creating user alice for testing: %v\n", err)
+	}
+
+	// Create API standard to be used in embeddings tests
+	apiStandardJSON := `{"api_standard_handle": "openai", "description": "OpenAI Embeddings API", "key_method": "auth_bearer", "key_field": "Authorization" }`
+	_, err = createAPIStandard(t, apiStandardJSON, options.AdminKey)
+	if err != nil {
+		t.Fatalf("Error creating API standard openai for testing: %v\n", err)
+	}
+
+	// Create LLM Service Instance to be used in embeddings tests
+	instanceJSON := `{ "instance_handle": "embedding1", "endpoint": "https://api.foo.bar/v1/embed", "description": "An LLM Service just for testing if the dhamps-vdb code is working", "api_standard": "openai", "model": "embed-test1", "dimensions": 5}`
+	_, err = createInstance(t, instanceJSON, "alice", aliceAPIKey)
+	if err != nil {
+		t.Fatalf("Error creating LLM service embedding1 for testing: %v\n", err)
 	}
 
 	fmt.Printf("\nRunning projects tests ...\n\n")
@@ -71,7 +83,7 @@ func TestProjectsFunc(t *testing.T) {
 			requestPath:  "/v1/projects/alice/test1",
 			bodyPath:     "../../testdata/valid_project.json",
 			apiKey:       aliceAPIKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/UploadProjectResponseBody.json\",\n  \"project_handle\": \"test1\",\n  \"project_id\": 1\n}\n",
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ProjectBrief.json\",\n  \"owner\": \"alice\",\n  \"project_handle\": \"test1\",\n  \"project_id\": 1,\n  \"public_read\": false,\n  \"role\": \"owner\"\n}\n",
 			expectStatus: http.StatusCreated,
 		},
 		{
@@ -98,7 +110,7 @@ func TestProjectsFunc(t *testing.T) {
 			requestPath:  "/v1/projects/alice",
 			bodyPath:     "../../testdata/valid_project.json",
 			apiKey:       aliceAPIKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/UploadProjectResponseBody.json\",\n  \"project_handle\": \"test1\",\n  \"project_id\": 1\n}\n",
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ProjectBrief.json\",\n  \"owner\": \"alice\",\n  \"project_handle\": \"test1\",\n  \"project_id\": 1,\n  \"public_read\": false,\n  \"role\": \"owner\"\n}\n",
 			expectStatus: http.StatusCreated,
 		},
 		{
@@ -116,7 +128,7 @@ func TestProjectsFunc(t *testing.T) {
 			requestPath:  "/v1/projects/alice/test1",
 			bodyPath:     "",
 			apiKey:       aliceAPIKey,
-			expectBody:   "{\n  \"project_id\": 1,\n  \"project_handle\": \"test1\",\n  \"owner\": \"alice\",\n  \"description\": \"This is a test project\",\n  \"authorizedReaders\": [\n    \"alice\"\n  ],\n  \"number_of_embeddings\": 0\n}\n",
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ProjectFull.json\",\n  \"project_id\": 1,\n  \"project_handle\": \"test1\",\n  \"owner\": \"alice\",\n  \"description\": \"This is a test project\",\n  \"public_read\": false,\n  \"shared_with\": [\n    {\n      \"user_handle\": \"alice\",\n      \"role\": \"owner\"\n    }\n  ],\n  \"instance\": {\n    \"owner\": \"alice\",\n    \"instance_handle\": \"embedding1\",\n    \"instance_id\": 1,\n    \"access_role\": \"owner\"\n  },\n  \"role\": \"owner\",\n  \"number_of_embeddings\": 0\n}\n",
 			expectStatus: http.StatusOK,
 		},
 		{
@@ -125,7 +137,7 @@ func TestProjectsFunc(t *testing.T) {
 			requestPath:  "/v1/projects/alice",
 			bodyPath:     "",
 			apiKey:       aliceAPIKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/GetProjectsResponseBody.json\",\n  \"projects\": [\n    {\n      \"project_id\": 1,\n      \"project_handle\": \"test1\",\n      \"owner\": \"alice\",\n      \"description\": \"This is a test project\",\n      \"authorizedReaders\": [\n        \"alice\"\n      ],\n      \"number_of_embeddings\": 0\n    }\n  ]\n}\n",
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/GetProjectsResponseBody.json\",\n  \"projects\": [\n    {\n      \"owner\": \"alice\",\n      \"project_handle\": \"test1\",\n      \"project_id\": 1,\n      \"public_read\": false,\n      \"role\": \"owner\"\n    }\n  ]\n}\n",
 			expectStatus: http.StatusOK,
 		},
 		{
@@ -250,13 +262,16 @@ func TestProjectsFunc(t *testing.T) {
 		shutDownServer()
 	})
 
+	fmt.Printf("\n")
 }
 
 // TestProjectTransactionRollback verifies that transactions are properly rolled back
 // when an error occurs during project creation, ensuring no orphaned records.
+
+/* We don't test transactions now because we don't link to authorized users in project creation ...
 func TestProjectTransactionRollback(t *testing.T) {
 
-	fmt.Printf("\n\n")
+	fmt.Printf("\n")
 
 	// Get the database connection pool from package variable
 	pool := connPool
@@ -334,7 +349,7 @@ func TestProjectTransactionRollback(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Create a project with Bob as a reader
-		projectJSON := `{"project_handle": "test-success", "description": "Test successful transaction", "authorizedReaders": ["bob"]}`
+		projectJSON := `{"project_handle": "test-success", "description": "Test successful transaction", "shared_with": [{ "user_handle": "bob", "role": "reader"}]}`
 		requestURL := fmt.Sprintf("http://%s:%d/v1/projects/alice/test-success", options.Host, options.Port)
 		req, err := http.NewRequest(http.MethodPut, requestURL, bytes.NewReader([]byte(projectJSON)))
 		assert.NoError(t, err)
@@ -369,8 +384,8 @@ func TestProjectTransactionRollback(t *testing.T) {
 		err = json.Unmarshal(respBody, &projectData)
 		assert.NoError(t, err)
 
-		readers, ok := projectData["authorizedReaders"].([]interface{})
-		assert.True(t, ok, "authorizedReaders should be an array")
+		readers, ok := projectData["shared_with"].([]interface{})
+		assert.True(t, ok, "shared_with should be an array")
 
 		// Convert to string slice for easier checking
 		readerStrings := make([]string, len(readers))
@@ -401,4 +416,7 @@ func TestProjectTransactionRollback(t *testing.T) {
 		fmt.Print("Shutting down server\n\n")
 		shutDownServer()
 	})
+
+	fmt.Printf("\n\n\n\n")
 }
+*/

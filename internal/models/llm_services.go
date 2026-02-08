@@ -21,26 +21,36 @@ import (
 	displayed in any output of the VDB. (Thus, make sure to keep your own backup
 	copy in some secure location, don't rely on the VDB to be able to tell you
 	your API key in case you forget it.)
+
+	With regard to terminology, the following models involve "owner" and "user_handle":
+	in most cases, both refer to the same entity: the owner of the resource.
+	We use "user_handle" preferably in the API paths (i.e. in Input structs)
+	and "owner" in the data model (and output JSON).
 */
 
 // === I. LLM Service Definitions ===
 
 // Definition represents a template for LLM service configurations
 // Definitions can be owned by _system (global templates) or individual users
-type Definition struct {
+type DefinitionFull struct {
 	DefinitionID     int    `json:"definition_id,omitempty" readOnly:"true" doc:"Unique LLM Service Definition identifier" example:"42"`
 	DefinitionHandle string `json:"definition_handle" minLength:"3" maxLength:"20" example:"openai-large" doc:"LLM Service Definition handle"`
 	Owner            string `json:"owner" readOnly:"true" doc:"User handle of the LLM Service Definition owner (_system for global)" example:"_system"`
-	Endpoint         string `json:"endpoint" example:"https://api.openai.com/v1/embeddings" doc:"LLM Service endpoint"`
+	Endpoint         string `json:"endpoint,omitempty" example:"https://api.openai.com/v1/embeddings" doc:"LLM Service endpoint"`
 	Description      string `json:"description,omitempty" doc:"LLM Service description"`
 	APIStandard      string `json:"api_standard" example:"openai" doc:"Standard of the API"`
-	Model            string `json:"model" example:"text-embedding-3-large" doc:"Embedding model name"`
-	Dimensions       int32  `json:"dimensions" example:"3072" doc:"Number of dimensions in the embeddings"`
+	Model            string `json:"model,omitempty" example:"text-embedding-3-large" doc:"Embedding model name"`
+	Dimensions       int32  `json:"dimensions,omitempty" example:"3072" doc:"Number of dimensions in the embeddings"`
+	ContextLimit     int32  `json:"context_limit,omitempty" example:"8192" doc:"Context limit of the LLM service"`
+	IsPublic         bool   `json:"is_public,omitempty" default:"false" doc:"Whether the definition is public (shared with all users)"`
 }
 
-// TODO: add complete set of structs and functions for Definitions
-
-type DefinitionInput struct{}
+type DefinitionBrief struct {
+	DefinitionID     int    `json:"definition_id" readOnly:"true" doc:"Unique LLM Service Definition identifier" example:"42"`
+	DefinitionHandle string `json:"definition_handle" minLength:"3" maxLength:"20" example:"openai-large" doc:"LLM Service Definition handle"`
+	Owner            string `json:"owner" readOnly:"true" doc:"User handle of the LLM Service Definition owner (_system for global)" example:"_system"`
+	IsPublic         bool   `json:"is_public" doc:"Whether the definition is public (shared with all users)"`
+}
 
 // Request and Response structs for the LLM Service Instance administration API
 // The huma framework requires that:
@@ -49,38 +59,134 @@ type DefinitionInput struct{}
 
 // Create/update llm-definition
 // PUT Path: "/v1/llm-definitions/{user_handle}/{definition_handle}"
+
+type PutDefinitionRequest struct {
+	UserHandle       string         `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
+	DefinitionHandle string         `json:"definition_handle" path:"definition_handle" maxLength:"20" minLength:"3" example:"openai-large" doc:"LLM Service Definition handle"`
+	Body             DefinitionFull `json:"body" doc:"LLM Service Definition to create or update"`
+}
+
 // POST Path: "/v1/llm-definitions/{user_handle}"
+type PostDefinitionRequest struct {
+	UserHandle string         `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
+	Body       DefinitionFull `json:"body" doc:"LLM Service Definition to create"`
+}
+
+type UploadDefinitionResponse struct {
+	Header []http.Header   `json:"header,omitempty" doc:"Response headers"`
+	Body   DefinitionBrief `json:"definition" doc:"Information about the created LLM Service Definition"`
+}
 
 // Get single LLM Service Definition
 // Path: "/v1/llm-definitions/{user_handle}/{definition_handle}"
 
-// Get all LLM Service Definitions by user
+type GetDefinitionRequest struct {
+	UserHandle       string `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
+	DefinitionHandle string `json:"definition_handle" path:"definition_handle" maxLength:"20" minLength:"3" example:"openai-large" doc:"LLM Service Definition handle"`
+}
+
+type GetDefinitionResponse struct {
+	Header []http.Header  `json:"header,omitempty" doc:"Response headers"`
+	Body   DefinitionFull `json:"definition" doc:"Information about the LLM Service Definition"`
+}
+
+// Get all LLM Service Definitions by user (i.e. owner)
 // Path: "/v1/llm-definitions/{user_handle}"
+
+type GetUserDefinitionsRequest struct {
+	UserHandle string `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
+	Limit      int    `json:"limit,omitempty" query:"limit" minimum:"1" maximum:"200" example:"10" default:"20" doc:"Maximum number of embeddings to return"`
+	Offset     int    `json:"offset,omitempty" query:"offset" minimum:"0" example:"0" default:"0" doc:"Offset into the list of embeddings"`
+}
+
+type GetUserDefinitionsResponse struct {
+	Header []http.Header `json:"header,omitempty" doc:"Response headers"`
+	Body   DefinitionsResponse
+}
+
+type DefinitionsResponse struct {
+	Definitions []DefinitionBrief `json:"definitions" doc:"List of LLM Service Definitions owned by the user"`
+}
 
 // Delete LLM Service Definition
 // Path: "/v1/llm-definitions/{user_handle}/{definition_handle}"
 
-// TODO: Share LLM Service Definition with user
+type DeleteDefinitionRequest struct {
+	UserHandle       string `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
+	DefinitionHandle string `json:"definition_handle" path:"definition_handle" maxLength:"20" minLength:"3" example:"openai-large" doc:"LLM Service Definition handle"`
+}
+
+type DeleteDefinitionResponse struct {
+	Header []http.Header `json:"header,omitempty" doc:"Response headers"`
+}
+
+// Share Definition with User
+// POST Path: "/v1/llm-definitions/{user_handle}/{definition_handle}/share"
+
+type ShareDefinitionRequest struct {
+	UserHandle       string `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"_system" doc:"Definition owner handle"`
+	DefinitionHandle string `json:"definition_handle" path:"definition_handle" maxLength:"20" minLength:"3" example:"openai-large" doc:"Definition handle"`
+	Body             struct {
+		ShareWithHandle string `json:"share_with_handle" minLength:"3" maxLength:"20" example:"bob" doc:"User handle to share with"`
+	}
+}
+
+type ShareDefinitionResponse struct {
+	Header []http.Header `json:"header,omitempty" doc:"Response headers"`
+	Body   struct {
+		Owner            string   `json:"owner" doc:"Definition owner"`
+		DefinitionHandle string   `json:"definition_handle" doc:"Definition handle"`
+		SharedWith       []string `json:"shared_with" doc:"List of users this definition is shared with"`
+	}
+}
+
+// Unshare Definition from User
+// DELETE Path: "/v1/llm-definitions/{user_handle}/{definition_handle}/share/{unshare_with_handle}"
+
+type UnshareDefinitionRequest struct {
+	UserHandle        string `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"_system" doc:"Definition owner handle"`
+	DefinitionHandle  string `json:"definition_handle" path:"definition_handle" maxLength:"20" minLength:"3" example:"openai-large" doc:"Definition handle"`
+	UnshareWithHandle string `json:"unshare_with_handle" path:"unshare_with_handle" maxLength:"20" minLength:"3" example:"bob" doc:"User handle to unshare from"`
+}
+
+type UnshareDefinitionResponse struct {
+	Header []http.Header `json:"header,omitempty" doc:"Response headers"`
+}
+
+// Get users a Definition is shared with (only for Definition owner)
+// GET Path: "/v1/llm-definitions/{user_handle}/{definition_handle}/shared-with"
+
+type GetDefinitionSharedUsersRequest struct {
+	UserHandle       string `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"_system" doc:"Definition owner handle"`
+	DefinitionHandle string `json:"definition_handle" path:"definition_handle" maxLength:"20" minLength:"3" example:"openai-large" doc:"Definition handle"`
+}
+
+type GetDefinitionSharedUsersResponse struct {
+	Header []http.Header `json:"header,omitempty" doc:"Response headers"`
+	Body   []string      `json:"shared_with" doc:"List of users this definition is shared with"`
+}
 
 // === II. LLM Service Instances ===
 
 // Instance represents a user-specific instance of an LLM service
 // Instances can be based on a definition or standalone
 type Instance struct {
-	InstanceID       int      `json:"instance_id,omitempty" readOnly:"true" doc:"Unique LLM Service Instance identifier" example:"153"`
-	InstanceHandle   string   `json:"instance_handle" minLength:"3" maxLength:"20" example:"my-openai-large" doc:"LLM Service Instance handle"`
-	Owner            string   `json:"owner" readOnly:"true" doc:"User handle of the LLM Service Instance owner"`
-	DefinitionID     *int     `json:"definition_id,omitempty" doc:"Reference to LLM Service Definition handle (if based on one)"`
-	DefinitionOwner  string   `json:"definition_owner,omitempty" readOnly:"true" doc:"User handle of the LLM Service Definition owner (if based on one)"`
-	DefinitionHandle string   `json:"definition_handle,omitempty" readOnly:"true" doc:"Handle of the LLM Service Definition (if based on one)"`
-	Endpoint         string   `json:"endpoint" example:"https://api.openai.com/v1/embeddings" doc:"LLM Service endpoint"`
-	Description      string   `json:"description,omitempty" doc:"LLM Service description"`
-	APIKeyEncrypted  string   `json:"api_key_encrypted,omitempty" writeOnly:"true" doc:"Authentication token (write-only, never returned)"`
-	HasAPIKey        bool     `json:"has_api_key,omitempty" readOnly:"true" doc:"Indicates if Instance has an API key configured"`
-	APIStandard      string   `json:"api_standard" example:"openai" doc:"Standard of the API"`
-	Model            string   `json:"model" example:"text-embedding-3-large" doc:"Embedding model name"`
-	Dimensions       int32    `json:"dimensions" example:"3072" doc:"Number of dimensions in the embeddings"`
-	SharedWith       []string `json:"shared_with,omitempty" readOnly:"true" doc:"Users this LLM Service Instance is shared with"`
+	Owner            string       `json:"owner" readOnly:"true" doc:"User handle of the LLM Service Instance owner"`
+	InstanceHandle   string       `json:"instance_handle" minLength:"3" maxLength:"20" example:"my-openai-large" doc:"LLM Service Instance handle"`
+	InstanceID       int          `json:"instance_id,omitempty" readOnly:"true" doc:"Unique LLM Service Instance identifier" example:"153"`
+	DefinitionID     *int         `json:"definition_id,omitempty" doc:"Reference to LLM Service Definition handle (if based on one)"`
+	DefinitionOwner  string       `json:"definition_owner,omitempty" readOnly:"true" doc:"User handle of the LLM Service Definition owner (if based on one)"`
+	DefinitionHandle string       `json:"definition_handle,omitempty" readOnly:"true" doc:"Handle of the LLM Service Definition (if based on one)"`
+	Endpoint         string       `json:"endpoint,omitempty" example:"https://api.openai.com/v1/embeddings" doc:"LLM Service endpoint"`
+	Description      string       `json:"description,omitempty" doc:"LLM Service description"`
+	APIKeyEncrypted  string       `json:"api_key_encrypted,omitempty" writeOnly:"true" doc:"Authentication token (write-only, never returned)"`
+	HasAPIKey        bool         `json:"has_api_key,omitempty" readOnly:"true" doc:"Indicates if Instance has an API key configured"`
+	APIStandard      string       `json:"api_standard,omitempty" example:"openai" doc:"Standard of the API"`
+	Model            string       `json:"model,omitempty" example:"text-embedding-3-large" doc:"Embedding model name"`
+	Dimensions       int32        `json:"dimensions,omitempty" example:"3072" doc:"Number of dimensions in the embeddings"`
+	ContextLimit     int32        `json:"context_limit,omitempty" example:"8192" doc:"Context limit of the LLM service"`
+	IsPublic         bool         `json:"is_public,omitempty" default:"false" doc:"Whether the instance is public (shared with all users)"`
+	SharedWith       []SharedUser `json:"shared_with,omitempty" readOnly:"true" doc:"Users this LLM Service Instance is shared with"`
 	// RateLimits			 []RateLimit `json:"rate_limits,omitempty" readOnly:"true" doc:"Rate limits configured for this LLM Service Instance"``
 	// ContextData      string `json:"contextData,omitempty" doc:"Context data that can be fed to the LLM service. Available in the request template as contextData variable."`
 	// SystemPrompt     string `json:"systemPrompt,omitempty" example:"Return the embeddings for the following text:" doc:"System prompt for requests to the service. Available in the request template as systemPrompt variable."`
@@ -89,15 +195,17 @@ type Instance struct {
 }
 
 type InstanceInput struct {
-	InstanceID       int    `json:"instance_id,omitempty" doc:"Unique LLM Service Instance identifier" example:"153"`
+	UserHandle       string `json:"user_handle,omitempty" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle of LLM Service Instance owner"`
 	InstanceHandle   string `json:"instance_handle" minLength:"3" maxLength:"20" example:"GPT-4 API" doc:"LLM Service Instance handle"`
+	InstanceID       int    `json:"instance_id,omitempty" doc:"Unique LLM Service Instance identifier" example:"153"`
 	DefinitionOwner  string `json:"definition_owner,omitempty" readOnly:"true" doc:"User handle of the LLM Service Definition owner (if based on one)"`
 	DefinitionHandle string `json:"definition_handle,omitempty" readOnly:"true" doc:"Handle of the LLM Service Definition (if based on one)"`
-	Endpoint         string `json:"endpoint" example:"https://api.openai.com/v1/embeddings" doc:"LLM Service endpoint"`
+	Endpoint         string `json:"endpoint,omitempty" example:"https://api.openai.com/v1/embeddings" doc:"LLM Service endpoint"`
 	Description      string `json:"description,omitempty" doc:"LLM Service Instance description"`
-	APIStandard      string `json:"api_standard" default:"openai" example:"openai" doc:"Standard of the API"`
-	Model            string `json:"model" example:"text-embedding-3-large" doc:"Embedding model name"`
-	Dimensions       int32  `json:"dimensions" example:"3072" doc:"Number of dimensions in the embeddings"`
+	APIStandard      string `json:"api_standard,omitempty" default:"openai" example:"openai" doc:"Standard of the API"`
+	Model            string `json:"model,omitempty" example:"text-embedding-3-large" doc:"Embedding model name"`
+	Dimensions       int32  `json:"dimensions,omitempty" example:"3072" doc:"Number of dimensions in the embeddings"`
+	ContextLimit     int32  `json:"context_limit,omitempty" example:"8192" doc:"Context limit of the LLM service"`
 	APIKey           string `json:"api_key,omitempty" example:"12345678901234567890123456789012" doc:"Authentication token for the service (will be saved in encrypted form only)"`
 	// RateLimits			 []RateLimit `json:"rate_limits,omitempty" readOnly:"true" doc:"Rate limits configured for this LLM Service Instance"``
 	// ContextData      string `json:"contextData,omitempty" doc:"Context data that can be fed to the LLM service. Available in the request template as contextData variable."`
@@ -106,25 +214,32 @@ type InstanceInput struct {
 	// RespFieldName    string `json:"respFieldName,omitempty" default:"embedding" example:"embedding" doc:"Field name of the service response containing the embeddings. Supported is a top-level key of a json object."`
 }
 
-// TODO: Distinguish Full and Brief Outputs
+type InstanceBrief struct {
+	Owner          string `json:"owner" readOnly:"true" doc:"User handle of the LLM Service Instance owner"`
+	InstanceHandle string `json:"instance_handle" minLength:"3" maxLength:"20" example:"my-openai-large" doc:"LLM Service Instance handle"`
+	InstanceID     int    `json:"instance_id" readOnly:"true" doc:"Unique LLM Service Instance identifier" example:"153"`
+	AccessRole     string `json:"access_role,omitempty" readOnly:"true" doc:"Access role of the requesting user for this instance (owner, editor, reader)"`
+}
 
 // In Output, never return the API key
-type InstanceOutput struct {
-	Owner            string   `json:"owner" readOnly:"true" doc:"User handle of the LLM Service Instance owner"`
-	InstanceHandle   string   `json:"instance_handle" minLength:"3" maxLength:"20" example:"my-openai-large" doc:"LLM Service Instance handle"`
-	InstanceID       int      `json:"instance_id" readOnly:"true" doc:"Unique LLM Service Instance identifier" example:"153"`
-	DefinitionID     *int     `json:"definition_id,omitempty" doc:"Reference to LLM Service Definition (if based on one)"`
-	DefinitionOwner  string   `json:"definition_owner,omitempty" readOnly:"true" doc:"User handle of the LLM Service Definition owner (if based on one)"`
-	DefinitionHandle string   `json:"definition_handle,omitempty" readOnly:"true" doc:"Handle of the LLM Service Definition (if based on one)"`
-	Endpoint         string   `json:"endpoint,omitempty" example:"https://api.openai.com/v1/embeddings" doc:"LLM Service endpoint"`
-	Description      string   `json:"description,omitempty" doc:"LLM Service Instance description"`
-	HasAPIKey        bool     `json:"has_api_key,omitempty" readOnly:"true" doc:"Indicates if the LLM Service Instance has an API key configured"`
-	APIStandard      string   `json:"api_standard,omitempty" example:"openai" doc:"Standard of the API"`
-	Model            string   `json:"model,omitempty" example:"text-embedding-3-large" doc:"Embedding model name"`
-	Dimensions       int32    `json:"dimensions,omitempty" example:"3072" doc:"Number of dimensions in the embeddings"`
-	SharedWith       []string `json:"shared_with,omitempty" readOnly:"true" doc:"Users this instance is shared with"` // TODO: this should only be reported when the request comes from the Instance owner
-	IsShared         bool     `json:"is_shared,omitempty" readOnly:"true" doc:"Indicates if this is a shared instance (not owned by requesting user)"`
-	// RateLimits			 []RateLimit `json:"rate_limits,omitempty" readOnly:"true" doc:"Rate limits configured for this LLM Service Instance"``
+type InstanceFull struct {
+	Owner            string       `json:"owner" readOnly:"true" doc:"User handle of the LLM Service Instance owner"`
+	InstanceHandle   string       `json:"instance_handle" minLength:"3" maxLength:"20" example:"my-openai-large" doc:"LLM Service Instance handle"`
+	InstanceID       int          `json:"instance_id" readOnly:"true" doc:"Unique LLM Service Instance identifier" example:"153"`
+	AccessRole       string       `json:"access_role,omitempty" readOnly:"true" doc:"Access role of the requesting user for this instance (owner, editor, reader)"`
+	DefinitionID     int          `json:"definition_id,omitempty" doc:"Reference to LLM Service Definition (if based on one)"`
+	DefinitionOwner  string       `json:"definition_owner,omitempty" readOnly:"true" doc:"User handle of the LLM Service Definition owner (if based on one)"`
+	DefinitionHandle string       `json:"definition_handle,omitempty" readOnly:"true" doc:"Handle of the LLM Service Definition (if based on one)"`
+	Endpoint         string       `json:"endpoint,omitempty" example:"https://api.openai.com/v1/embeddings" doc:"LLM Service endpoint"`
+	Description      string       `json:"description,omitempty" doc:"LLM Service Instance description"`
+	HasAPIKey        bool         `json:"has_api_key,omitempty" readOnly:"true" doc:"Indicates if the LLM Service Instance has an API key configured"`
+	APIStandard      string       `json:"api_standard,omitempty" example:"openai" doc:"Standard of the API"`
+	Model            string       `json:"model,omitempty" example:"text-embedding-3-large" doc:"Embedding model name"`
+	Dimensions       int32        `json:"dimensions,omitempty" example:"3072" doc:"Number of dimensions in the embeddings"`
+	ContextLimit     int32        `json:"context_limit,omitempty" example:"8192" doc:"Maximum context length supported by the model"`
+	SharedWith       []SharedUser `json:"shared_with,omitempty" readOnly:"true" doc:"Users this instance is shared with"` // This should only be reported when the request comes from the Instance owner
+	IsShared         bool         `json:"is_shared,omitempty" readOnly:"true" doc:"Indicates if this is a shared instance (not owned by requesting user)"`
+	// RateLimits       []RateLimit `json:"rate_limits,omitempty" readOnly:"true" doc:"Rate limits configured for this LLM Service Instance"``
 	// ContextData      string `json:"contextData,omitempty" doc:"Context data that can be fed to the LLM service. Available in the request template as contextData variable."`
 	// SystemPrompt     string `json:"systemPrompt,omitempty" example:"Return the embeddings for the following text:" doc:"System prompt for requests to the service. Available in the request template as systemPrompt variable."`
 	// RequestTemplate  string `json:"requestTemplate,omitempty" doc:"Request template for the service. Can use input, contextData, and systemPrompt variables." example:"{\"input\": \"{{ input }}\", \"model\": \"text-embedding-3-small\"}"`
@@ -136,7 +251,8 @@ type InstanceOutput struct {
 // - request structs are structs with fields for the request path/query/header/cookie parameters and/or body.
 // - response structs are structs with fields for the output headers and body of the operation, if any.
 
-// Put/post llm-instance
+// Create/Update LLM Service Instance
+
 // PUT Path: "/v1/llm-instances/{user_handle}/{instance_handle}"
 
 type PutInstanceRequest struct {
@@ -150,6 +266,13 @@ type PutInstanceRequest struct {
 type PostInstanceRequest struct {
 	UserHandle string        `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
 	Body       InstanceInput `json:"instance" doc:"LLM Service Instance to create or update"`
+}
+
+// PostInstanceFromDefinitionRequest is for creating an instance based on a definition
+// POST Path: "/v1/llm-instances/{user_handle}/from-definition"
+type PostInstanceFromDefinitionRequest struct {
+	UserHandle string        `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
+	Body       InstanceInput `json:"instance" doc:"LLM Service Instance to create, based on the specified definition. The instance_handle field is required, other fields will override the values from the definition if provided."`
 }
 
 type UploadInstanceResponse struct {
@@ -173,10 +296,10 @@ type GetInstanceRequest struct {
 
 type GetInstanceResponse struct {
 	Header []http.Header `json:"header,omitempty" doc:"Response headers"`
-	Body   Instance      `json:"instance" doc:"LLM Service Instance"`
+	Body   InstanceFull  `json:"instance" doc:"LLM Service Instance"`
 }
 
-// Get all LLM Service Instances by user
+// Get all LLM Service Instances by user (i.e. owner or shared with)
 // Path: "/v1/llm-instances/{user_handle}"
 
 type GetUserInstancesRequest struct {
@@ -188,7 +311,7 @@ type GetUserInstancesRequest struct {
 type GetUserInstancesResponse struct {
 	Header []http.Header `json:"header,omitempty" doc:"Response headers"`
 	Body   struct {
-		Instances []InstanceOutput `json:"instances" doc:"List of LLM Service Instances"`
+		Instances []InstanceBrief `json:"instances" doc:"List of LLM Service Instances"`
 	}
 }
 
@@ -204,105 +327,34 @@ type DeleteInstanceResponse struct {
 	Header []http.Header `json:"header,omitempty" doc:"Response headers"`
 }
 
-// CreateInstanceFromDefinitionRequest is for creating an instance based on a definition
-type CreateInstanceFromDefinitionRequest struct {
-	UserHandle       string  `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"jdoe" doc:"User handle"`
-	InstanceHandle   string  `json:"instance_handle" path:"instance_handle" maxLength:"20" minLength:"3" example:"my-openai" doc:"Instance handle"`
-	DefinitionOwner  string  `json:"definition_owner" example:"_system" doc:"Owner of the definition to base instance on"`
-	DefinitionHandle string  `json:"definition_handle" example:"openai-large" doc:"Handle of the definition to base instance on"`
-	APIKeyEncrypted  string  `json:"api_key_encrypted,omitempty" doc:"Optional API key for this instance"`
-	Endpoint         *string `json:"endpoint,omitempty" doc:"Optional endpoint override"`
-	Description      *string `json:"description,omitempty" doc:"Optional description override"`
-}
-
-// === III. Sharing LLM Service Definitions ===
-
-// Share Definition with User
-// POST Path: "/v1/llm-definitions/{owner}/{definition_handle}/share"
-
-type ShareDefinitionRequest struct {
-	Owner            string `json:"owner" path:"owner" maxLength:"20" minLength:"3" example:"_system" doc:"Definition owner handle"`
-	DefinitionHandle string `json:"definition_handle" path:"definition_handle" maxLength:"20" minLength:"3" example:"openai-large" doc:"Definition handle"`
-	Body             struct {
-		UserHandle string `json:"user_handle" minLength:"3" maxLength:"20" example:"bob" doc:"User handle to share with"`
-		Role       string `json:"role" enum:"reader,editor" example:"reader" doc:"Role for shared access"`
-	}
-}
-
-type ShareDefinitionResponse struct {
-	Header []http.Header `json:"header,omitempty" doc:"Response headers"`
-	Body   struct {
-		Owner            string `json:"owner" doc:"Definition owner"`
-		DefinitionHandle string `json:"definition_handle" doc:"Definition handle"`
-		SharedWith       string `json:"shared_with" doc:"User shared with"`
-		Role             string `json:"role" doc:"Access role granted"`
-	}
-}
-
-// Unshare Definition from User
-// DELETE Path: "/v1/llm-definitions/{owner}/{definition_handle}/share/{user_handle}"
-
-type UnshareDefinitionRequest struct {
-	Owner            string `json:"owner" path:"owner" maxLength:"20" minLength:"3" example:"_system" doc:"Definition owner handle"`
-	DefinitionHandle string `json:"definition_handle" path:"definition_handle" maxLength:"20" minLength:"3" example:"openai-large" doc:"Definition handle"`
-	UserHandle       string `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"bob" doc:"User handle to unshare from"`
-}
-
-type UnshareDefinitionResponse struct {
-	Header []http.Header `json:"header,omitempty" doc:"Response headers"`
-}
-
-// Get users a Definition is shared with
-// GET Path: "/v1/llm-definitions/{owner}/{definition_handle}/shared-with"
-
-type GetDefinitionSharedUsersRequest struct {
-	Owner            string `json:"owner" path:"owner" maxLength:"20" minLength:"3" example:"_system" doc:"Definition owner handle"`
-	DefinitionHandle string `json:"definition_handle" path:"definition_handle" maxLength:"20" minLength:"3" example:"openai-large" doc:"Definition handle"`
-}
-
-type SharedUser struct {
-	UserHandle string `json:"user_handle" doc:"User handle"`
-	Role       string `json:"role" doc:"Access role"`
-}
-
-type GetDefinitionSharedUsersResponse struct {
-	Header []http.Header `json:"header,omitempty" doc:"Response headers"`
-	Body   struct {
-		SharedWith []SharedUser `json:"shared_with" doc:"List of users this definition is shared with"`
-	}
-}
-
-// === IV. Sharing LLM Service Instances ===
-
 // Share Instance with User
-// POST Path: "/v1/llm-instances/{owner}/{instance_handle}/share"
+// POST Path: "/v1/llm-instances/{user_handle}/{instance_handle}/share"
 
 type ShareInstanceRequest struct {
-	Owner          string `json:"owner" path:"owner" maxLength:"20" minLength:"3" example:"alice" doc:"Instance owner handle"`
+	UserHandle     string `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"alice" doc:"Instance owner handle"`
 	InstanceHandle string `json:"instance_handle" path:"instance_handle" maxLength:"20" minLength:"3" example:"my-openai" doc:"Instance handle"`
 	Body           struct {
-		UserHandle string `json:"user_handle" minLength:"3" maxLength:"20" example:"bob" doc:"User handle to share with"`
-		Role       string `json:"role" enum:"reader,editor" example:"reader" doc:"Role for shared access"`
+		ShareWithHandle string `json:"share_with_handle" minLength:"3" maxLength:"20" example:"bob" doc:"User handle to share with"`
+		Role            string `json:"role" enum:"reader,editor" example:"reader" doc:"Role for shared access"`
 	}
 }
 
 type ShareInstanceResponse struct {
 	Header []http.Header `json:"header,omitempty" doc:"Response headers"`
 	Body   struct {
-		Owner          string `json:"owner" doc:"Instance owner"`
-		InstanceHandle string `json:"instance_handle" doc:"Instance handle"`
-		SharedWith     string `json:"shared_with" doc:"User shared with"`
-		Role           string `json:"role" doc:"Access role granted"`
+		Owner          string       `json:"owner" doc:"Instance owner"`
+		InstanceHandle string       `json:"instance_handle" doc:"Instance handle"`
+		SharedWith     []SharedUser `json:"shared_with" doc:"Users this instance is shared with"`
 	}
 }
 
 // Unshare Instance from User
-// DELETE Path: "/v1/llm-instances/{owner}/{instance_handle}/share/{user_handle}"
+// DELETE Path: "/v1/llm-instances/{user_handle}/{instance_handle}/share/{unshare_with_handle}"
 
 type UnshareInstanceRequest struct {
-	Owner          string `json:"owner" path:"owner" maxLength:"20" minLength:"3" example:"alice" doc:"Instance owner handle"`
-	InstanceHandle string `json:"instance_handle" path:"instance_handle" maxLength:"20" minLength:"3" example:"my-openai" doc:"Instance handle"`
-	UserHandle     string `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"bob" doc:"User handle to unshare from"`
+	UserHandle        string `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"alice" doc:"Instance owner handle"`
+	InstanceHandle    string `json:"instance_handle" path:"instance_handle" maxLength:"20" minLength:"3" example:"my-openai" doc:"Instance handle"`
+	UnshareWithHandle string `json:"unshare_with_handle" path:"unshare_with_handle" maxLength:"20" minLength:"3" example:"bob" doc:"User handle to unshare from"`
 }
 
 type UnshareInstanceResponse struct {
@@ -310,16 +362,18 @@ type UnshareInstanceResponse struct {
 }
 
 // Get users an Instance is shared with
-// GET Path: "/v1/llm-instances/{owner}/{instance_handle}/shared-with"
+// GET Path: "/v1/llm-instances/{user_handle}/{instance_handle}/shared-with"
 
 type GetInstanceSharedUsersRequest struct {
-	Owner          string `json:"owner" path:"owner" maxLength:"20" minLength:"3" example:"alice" doc:"Instance owner handle"`
+	UserHandle     string `json:"user_handle" path:"user_handle" maxLength:"20" minLength:"3" example:"alice" doc:"Instance owner handle"`
 	InstanceHandle string `json:"instance_handle" path:"instance_handle" maxLength:"20" minLength:"3" example:"my-openai" doc:"Instance handle"`
 }
 
 type GetInstanceSharedUsersResponse struct {
 	Header []http.Header `json:"header,omitempty" doc:"Response headers"`
 	Body   struct {
-		SharedWith []SharedUser `json:"shared_with" doc:"List of users this instance is shared with"`
+		Owner          string       `json:"owner" doc:"Instance owner"`
+		InstanceHandle string       `json:"instance_handle" doc:"Instance handle"`
+		SharedWith     []SharedUser `json:"shared_with" doc:"List of users this instance is shared with"`
 	}
 }

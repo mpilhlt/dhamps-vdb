@@ -84,7 +84,7 @@ postgres=# CREATE EXTENSION IF NOT EXISTS vector;
 
 Clients should communicate the API key in the `Authorization` header with a `Bearer` prefix, e.g. `Bearer 024v2013621509245f2e24`. Most operations can only be done by the (admin or the) owner of the resource in question. For projects and their embeddings, you can define other user accounts that should be authorized as readers, too. 
 
-**Public Access**: Projects can be made publicly accessible (allowing unauthenticated read access to embeddings and similars) by including `"*"` in the `authorizedReaders` array when creating or updating the project. See [docs/PUBLIC_ACCESS.md](./docs/PUBLIC_ACCESS.md) for details.
+**Public Access**: Projects can be made publicly accessible (allowing unauthenticated read access to embeddings and similars) by including `"*"` in the `shared_with` array when creating or updating the project. See [docs/PUBLIC_ACCESS.md](./docs/PUBLIC_ACCESS.md) for details.
 
 ## Data Validation
 
@@ -304,7 +304,7 @@ For resources that support both GET and PUT operations, PATCH requests are autom
 curl -X PATCH https://<hostname>/v1/projects/alice/myproject \
   -H "Authorization: Bearer <vdb_key>" \
   -H "Content-Type: application/json" \
-  -d '{"authorizedReaders": ["*"]}'
+  -d '{"shared_with": ["*"]}'
 ```
 
 **Example: Update project description**
@@ -416,16 +416,20 @@ dhamps-vdb/
   - [x] Validation with metadata schema
 - [x] Allow to filter similar passages by metadata field (so as to exclude e.g. documents from the same author)
   - [ ] Add documentation (the GET query parameters are called `metadata_path` and `metadata_value` as in: `https://xy.org/vdb-api/v1/similars/sal/sal-openai-large/https%3A%2F%2Fid.myproject.net%2Ftexts%2FW0011%3A1.3.1.3.1?threshold=0.7&limit=5&metadata_path=author_id&metadata_value=A0083`)
+- [x] Use **transactions** (most importantly, when an action requires several queries, e.g. projects being added and then linked to several read-authorized users)
+- [ ] Prevent acceptance of requests as user "_system"
 - [ ] Implement and make consequent use of **max_idle** (5), **max_concurr** (5), **timeouts**, and **cancellations**
 - [ ] **Concurrency** (leaky bucket approach) and **Rate limiting** (redis, sliding window, implement headers)
-- [x] Use **transactions** (most importantly, when an action requires several queries, e.g. projects being added and then linked to several read-authorized users)
-- [ ] Use PATCH method to change existing resources
-- [x] Add mechanism to allow anonymous/public reading access to embeddings (via `"*"` in `authorizedReaders`)
+- [ ] Always use specific error messages
+- [ ] Add project sharing/unsharing functions & API paths
+- [ ] Add definition creation/listing/deletion functions & paths
+- [ ] Allow to request verbose information even in list outputs (with a verbose=yes query parameter?)
+- [ ] Add possiblity to use PATCH method to change existing resources
+- [x] Add mechanism to allow anonymous/public reading access to embeddings (via `"*"` in `shared_with`)
 - [ ] **Dockerization**
 - [ ] **Batch mode**
-- [ ] **Link or unlink** users/LLMs as standalone operations
 - [ ] **Transfer** of projects from one owner to another as new operation
-- [ ] Fix automatically generated documentation
+- [ ] Revisit all documentation
 - [ ] Proper **logging** with `--verbose` and `--quiet` modes
 - [ ] Caching
 - [ ] HTML UI?
@@ -440,4 +444,5 @@ dhamps-vdb/
 
 ## Versions
 
+- 2026-02-XX **v0.1.0**: Fix many things, add many things, still API v1 on the way to stable...
 - 2024-12-10 **v0.0.1**: Initial public release (still work in progress) of API v1

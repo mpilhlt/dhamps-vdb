@@ -198,59 +198,167 @@ func VDBKeyReaderAuth(api huma.API, pool *pgxpool.Pool, options *models.Options)
 
 		owner := ctx.Param("user_handle")
 		project := ctx.Param("project_handle")
-		token := strings.TrimPrefix(ctx.Header("Authorization"), "Bearer ")
+		definition := ctx.Param("definition_handle")
+		instance := ctx.Param("instance_handle")
 
-		if len(owner) == 0 || len(project) == 0 {
+		// If no owner or project/definition/instance is specified, skip reader auth
+		if len(owner) == 0 || (len(project) == 0 && len(definition) == 0 && len(instance) == 0) {
 			next(ctx)
 			return
 		}
 
-		// Check if the project has public_read enabled
-		queries := database.New(pool)
-		publicReadParams := database.IsProjectPubliclyReadableParams{
-			Owner:         owner,
-			ProjectHandle: project,
-		}
-		publicRead, err := queries.IsProjectPubliclyReadable(ctx.Context(), publicReadParams)
-		// If project exists and public_read is true, allow unauthenticated access
-		if err == nil && publicRead.Valid && publicRead.Bool {
-			// Public read is enabled, allow unauthenticated access
-			fmt.Print("        Public read access granted (no authentication required)\n")
-			ctx = huma.WithValue(ctx, AuthUserKey, "public")
-			next(ctx)
+		fmt.Printf("    Reader auth for owner=%s project=%s definition=%s instance=%s running...\n", owner, project, definition, instance)
+		// Branch based on whether project, definition, or instance is being accessed
+		if len(project) > 0 {
+			fmt.Print("        Checking project access...\n")
+			handleProjectReaderAuth(api, pool, owner, project)(ctx, next)
 			return
 		}
-		// If there's an error (e.g., project not found), continue to check authorized readers
-		// The project existence check will happen in the handler
+		if len(definition) > 0 {
+			fmt.Print("        Checking definition access...\n")
+			handleDefinitionReaderAuth(api, pool, owner, definition)(ctx, next)
+			return
+		}
+		if len(instance) > 0 {
+			fmt.Print("        Checking instance access...\n")
+			handleInstanceReaderAuth(api, pool, owner, instance)(ctx, next)
+			return
+		}
+	}
+}
 
-		// If not public, check for authorized readers
-		getKeysByProjectParams := database.GetKeysByProjectParams{
-			Owner:         owner,
-			ProjectHandle: project,
-			Limit:         50,
-			Offset:        0,
-		}
-		allowedKeys, err := queries.GetKeysByProject(ctx.Context(), getKeysByProjectParams)
-		if err != nil && err.Error() != "no rows in result set" {
-			_ = huma.WriteErr(api, ctx, http.StatusInternalServerError, "unable to get linked users")
-			return
-		}
-		if err != nil && err.Error() == "no rows in result set" {
-			next(ctx)
-			return
-		}
-		for _, authKey := range allowedKeys {
-			storedHash := authKey.VDBKey
+func handleProjectReaderAuth(api huma.API, pool *pgxpool.Pool, owner string, project string) func(ctx huma.Context, next func(huma.Context)) {
+	{
+		return func(ctx huma.Context, next func(huma.Context)) {
 
-			if VDBKeyIsValid(token, storedHash) {
-				fmt.Print("        Reader authentication successful\n")
-				ctx = huma.WithValue(ctx, AuthUserKey, authKey.UserHandle)
+			token := strings.TrimPrefix(ctx.Header("Authorization"), "Bearer ")
+
+			// Check if the project has public_read enabled
+			queries := database.New(pool)
+			publicReadParams := database.IsProjectPubliclyReadableParams{
+				Owner:         owner,
+				ProjectHandle: project,
+			}
+			publicRead, err := queries.IsProjectPubliclyReadable(ctx.Context(), publicReadParams)
+			// If project exists and public_read is true, allow unauthenticated access
+			if err == nil && publicRead.Valid && publicRead.Bool {
+				// Public read is enabled, allow unauthenticated access
+				fmt.Print("        Public read access granted (no authentication required)\n")
+				ctx = huma.WithValue(ctx, AuthUserKey, "public")
 				next(ctx)
 				return
 			}
-		}
 
-		next(ctx)
+			// If there's an error (e.g., project not found), continue to check authorized readers
+			// The project existence check will happen in the handler
+
+			// If not public, check for authorized readers
+			getKeysByProjectParams := database.GetKeysByProjectParams{
+				Owner:         owner,
+				ProjectHandle: project,
+				Limit:         50,
+				Offset:        0,
+			}
+			allowedKeys, err := queries.GetKeysByProject(ctx.Context(), getKeysByProjectParams)
+			if err != nil && err.Error() != "no rows in result set" {
+				_ = huma.WriteErr(api, ctx, http.StatusInternalServerError, "unable to get linked users")
+				return
+			}
+			if err != nil && err.Error() == "no rows in result set" {
+				next(ctx)
+				return
+			}
+			for _, authKey := range allowedKeys {
+				storedHash := authKey.VDBKey
+
+				if VDBKeyIsValid(token, storedHash) {
+					fmt.Print("        Reader authentication successful\n")
+					ctx = huma.WithValue(ctx, AuthUserKey, authKey.UserHandle)
+					next(ctx)
+					return
+				}
+			}
+
+			next(ctx)
+		}
+	}
+}
+
+func handleDefinitionReaderAuth(api huma.API, pool *pgxpool.Pool, owner string, definition string) func(ctx huma.Context, next func(huma.Context)) {
+	{
+		return func(ctx huma.Context, next func(huma.Context)) {
+
+			token := strings.TrimPrefix(ctx.Header("Authorization"), "Bearer ")
+
+			// Check for authorized readers
+			queries := database.New(pool)
+			getKeysByDefinitionParams := database.GetKeysByDefinitionParams{
+				Owner:            owner,
+				DefinitionHandle: definition,
+				Limit:            50,
+				Offset:           0,
+			}
+			allowedKeys, err := queries.GetKeysByDefinition(ctx.Context(), getKeysByDefinitionParams)
+			if err != nil && err.Error() != "no rows in result set" {
+				_ = huma.WriteErr(api, ctx, http.StatusInternalServerError, "unable to get linked users")
+				return
+			}
+			if err != nil && err.Error() == "no rows in result set" {
+				next(ctx)
+				return
+			}
+			for _, authKey := range allowedKeys {
+				storedHash := authKey.VDBKey
+
+				if VDBKeyIsValid(token, storedHash) {
+					fmt.Print("        Reader authentication successful\n")
+					ctx = huma.WithValue(ctx, AuthUserKey, authKey.UserHandle)
+					next(ctx)
+					return
+				}
+			}
+
+			next(ctx)
+		}
+	}
+}
+
+func handleInstanceReaderAuth(api huma.API, pool *pgxpool.Pool, owner string, instance string) func(ctx huma.Context, next func(huma.Context)) {
+	{
+		return func(ctx huma.Context, next func(huma.Context)) {
+
+			token := strings.TrimPrefix(ctx.Header("Authorization"), "Bearer ")
+
+			// Check for authorized readers
+			queries := database.New(pool)
+			getKeysByInstanceParams := database.GetKeysByInstanceParams{
+				Owner:          owner,
+				InstanceHandle: instance,
+				Limit:          50,
+				Offset:         0,
+			}
+			allowedKeys, err := queries.GetKeysByInstance(ctx.Context(), getKeysByInstanceParams)
+			if err != nil && err.Error() != "no rows in result set" {
+				_ = huma.WriteErr(api, ctx, http.StatusInternalServerError, "unable to get linked users")
+				return
+			}
+			if err != nil && err.Error() == "no rows in result set" {
+				next(ctx)
+				return
+			}
+			for _, authKey := range allowedKeys {
+				storedHash := authKey.VDBKey
+
+				if VDBKeyIsValid(token, storedHash) {
+					fmt.Print("        Reader authentication successful\n")
+					ctx = huma.WithValue(ctx, AuthUserKey, authKey.UserHandle)
+					next(ctx)
+					return
+				}
+			}
+
+			next(ctx)
+		}
 	}
 }
 

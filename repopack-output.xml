@@ -444,7 +444,7 @@ components:
         description:
           type: string
           maxLength: 255
-        authorizedReaders:
+        shared_with:
           type: array
           items:
             type: string
@@ -4307,7 +4307,7 @@ func TestProjectFunc(t *testing.T) {
 			requestPath:  "/projects/alice/test1",
 			bodyPath:     "",
 			apiKeyHeader: aliceAPIKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/GetProjectResponseBody.json\",\n  \"project\": {\n    \"project_id\": 0,\n    \"handle\": \"test1\",\n    \"description\": \"This is a test project\",\n    \"authorizedReaders\": [\n      \"alice\"\n    ]\n  }\n}\n",
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/GetProjectResponseBody.json\",\n  \"project\": {\n    \"project_id\": 0,\n    \"handle\": \"test1\",\n    \"description\": \"This is a test project\",\n    \"shared_with\": [\n      \"alice\"\n    ]\n  }\n}\n",
 			expectStatus: 200,
 		},
 		{
@@ -4316,7 +4316,7 @@ func TestProjectFunc(t *testing.T) {
 			requestPath:  "/projects/alice",
 			bodyPath:     "",
 			apiKeyHeader: aliceAPIKey,
-			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/GetProjectsResponseBody.json\",\n  \"projects\": [\n    {\n      \"project_id\": 2,\n      \"handle\": \"test1\",\n      \"description\": \"This is a test project\",\n      \"authorizedReaders\": [\n        \"alice\"\n      ]\n    }\n  ]\n}\n",
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/GetProjectsResponseBody.json\",\n  \"projects\": [\n    {\n      \"project_id\": 2,\n      \"handle\": \"test1\",\n      \"description\": \"This is a test project\",\n      \"shared_with\": [\n        \"alice\"\n      ]\n    }\n  ]\n}\n",
 			expectStatus: 200,
 		},
 		{
@@ -4508,7 +4508,7 @@ func putProjectFunc(ctx context.Context, input *models.PutProjectRequest) (*mode
 
 	// Build query parameters (project)
 	readers := make(map[string]bool)
-	for _, user := range input.Body.AuthorizedReaders {
+	for _, user := range input.Body.SharedWith {
 		if user == "*" {
 			users, err := getUsersFunc(ctx, &models.GetUsersRequest{})
 			if err != nil {
@@ -4614,7 +4614,7 @@ func getProjectsFunc(ctx context.Context, input *models.GetProjectsRequest) (*mo
 			Id:                int(project.ProjectID),
 			Handle:            project.Handle,
 			Description:       project.Description.String,
-			AuthorizedReaders: readers,
+			SharedWith: readers,
 			LLMServices:       nil,
 		})
 	}
@@ -4674,7 +4674,7 @@ func getProjectFunc(ctx context.Context, input *models.GetProjectRequest) (*mode
 		Handle:            p.Handle,
 		Description:       p.Description.String,
 		MetadataScheme:    p.MetadataScheme.String,
-		AuthorizedReaders: readers,
+		SharedWith: readers,
 		LLMServices:       nil,
 	}
 
@@ -5580,7 +5580,7 @@ type Project struct {
 	Handle            string       `json:"handle" minLength:"3" maxLength:"20" example:"my-gpt-4" doc:"Project handle"`
 	Description       string       `json:"description,omitempty" maxLength:"255" doc:"Description of the project."`
 	MetadataScheme    string       `json:"metadataScheme,omitempty" doc:"Metadata json scheme used in the project."`
-	AuthorizedReaders []string     `json:"authorizedReaders,omitempty" default:"" example:"[\"jdoe\",\"foobar\"]" doc:"Account names allowed to retrieve information from the project. Defaults to everyone ([\"*\"])"`
+	SharedWith []string     `json:"shared_with,omitempty" default:"" example:"[\"jdoe\",\"foobar\"]" doc:"Account names allowed to retrieve information from the project. Defaults to everyone ([\"*\"])"`
 	LLMServices       []LLMService `json:"llmServices,omitempty" doc:"LLM services used in the project"`
 }
 
@@ -5588,7 +5588,7 @@ type ProjectSubmission struct {
 	Handle            string       `json:"handle" minLength:"3" maxLength:"20" example:"my-gpt-4" doc:"Project handle"`
 	Description       string       `json:"description,omitempty" maxLength:"255" doc:"Description of the project."`
 	MetadataScheme    string       `json:"metadataScheme,omitempty" doc:"Metadata json scheme used in the project."`
-	AuthorizedReaders []string     `json:"authorizedReaders,omitempty" default:"" example:"[\"jdoe\",\"foobar\"]" doc:"Account names allowed to retrieve information from the project. Defaults to everyone ([\"*\"])"`
+	SharedWith []string     `json:"shared_with,omitempty" default:"" example:"[\"jdoe\",\"foobar\"]" doc:"Account names allowed to retrieve information from the project. Defaults to everyone ([\"*\"])"`
 	LLMServices       []LLMService `json:"llmServices,omitempty" doc:"LLM services used in the project"`
 }
 

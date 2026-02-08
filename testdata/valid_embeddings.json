@@ -23,7 +23,7 @@
     "user_handle": "alice",
     "project_handle": "test1",
     "project_id": 1,
-    "instance_handle": "test1",
+    "instance_handle": "embedding1",
     "text": "This is a similar test document",
     "vector": [
         -2.085085e-02,
@@ -42,7 +42,7 @@
     "user_handle": "alice",
     "project_handle": "test1",
     "project_id": 1,
-    "instance_handle": "test1",
+    "instance_handle": "embedding1",
     "text": "This is a similar test document",
     "vector": [
         -2.085085e-02,

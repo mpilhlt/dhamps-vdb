@@ -167,6 +167,15 @@ func deleteAPIStandardFunc(ctx context.Context, input *models.DeleteAPIStandardR
 		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to check if API standard %s exists before deleting. %v", input.APIStandardHandle, err))
 	}
 
+	// Check if API standard is still in use by any LLM service definitions and prevent deletion if so, or cascade delete, depending on desired behavior and use cases. For now, we just return an error if the standard is in use.
+	inUse, err := queries.CheckIfAPIStandardInUse(ctx, input.APIStandardHandle)
+	if err != nil {
+		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to check if API standard %s is in use before deleting. %v", input.APIStandardHandle, err))
+	}
+	if inUse {
+		return nil, huma.Error400BadRequest(fmt.Sprintf("cannot delete API standard %s because it is still in use by one or more LLM service definitions. Please update or delete those definitions first.", input.APIStandardHandle))
+	}
+
 	// Run the query
 	err = queries.DeleteAPIStandard(ctx, input.APIStandardHandle)
 	if err != nil {

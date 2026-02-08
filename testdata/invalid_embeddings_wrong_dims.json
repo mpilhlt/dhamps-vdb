@@ -3,6 +3,7 @@
     "text_id": "test-wrong-dims",
     "user_handle": "alice",
     "project_handle": "test1",
+    "instance_owner": "alice",
     "instance_handle": "embedding1",
     "text": "This is a test document",
     "vector": [

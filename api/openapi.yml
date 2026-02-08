@@ -332,7 +332,7 @@ components:
         description:
           type: string
           maxLength: 255
-        authorizedReaders:
+        shared_with:
           type: array
           items:
             type: string

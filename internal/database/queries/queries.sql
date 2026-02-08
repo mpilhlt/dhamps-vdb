@@ -15,7 +15,9 @@
 -- - "...All..." functions return all objects of a type without filtering (or perform an action on all records).
 -- - "...By..." functions return objects filtered by some association.
 
+
 -- === USERS ===
+
 
 -- name: UpsertUser :one
 INSERT
@@ -59,6 +61,11 @@ SELECT "vdb_key"
 FROM users
 WHERE "user_handle" = $1 LIMIT 1;
 
+-- name: GetUserByVDBKey :one
+SELECT "user_handle"
+FROM users
+WHERE "vdb_key" = $1 LIMIT 1;
+
 -- name: GetKeysByProject :many
 SELECT users."user_handle", users_projects."role", users."vdb_key"
 FROM users
@@ -70,8 +77,31 @@ WHERE projects."owner" = $1
 AND projects."project_handle" = $2
 ORDER BY users."user_handle" ASC LIMIT $3 OFFSET $4;
 
+-- name: GetKeysByDefinition :many
+SELECT users."user_handle", users."vdb_key"
+FROM users
+JOIN definitions_shared_with
+ON users."user_handle" = definitions_shared_with."user_handle"
+JOIN definitions
+ON definitions_shared_with."definition_id" = definitions."definition_id"
+WHERE definitions."owner" = $1
+AND definitions."definition_handle" = $2
+ORDER BY users."user_handle" ASC LIMIT $3 OFFSET $4;
+
+-- name: GetKeysByInstance :many
+SELECT users."user_handle", instances_shared_with."role", users."vdb_key"
+FROM users
+JOIN instances_shared_with
+ON users."user_handle" = instances_shared_with."user_handle"
+JOIN instances
+ON instances_shared_with."instance_id" = instances."instance_id"
+WHERE instances."owner" = $1
+AND instances."instance_handle" = $2
+ORDER BY users."user_handle" ASC LIMIT $3 OFFSET $4;
+
 
 -- === PROJECTS ===
+
 
 -- name: UpsertProject :one
 INSERT
@@ -95,18 +125,49 @@ WHERE "owner" = $1
 AND "project_handle" = $2;
 
 -- name: GetProjectsByUser :many
-SELECT projects."owner", projects."project_handle", users_projects."role"
+SELECT projects."owner",
+  projects."project_handle",
+  projects."project_id",
+  projects."public_read",
+  users_projects."role"
 FROM projects
 JOIN users_projects
 ON projects."project_id" = users_projects."project_id"
 WHERE users_projects."user_handle" = $1
 ORDER BY projects."project_handle" ASC LIMIT $2 OFFSET $3;
 
+-- name: GetAccessibleProjectsByUser :many
+SELECT projects."owner",
+  projects."project_handle",
+  projects."project_id",
+  projects."public_read",
+  CASE
+    WHEN projects."owner" = $1 THEN 'owner'
+    ELSE users_projects."role"
+  END AS "role"
+FROM projects
+LEFT JOIN users_projects
+ON projects."project_id" = users_projects."project_id"
+WHERE users_projects."user_handle" = $1
+OR projects."owner" = $1
+ORDER BY projects."owner" ASC 
+LIMIT $2 OFFSET $3;
+
 -- name: RetrieveProject :one
 SELECT *
 FROM projects
 WHERE "owner" = $1
 AND "project_handle" = $2
+LIMIT 1;
+
+-- name: RetrieveProjectForUser :one
+SELECT projects.*, users_projects."role"
+FROM projects
+LEFT JOIN users_projects
+ON projects."project_id" = users_projects."project_id"
+WHERE projects."owner" = $1
+AND projects."project_handle" = $2
+AND (users_projects."user_handle" = $3 OR projects."public_read" = TRUE)
 LIMIT 1;
 
 -- name: IsProjectPubliclyReadable :one
@@ -146,12 +207,13 @@ AND "project_id" = $2;
 
 -- === LLM Service Definitions (user-shared templates) ===
 
+
 -- name: UpsertDefinition :one
 INSERT
 INTO definitions (
-  "owner", "definition_handle", "endpoint", "description", "api_standard", "model", "dimensions", "context_limit", "created_at", "updated_at"
+  "owner", "definition_handle", "endpoint", "description", "api_standard", "model", "dimensions", "context_limit", "is_public", "created_at", "updated_at"
 ) VALUES (
-  $1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW()
+  $1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW()
 )
 ON CONFLICT ("owner", "definition_handle") DO UPDATE SET
   "endpoint" = EXCLUDED."endpoint",
@@ -160,8 +222,9 @@ ON CONFLICT ("owner", "definition_handle") DO UPDATE SET
   "model" = EXCLUDED."model",
   "dimensions" = EXCLUDED."dimensions",
   "context_limit" = EXCLUDED."context_limit",
+  "is_public" = EXCLUDED."is_public",
   "updated_at" = NOW()
-RETURNING "owner", "definition_handle", "definition_id";
+RETURNING "owner", "definition_handle", "definition_id", "is_public";
 
 -- name: DeleteDefinition :exec
 DELETE
@@ -196,13 +259,11 @@ ORDER BY "definition_handle" ASC LIMIT $1 OFFSET $2;
 -- name: LinkDefinitionToUser :exec
 INSERT
 INTO definitions_shared_with (
-  "user_handle", "definition_id", "role", "created_at", "updated_at"
+  "user_handle", "definition_id", "created_at", "updated_at"
 ) VALUES (
-  $1, $2, $3, NOW(), NOW()
+  $1, $2, NOW(), NOW()
 )
-ON CONFLICT ("user_handle", "definition_id") DO UPDATE SET
-  "role" = EXCLUDED."role",
-  "updated_at" = NOW();
+ON CONFLICT ("user_handle", "definition_id") DO NOTHING;
 
 -- name: UnlinkDefinition :exec
 DELETE
@@ -211,8 +272,7 @@ WHERE "user_handle" = $1
 AND "definition_id" = $2;
 
 -- name: GetSharedUsersForDefinition :many
-SELECT  definitions_shared_with."user_handle",
-        definitions_shared_with."role"
+SELECT  definitions_shared_with."user_handle"
 FROM definitions_shared_with
 JOIN definitions
 ON definitions."definition_id" = definitions_shared_with."definition_id"
@@ -227,12 +287,7 @@ ORDER BY "user_handle" ASC;
 SELECT  definitions."owner",
         definitions."definition_handle",
         definitions."definition_id",
-        CASE 
-          WHEN definitions."owner" = $1 THEN 'owner'
-          WHEN definitions."owner" = '_system' THEN 'reader'
-          ELSE definitions_shared_with."role"
-        END as "role",
-        definitions."owner" = $1 as "is_owner"
+        definitions."is_public"
 FROM definitions
 LEFT JOIN definitions_shared_with
   ON definitions."definition_id" = definitions_shared_with."definition_id"
@@ -244,6 +299,7 @@ LIMIT $2 OFFSET $3;
 
 
 -- === LLM Service Instances (user-specific instances with optional API keys) ===
+
 
 -- name: UpsertInstance :one
 INSERT
@@ -303,12 +359,19 @@ WHERE "owner" = $1
 AND "instance_handle" = $2;
 
 -- name: RetrieveInstance :one
-SELECT  instances."instance_id",
-        instances."owner",
+SELECT  instances."owner",
         instances."instance_handle",
+        instances."instance_id",
         instances."definition_id",
+        definitions."owner" AS "definition_owner",
+        definitions."definition_handle" AS "definition_handle",
         instances."endpoint",
         instances."description",
+        -- when api_key_encrypted is not null, return true
+        CASE
+          WHEN instances."api_key_encrypted" IS NULL THEN TRUE
+          ELSE FALSE
+        END AS "has_api_key",
         instances."api_standard",
         instances."model",
         instances."dimensions",
@@ -316,13 +379,16 @@ SELECT  instances."instance_id",
         instances."created_at",
         instances."updated_at"
 FROM instances
-WHERE "owner" = $1
-AND "instance_handle" = $2
+LEFT JOIN definitions
+ON instances."definition_id" = definitions."definition_id"
+WHERE instances."owner" = $1
+AND instances."instance_handle" = $2
 LIMIT 1;
 
 -- name: RetrieveInstanceByID :one
 SELECT  instances."owner",
         instances."instance_handle",
+        instances."instance_id",
         instances."definition_id",
         instances."endpoint",
         instances."description",
@@ -334,6 +400,69 @@ SELECT  instances."owner",
         instances."updated_at"
 FROM instances
 WHERE "instance_id" = $1
+LIMIT 1;
+
+-- name: RetrieveInstanceByProject :one
+SELECT  instances."owner",
+        instances."instance_handle",
+        instances."instance_id",
+        instances."definition_id",
+        instances."endpoint",
+        instances."description",
+        instances."api_standard",
+        instances."model",
+        instances."dimensions",
+        instances."context_limit",
+        instances."created_at",
+        instances."updated_at"
+FROM instances
+JOIN projects
+ON projects."instance_id" = instances."instance_id"
+WHERE projects."owner" = $1
+  AND projects."project_handle" = $2
+LIMIT 1;
+
+-- name: RetrieveInstanceByProjectForUser :one
+SELECT  instances."owner",
+        instances."instance_handle",
+        instances."instance_id",
+        instances."definition_id",
+        instances."endpoint",
+        instances."description",
+        instances."api_standard",
+        instances."model",
+        instances."dimensions",
+        instances."context_limit",
+        instances."created_at",
+        instances."updated_at",
+        instances_shared_with."role" AS "access_role"
+FROM instances
+JOIN projects
+ON projects."instance_id" = instances."instance_id"
+LEFT JOIN instances_shared_with
+ON instances_shared_with."instance_id" = instances."instance_id"
+WHERE projects."owner" = $1
+  AND projects."project_handle" = $2
+  AND instances_shared_with."user_handle" = $3
+LIMIT 1;
+
+-- name: RetrieveInstanceByProjectID :one
+SELECT  instances."owner",
+        instances."instance_handle",
+        instances."instance_id",
+        instances."definition_id",
+        instances."endpoint",
+        instances."description",
+        instances."api_standard",
+        instances."model",
+        instances."dimensions",
+        instances."context_limit",
+        instances."created_at",
+        instances."updated_at"
+FROM instances
+JOIN projects
+ON projects."instance_id" = instances."instance_id"
+WHERE projects."project_id" = $1
 LIMIT 1;
 
 -- name: LinkInstanceToUser :exec
@@ -362,26 +491,6 @@ ON instances."instance_id" = instances_shared_with."instance_id"
 WHERE instances."owner" = $1
   AND instances."instance_handle" = $2
 ORDER BY "user_handle" ASC;
-
--- name: RetrieveInstanceByProject :one
-SELECT  instances."owner",
-        instances."instance_handle",
-        instances."instance_id",
-        instances."definition_id",
-        instances."endpoint",
-        instances."description",
-        instances."api_standard",
-        instances."model",
-        instances."dimensions",
-        instances."context_limit",
-        instances."created_at",
-        instances."updated_at"
-FROM instances
-JOIN projects
-ON projects."instance_id" = instances."instance_id"
-WHERE projects."owner" = $1
-  AND projects."project_handle" = $2
-LIMIT 1;
 
 -- name: RetrieveSharedInstance :one
 -- Get single instance, but only if it is shared with requesting user
@@ -447,7 +556,9 @@ SELECT COUNT(*)
 FROM instances
 WHERE "owner" = $1;
 
+
 -- === EMBEDDINGS ===
+
 
 -- name: UpsertEmbeddings :one
 INSERT
@@ -532,35 +643,8 @@ AND projects."project_handle" = $2;
 SELECT COUNT(*)
 FROM embeddings;
 
--- name: UpsertAPIStandard :one
-INSERT
-INTO api_standards (
-  "api_standard_handle", "description", "key_method", "key_field", "created_at", "updated_at"
-) VALUES (
-  $1, $2, $3, $4, NOW(), NOW()
-)
-ON CONFLICT ("api_standard_handle") DO UPDATE SET
-  "description" = $2,
-  "key_method" = $3,
-  "key_field" = $4,
-  "updated_at" = NOW()
-RETURNING "api_standard_handle";
 
--- name: DeleteAPIStandard :exec
-DELETE
-FROM api_standards
-WHERE "api_standard_handle" = $1;
-
--- name: RetrieveAPIStandard :one
-SELECT *
-FROM api_standards
-WHERE "api_standard_handle" = $1 LIMIT 1;
-
--- name: GetAPIStandards :many
-SELECT api_standards."api_standard_handle"
-FROM api_standards
-ORDER BY "api_standard_handle" ASC LIMIT $1 OFFSET $2;
-
+-- === SIMILARITY SEARCH ===
 
 
 -- name: GetSimilarsByVector :many
@@ -605,17 +689,70 @@ ORDER BY e1.vector <=> e2.vector
 LIMIT $7 OFFSET $8;
 
 
+-- === API STANDARDS ===
+
+
+-- name: UpsertAPIStandard :one
+INSERT
+INTO api_standards (
+  "api_standard_handle", "description", "key_method", "key_field", "created_at", "updated_at"
+) VALUES (
+  $1, $2, $3, $4, NOW(), NOW()
+)
+ON CONFLICT ("api_standard_handle") DO UPDATE SET
+  "description" = $2,
+  "key_method" = $3,
+  "key_field" = $4,
+  "updated_at" = NOW()
+RETURNING "api_standard_handle";
+
+-- name: DeleteAPIStandard :exec
+DELETE
+FROM api_standards
+WHERE "api_standard_handle" = $1;
+
+-- name: RetrieveAPIStandard :one
+SELECT *
+FROM api_standards
+WHERE "api_standard_handle" = $1 LIMIT 1;
+
+-- name: GetAPIStandards :many
+SELECT api_standards."api_standard_handle"
+FROM api_standards
+ORDER BY "api_standard_handle" ASC LIMIT $1 OFFSET $2;
+
+-- name: CheckIfAPIStandardInUse :one
+SELECT EXISTS (
+  SELECT 1
+  FROM definitions
+  WHERE "api_standard" = $1
+  LIMIT 1
+);
+
+-- === ADMIN QUERIES ===
+
+
 -- name: ResetAllSerials :exec
 DO $$
 DECLARE
     seq_name text;
+    max_id bigint;
 BEGIN
     FOR seq_name IN
       SELECT sequence_name
       FROM information_schema.sequences
       WHERE sequence_schema = 'public' AND sequence_name LIKE '%_seq'
     LOOP
-        EXECUTE format('ALTER SEQUENCE public.%I RESTART WITH 1', seq_name);
+        -- For definitions table, set sequence to max preserved definition_id + 1
+        IF seq_name = 'definitions_definition_id_seq' THEN
+            SELECT COALESCE(MAX("definition_id"), 0) INTO max_id
+            FROM definitions
+            WHERE "owner" = '_system';
+            EXECUTE format('ALTER SEQUENCE public.%I RESTART WITH %s', seq_name, max_id + 1);
+        -- For all other sequences, reset to 1
+        ELSE
+            EXECUTE format('ALTER SEQUENCE public.%I RESTART WITH 1', seq_name);
+        END IF;
     END LOOP;
 END $$;
 
@@ -628,8 +765,15 @@ BEGIN
         SELECT table_name 
         FROM information_schema.tables 
         WHERE table_schema = 'public'
-          AND table_name NOT IN ('key_methods', 'vdb_roles')
+          AND table_name NOT IN ('key_methods', 'vdb_roles', 'api_standards') -- preserve static reference data
     LOOP
-        EXECUTE format('DELETE FROM %I;', r.table_name);
+        -- Preserve _system user and its definitions
+        IF r.table_name = 'users' THEN
+            EXECUTE format('DELETE FROM %I WHERE "user_handle" != ''_system'';', r.table_name);
+        ELSIF r.table_name = 'definitions' THEN
+            EXECUTE format('DELETE FROM %I WHERE "owner" != ''_system'';', r.table_name);
+        ELSE
+            EXECUTE format('DELETE FROM %I;', r.table_name);
+        END IF;
     END LOOP;
 END $$;

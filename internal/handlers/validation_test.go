@@ -2,6 +2,7 @@ package handlers_test
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,8 +13,6 @@ import (
 )
 
 func TestValidationFunc(t *testing.T) {
-
-	fmt.Printf("\n\n\n\n")
 
 	// Get the database connection pool from package variable
 	pool := connPool
@@ -34,20 +33,6 @@ func TestValidationFunc(t *testing.T) {
 		t.Fatalf("Error creating user alice for testing: %v\n", err)
 	}
 
-	// Create project without schema
-	projectJSON := `{"project_handle": "test1", "description": "A test project"}`
-	_, err = createProject(t, projectJSON, "alice", aliceAPIKey)
-	if err != nil {
-		t.Fatalf("Error creating project alice/test1 for testing: %v\n", err)
-	}
-
-	// Create project with metadata schema
-	projectWithSchemaJSON := `{"project_handle": "test-schema", "description": "Test project with schema", "metadataScheme": "{\"type\":\"object\",\"properties\":{\"author\":{\"type\":\"string\"},\"year\":{\"type\":\"integer\"}},\"required\":[\"author\"]}"}`
-	_, err = createProject(t, projectWithSchemaJSON, "alice", aliceAPIKey)
-	if err != nil {
-		t.Fatalf("Error creating project alice/test-schema for testing: %v\n", err)
-	}
-
 	// Create API standard to be used in embeddings tests
 	apiStandardJSON := `{"api_standard_handle": "openai", "description": "OpenAI Embeddings API", "key_method": "auth_bearer", "key_field": "Authorization" }`
 	_, err = createAPIStandard(t, apiStandardJSON, options.AdminKey)
@@ -62,9 +47,21 @@ func TestValidationFunc(t *testing.T) {
 		t.Fatalf("Error creating LLM Service Instance embedding1 for testing: %v\n", err)
 	}
 
-	fmt.Printf("\nRunning validation tests ...\n\n")
+	// Create project without schema
+	projectJSON := `{"project_handle": "test1", "description": "A test project", "instance_owner": "alice", "instance_handle": "embedding1"}`
+	_, err = createProject(t, projectJSON, "alice", aliceAPIKey)
+	if err != nil {
+		t.Fatalf("Error creating project alice/test1 for testing: %v\n", err)
+	}
 
-	// TODO test actual resonse bodies!!
+	// Create project with metadata schema
+	projectWithSchemaJSON := `{"project_handle": "test-schema", "description": "Test project with schema", "metadataScheme": "{\"type\":\"object\",\"properties\":{\"author\":{\"type\":\"string\"},\"year\":{\"type\":\"integer\"}},\"required\":[\"author\"]}", "instance_owner": "alice", "instance_handle": "embedding1"}`
+	_, err = createProject(t, projectWithSchemaJSON, "alice", aliceAPIKey)
+	if err != nil {
+		t.Fatalf("Error creating project alice/test-schema for testing: %v\n", err)
+	}
+
+	fmt.Printf("\nRunning validation tests ...\n\n")
 
 	// Define test cases
 	tt := []struct {
@@ -72,7 +69,7 @@ func TestValidationFunc(t *testing.T) {
 		method       string
 		requestPath  string
 		bodyPath     string
-		apiKeyHeader string
+		apiKey       string
 		expectBody   string
 		expectStatus int16
 	}{
@@ -81,8 +78,8 @@ func TestValidationFunc(t *testing.T) {
 			method:       http.MethodPost,
 			requestPath:  "/v1/embeddings/alice/test1",
 			bodyPath:     "../../testdata/invalid_embeddings_wrong_dims.json",
-			apiKeyHeader: aliceAPIKey,
-			expectBody:   "dimension validation failed: vector length mismatch",
+			apiKey:       aliceAPIKey,
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Bad Request\",\n  \"status\": 400,\n  \"detail\": \"Dimension validation failed for input test-wrong-dims: vector length mismatch for text_id 'test-wrong-dims': actual vector has 3 elements but vector_dim declares 5\"\n}\n",
 			expectStatus: http.StatusBadRequest,
 		},
 		{
@@ -90,8 +87,8 @@ func TestValidationFunc(t *testing.T) {
 			method:       http.MethodPost,
 			requestPath:  "/v1/embeddings/alice/test1",
 			bodyPath:     "../../testdata/invalid_embeddings_dimension_mismatch.json",
-			apiKeyHeader: aliceAPIKey,
-			expectBody:   "dimension validation failed: vector dimension mismatch",
+			apiKey:       aliceAPIKey,
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Bad Request\",\n  \"status\": 400,\n  \"detail\": \"Dimension validation failed for input test-mismatch-dims: vector dimension mismatch: embedding declares 3072 dimensions but LLM service instance 'embedding1' expects 5 dimensions\"\n}\n",
 			expectStatus: http.StatusBadRequest,
 		},
 		{
@@ -99,8 +96,8 @@ func TestValidationFunc(t *testing.T) {
 			method:       http.MethodPost,
 			requestPath:  "/v1/embeddings/alice/test-schema",
 			bodyPath:     "../../testdata/valid_embeddings_with_schema.json",
-			apiKeyHeader: aliceAPIKey,
-			expectBody:   "test-valid-metadata",
+			apiKey:       aliceAPIKey,
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/UploadProjEmbeddingsResponseBody.json\",\n  \"ids\": [\n    \"test-valid-metadata\"\n  ]\n}\n",
 			expectStatus: http.StatusCreated,
 		},
 		{
@@ -108,52 +105,83 @@ func TestValidationFunc(t *testing.T) {
 			method:       http.MethodPost,
 			requestPath:  "/v1/embeddings/alice/test-schema",
 			bodyPath:     "../../testdata/invalid_embeddings_schema_violation.json",
-			apiKeyHeader: aliceAPIKey,
-			expectBody:   "metadata validation failed",
+			apiKey:       aliceAPIKey,
+			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/ErrorModel.json\",\n  \"title\": \"Bad Request\",\n  \"status\": 400,\n  \"detail\": \"metadata validation failed for text_id 'test-invalid-metadata': metadata validation failed:\\n  - (root): author is required\"\n}\n",
 			expectStatus: http.StatusBadRequest,
 		},
 	}
 
-	// Run the tests
-	for _, tc := range tt {
-		t.Run(tc.name, func(t *testing.T) {
-			// Read the body from file if specified
-			var bodyReader io.Reader
-			if tc.bodyPath != "" {
-				body, err := os.ReadFile(tc.bodyPath)
-				if err != nil {
-					t.Fatalf("Error reading body file: %v", err)
-				}
-				bodyReader = bytes.NewReader(body)
-			}
+	for _, v := range tt {
+		t.Run(v.name, func(t *testing.T) {
 
-			// Create the request
-			req, err := http.NewRequest(tc.method, fmt.Sprintf("http://localhost:8080%s", tc.requestPath), bodyReader)
-			assert.NoError(t, err)
-			if tc.apiKeyHeader != "" {
-				req.Header.Set("Authorization", "Bearer "+tc.apiKeyHeader)
+			// We need to handle the body only for POST requests
+			reqBody := io.Reader(nil)
+			if v.method == http.MethodPost {
+				f, err := os.Open(v.bodyPath)
+				assert.NoError(t, err)
+				defer func() {
+					if err := f.Close(); err != nil {
+						t.Fatal(err)
+					}
+				}()
+				b := new(bytes.Buffer)
+				_, err = io.Copy(b, f)
+				assert.NoError(t, err)
+				reqBody = bytes.NewReader(b.Bytes())
 			}
+			requestURL := fmt.Sprintf("http://%v:%d%v", options.Host, options.Port, v.requestPath)
+			req, err := http.NewRequest(v.method, requestURL, reqBody)
+			assert.NoError(t, err)
+			req.Header.Set("Authorization", "Bearer "+v.apiKey)
 			req.Header.Set("Content-Type", "application/json")
-
-			// Send the request
 			resp, err := http.DefaultClient.Do(req)
-			assert.NoError(t, err)
-			defer resp.Body.Close()
-
-			// Read the response body
-			respBody, err := io.ReadAll(resp.Body)
-			assert.NoError(t, err)
-
-			// Check the status code
-			assert.Equal(t, int(tc.expectStatus), resp.StatusCode, "Status code mismatch for test: %s. Response body: %s", tc.name, string(respBody))
-
-			// Check the response body contains expected text
-			if tc.expectBody != "" {
-				assert.Contains(t, string(respBody), tc.expectBody, "Response body mismatch for test: %s", tc.name)
+			if err != nil {
+				t.Errorf("Error sending request: %v\n", err)
 			}
+			defer resp.Body.Close()
+			assert.NoError(t, err)
+
+			if resp.StatusCode != int(v.expectStatus) {
+				t.Errorf("Expected status code %d, got %s\n", v.expectStatus, resp.Status)
+			} else {
+				t.Logf("Expected status code %d, got %s\n", v.expectStatus, resp.Status)
+			}
+
+			respBody, err := io.ReadAll(resp.Body) // response body is []byte
+			assert.NoError(t, err)
+			formattedResp := ""
+			if v.expectBody != "" {
+				fr := new(bytes.Buffer)
+				err = json.Indent(fr, respBody, "", "  ")
+				assert.NoError(t, err)
+				formattedResp = fr.String()
+			}
+			assert.Equal(t, v.expectBody, formattedResp, "they should be equal")
 		})
 	}
 
-	// Shutdown the server
-	shutDownServer()
+	// Verify that the expectations regarding the mock key generation were met
+	mockKeyGen.AssertExpectations(t)
+
+	// Cleanup removes items created by the put function test
+	// (deleting '/users/alice' should delete all the
+	//  projects, instances and embeddings connected to alice as well)
+	t.Cleanup(func() {
+		fmt.Print("\n\nRunning cleanup ...\n\n")
+
+		requestURL := fmt.Sprintf("http://%s:%d/v1/admin/footgun", options.Host, options.Port)
+		req, err := http.NewRequest(http.MethodGet, requestURL, nil)
+		assert.NoError(t, err)
+		req.Header.Set("Authorization", "Bearer "+options.AdminKey)
+		_, err = http.DefaultClient.Do(req)
+		if err != nil && err.Error() != "no rows in result set" {
+			t.Fatalf("Error sending request: %v\n", err)
+		}
+		assert.NoError(t, err)
+
+		fmt.Print("Shutting down server\n\n")
+		shutDownServer()
+	})
+
+	fmt.Printf("\n")
 }

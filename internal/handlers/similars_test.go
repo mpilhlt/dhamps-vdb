@@ -14,8 +14,6 @@ import (
 
 func TestSimilarsFunc(t *testing.T) {
 
-	fmt.Printf("\n\n\n\n")
-
 	// Get the database connection pool from package variable
 	pool := connPool
 
@@ -35,13 +33,6 @@ func TestSimilarsFunc(t *testing.T) {
 		t.Fatalf("Error creating user alice for testing: %v\n", err)
 	}
 
-	// Create project
-	projectJSON := `{"project_handle": "test1", "description": "A test project"}`
-	_, err = createProject(t, projectJSON, "alice", aliceAPIKey)
-	if err != nil {
-		t.Fatalf("Error creating project alice/test1 for testing: %v\n", err)
-	}
-
 	// Create API standard
 	apiStandardJSON := `{"api_standard_handle": "openai", "description": "OpenAI Embeddings API", "key_method": "auth_bearer", "key_field": "Authorization" }`
 	_, err = createAPIStandard(t, apiStandardJSON, options.AdminKey)
@@ -56,12 +47,20 @@ func TestSimilarsFunc(t *testing.T) {
 		t.Fatalf("Error creating LLM service openai-large for testing: %v\n", err)
 	}
 
+	// Create project
+	projectJSON := `{"project_handle": "test1", "description": "A test project", "instance_owner": "alice", "instance_handle": "embedding1"}`
+	_, err = createProject(t, projectJSON, "alice", aliceAPIKey)
+	if err != nil {
+		t.Fatalf("Error creating project alice/test1 for testing: %v\n", err)
+	}
+
 	// Upload embeddings
 	embeddingsFilePath := "../../testdata/valid_embeddings.json"
 	embeddingsFile, err := os.Open(embeddingsFilePath)
 	if err != nil {
 		t.Fatalf("Error opening embeddings file: %v\n", err)
 	}
+	// Defer closing embeddingsFile
 	defer func() {
 		if err := embeddingsFile.Close(); err != nil {
 			t.Fatalf("Error closing embeddings file: %v\n", err)
@@ -71,7 +70,7 @@ func TestSimilarsFunc(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error reading embeddings file: %v\n", err)
 	}
-	err = createEmbeddings(t, embeddingsData, "alice", "openai-large", aliceAPIKey)
+	err = createEmbeddings(t, embeddingsData, "alice", "test1", aliceAPIKey)
 	if err != nil {
 		t.Fatalf("Error creating embeddings for testing: %v\n", err)
 	}
@@ -91,7 +90,7 @@ func TestSimilarsFunc(t *testing.T) {
 			method:       http.MethodGet,
 			requestPath:  "/v1/similars/alice/test1/https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.1.1.1.1",
 			bodyPath:     "",
-			apiKey:       options.AdminKey,
+			apiKey:       aliceAPIKey,
 			expectBody:   "{\n  \"$schema\": \"http://localhost:8080/schemas/SimilarResponseBody.json\",\n  \"user_handle\": \"alice\",\n  \"project_handle\": \"test1\",\n  \"ids\": [\n    \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.2\",\n    \"https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol2\"\n  ]\n}\n",
 			expectStatus: http.StatusOK,
 		},
@@ -182,6 +181,7 @@ func TestSimilarsFunc(t *testing.T) {
 		shutDownServer()
 	})
 
+	fmt.Printf("\n\n\n\n")
 }
 
 // TestPostSimilarStub is a placeholder test for the POST similar functionality.

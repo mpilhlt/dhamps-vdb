@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS vdb_roles(
 );
 
 INSERT INTO "vdb_roles"("vdb_role")
-VALUES ('owner'), ('writer'), ('reader');
+VALUES ('owner'), ('editor'), ('reader');
 
 CREATE TABLE IF NOT EXISTS users_projects(
   "user_handle" VARCHAR(20) REFERENCES "users"("user_handle") ON DELETE CASCADE,

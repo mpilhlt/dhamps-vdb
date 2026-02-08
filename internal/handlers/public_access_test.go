@@ -14,56 +14,69 @@ import (
 
 // TODO: Test against actual JSON body
 
-// TestPublicAccess tests the public access functionality when "*" is in authorizedReaders
+// TestPublicAccess tests the public access functionality when "*" is in shared_with
 func TestPublicAccess(t *testing.T) {
-
-	fmt.Printf("\n\n\n\n")
 
 	// Get the database connection pool from package variable
 	pool := connPool
 
 	// Create a mock key generator
 	mockKeyGen := new(MockKeyGen)
-	// Set up expectations for the mock key generator
-	mockKeyGen.On("RandomKey", 32).Return("12345678901234567890123456789012", nil).Maybe()
+	// Set up expectations for the mock key generator - return different keys for each call
+	mockKeyGen.On("RandomKey", 32).Return("12345678901234567890123456789012", nil).Once()  // Alice's key
+	mockKeyGen.On("RandomKey", 32).Return("abcdefghijklmnopqrstuvwxyz123456", nil).Once()  // Bob's key
+	mockKeyGen.On("RandomKey", 32).Return("98765432109876543210987654321098", nil).Maybe() // Any additional keys
 
 	// Start the server
 	err, shutDownServer := startTestServer(t, pool, mockKeyGen)
 	assert.NoError(t, err)
 
-	// Create user bob to be used in tests
-	bobJSON := `{"user_handle": "bob", "name": "Bob Smith", "email": "bob@foo.bar"}`
-	bobAPIKey, err := createUser(t, bobJSON)
+	// Create users to be used in sharing tests
+	aliceJSON := `{"user_handle": "alice", "name": "Alice Doe", "email": "alice@foo.bar"}`
+	aliceAPIKey, err := createUser(t, aliceJSON)
 	if err != nil {
-		t.Fatalf("Error creating user bob for testing: %v\n", err)
+		t.Fatalf("Error creating user alice for testing: %v\n", err)
 	}
 
-	// Create a public project with "*" in authorizedReaders
-	publicProjectJSON := `{"project_handle": "public-test", "description": "A public test project", "authorizedReaders": ["*"]}`
-	_, err = createProject(t, publicProjectJSON, "bob", bobAPIKey)
-	if err != nil {
-		t.Fatalf("Error creating project bob/public-test for testing: %v\n", err)
-	}
-
-	// Create API standard to be used in embeddings tests
-	apiStandardJSON := `{"api_standard_handle": "openai", "description": "OpenAI Embeddings API", "key_method": "auth_bearer", "key_field": "Authorization" }`
-	_, err = createAPIStandard(t, apiStandardJSON, options.AdminKey)
-	if err != nil {
-		// Ignore error if API standard already exists from previous test
-		if err.Error() != "status code 409" {
-			t.Logf("Warning: Error creating API standard (may already exist): %v\n", err)
+	/*
+		bobJSON := `{"user_handle": "bob", "name": "Bob Smith", "email": "bob@foo.bar"}`
+		bobAPIKey, err := createUser(t, bobJSON)
+		if err != nil {
+			t.Fatalf("Error creating user bob for testing: %v\n", err)
 		}
+	*/
+
+	// Create API standard to be used in tests
+	openaiJSON := `{"api_standard_handle": "openai", "description": "OpenAI Embeddings API", "key_method": "auth_bearer", "key_field": "Authorization" }`
+	_, err = createAPIStandard(t, openaiJSON, options.AdminKey)
+	if err != nil {
+		t.Fatalf("Error creating API standard openai for testing: %v\n", err)
 	}
 
-	// Create LLM Service to be used in embeddings tests
-	InstanceJSON := `{ "instance_handle": "embedding1", "endpoint": "https://api.foo.bar/v1/embed", "description": "An LLM Service just for testing if the dhamps-vdb code is working", "api_standard": "openai", "model": "embed-test1", "dimensions": 5}`
-	_, err = createInstance(t, InstanceJSON, "bob", bobAPIKey)
+	// Create an instance for alice
+	instanceJSON := `{"instance_handle": "embedding1", "endpoint": "https://api.openai.com/v1/embeddings", "description": "Alice's OpenAI instance", "api_standard": "openai", "model": "text-embedding-3-large", "dimensions": 5}`
+	_, err = createInstance(t, instanceJSON, "alice", aliceAPIKey)
 	if err != nil {
-		t.Fatalf("Error creating LLM service openai-large for testing: %v\n", err)
+		t.Fatalf("Error creating instance for sharing tests: %v\n", err)
 	}
+
+	// Create public project to be used in embeddings tests
+	projectJSON := `{ "project_handle": "public-test", "instance_owner": "alice", "instance_handle": "embedding1", "description": "This is a test project", "public_read": true }`
+	_, err = createProject(t, projectJSON, "alice", aliceAPIKey)
+	if err != nil {
+		t.Fatalf("Error creating project alice/public-test for testing: %v\n", err)
+	}
+
+	/*
+		shareProjectJSON := `{"share_with_handle": "*", "role": "reader"}`
+		_, err = shareProject(t, "bob", "public-test", shareProjectJSON, bobAPIKey)
+		if err != nil {
+			t.Fatalf("Error sharing project bob/public-test with *: %v\n", err)
+		}
+	*/
 
 	// Post some embeddings to the public project
-	_, err = postEmbeddings(t, "../../testdata/valid_embeddings.json", "bob", "public-test", bobAPIKey)
+	_, err = postEmbeddings(t, "../../testdata/valid_embeddings.json", "alice", "public-test", aliceAPIKey)
 	if err != nil {
 		t.Fatalf("Error posting embeddings: %v\n", err)
 	}
@@ -81,9 +94,18 @@ func TestPublicAccess(t *testing.T) {
 		expectStatus int16
 	}{
 		{
+			name:         "Get project metadata without authentication (public project)",
+			method:       http.MethodGet,
+			requestPath:  "/v1/projects/alice/public-test",
+			bodyPath:     "",
+			VDBKey:       "",
+			expectBody:   "",
+			expectStatus: http.StatusOK,
+		},
+		{
 			name:         "Get project embeddings without authentication (public project)",
 			method:       http.MethodGet,
-			requestPath:  "/v1/embeddings/bob/public-test",
+			requestPath:  "/v1/embeddings/alice/public-test",
 			bodyPath:     "",
 			VDBKey:       "",
 			expectBody:   "",
@@ -92,7 +114,7 @@ func TestPublicAccess(t *testing.T) {
 		{
 			name:         "Get document embeddings without authentication (public project)",
 			method:       http.MethodGet,
-			requestPath:  "/v1/embeddings/bob/public-test/https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.1.1.1.1",
+			requestPath:  "/v1/embeddings/alice/public-test/https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.1.1.1.1",
 			bodyPath:     "",
 			VDBKey:       "",
 			expectBody:   "",
@@ -101,16 +123,7 @@ func TestPublicAccess(t *testing.T) {
 		{
 			name:         "Get similars without authentication (public project)",
 			method:       http.MethodGet,
-			requestPath:  "/v1/similars/bob/public-test/https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.1.1.1.1",
-			bodyPath:     "",
-			VDBKey:       "",
-			expectBody:   "",
-			expectStatus: http.StatusOK,
-		},
-		{
-			name:         "Get project metadata without authentication (public project)",
-			method:       http.MethodGet,
-			requestPath:  "/v1/projects/bob/public-test",
+			requestPath:  "/v1/similars/alice/public-test/https%3A%2F%2Fid.salamanca.school%2Ftexts%2FW0001%3Avol1.1.1.1.1",
 			bodyPath:     "",
 			VDBKey:       "",
 			expectBody:   "",
@@ -119,8 +132,8 @@ func TestPublicAccess(t *testing.T) {
 		{
 			name:         "Post embeddings without authentication (public project)",
 			method:       http.MethodPost,
-			requestPath:  "/v1/embeddings/bob/public-test",
-			bodyPath:     "../../testdata/invalid_embeddings.json",
+			requestPath:  "/v1/embeddings/alice/public-test",
+			bodyPath:     "../../testdata/valid_embeddings.json",
 			VDBKey:       "",
 			expectBody:   "",
 			expectStatus: http.StatusUnauthorized,
@@ -181,58 +194,68 @@ func TestPublicAccess(t *testing.T) {
 	}
 
 	// Cleanup
-	fmt.Print("\n\nRunning cleanup ...\n\n")
+	t.Cleanup(func() {
+		fmt.Print("\n\nRunning cleanup ...\n\n")
 
-	requestURL := fmt.Sprintf("http://%s:%d/v1/admin/footgun", options.Host, options.Port)
-	req, err := http.NewRequest(http.MethodGet, requestURL, nil)
-	assert.NoError(t, err)
-	req.Header.Set("Authorization", "Bearer "+options.AdminKey)
-	_, err = http.DefaultClient.Do(req)
-	if err != nil && err.Error() != "no rows in result set" {
-		t.Fatalf("Error sending request: %v\n", err)
-	}
-	assert.NoError(t, err)
+		requestURL := fmt.Sprintf("http://%s:%d/v1/admin/footgun", options.Host, options.Port)
+		req, err := http.NewRequest(http.MethodGet, requestURL, nil)
+		assert.NoError(t, err)
+		req.Header.Set("Authorization", "Bearer "+options.AdminKey)
+		_, err = http.DefaultClient.Do(req)
+		if err != nil && err.Error() != "no rows in result set" {
+			t.Fatalf("Error sending request: %v\n", err)
+		}
+		assert.NoError(t, err)
 
-	fmt.Print("Shutting down server\n\n")
-	shutDownServer()
+		fmt.Print("Shutting down server\n\n")
+		shutDownServer()
+	})
+
+	fmt.Printf("\n\n\n\n")
 }
 
 // Helper function to post embeddings
 func postEmbeddings(t *testing.T, bodyPath, user, project, apiKey string) (string, error) {
 	f, err := os.Open(bodyPath)
 	if err != nil {
-		return "", err
+		fmt.Printf("%v", err)
 	}
 	defer f.Close()
+	assert.NoError(t, err)
 
 	b := new(bytes.Buffer)
 	_, err = io.Copy(b, f)
 	if err != nil {
-		return "", err
+		fmt.Printf("%v", err)
 	}
+	assert.NoError(t, err)
 
 	requestURL := fmt.Sprintf("http://%v:%d/v1/embeddings/%s/%s", options.Host, options.Port, user, project)
 	req, err := http.NewRequest(http.MethodPost, requestURL, bytes.NewReader(b.Bytes()))
 	if err != nil {
-		return "", err
+		fmt.Printf("%v", err)
 	}
 	req.Header.Add("Authorization", "Bearer "+apiKey)
+	assert.NoError(t, err)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return "", err
+		fmt.Printf("%v", err)
 	}
 	defer resp.Body.Close()
+	assert.NoError(t, err)
 
 	if resp.StatusCode != http.StatusCreated {
 		bodyBytes, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("status code %d: %s", resp.StatusCode, string(bodyBytes))
+		fmt.Printf("status code %d: %s", resp.StatusCode, string(bodyBytes))
 	}
+	assert.Equal(t, http.StatusCreated, resp.StatusCode, "Expected status code 201 Created")
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", err
+		fmt.Printf("%v", err)
 	}
+	assert.NoError(t, err)
 
 	return string(bodyBytes), nil
 }

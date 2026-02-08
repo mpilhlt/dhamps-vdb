@@ -1,5 +1,5 @@
 {
   "project_handle": "test-rollback",
   "description": "Test project with invalid reader for transaction rollback",
-  "authorizedReaders": ["nonexistent_user"]
+  "shared_with": [{ "user_handle": "nonexistent_user", "role": "reader"}]
 }

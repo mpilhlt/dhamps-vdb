@@ -2,19 +2,19 @@
 
 ## Overview
 
-Projects can be configured to allow unauthenticated (public) read access to embeddings and similar documents by including the special value `"*"` in the `authorizedReaders` array when creating or updating a project.
+Projects can be configured to allow unauthenticated (public) read access to embeddings and similar documents by including the special value `"*"` in the `shared_with` array when creating or updating a project.
 
 ## Usage
 
 ### Creating a Public Project
 
-When creating or updating a project, include `"*"` in the `authorizedReaders` field:
+When creating or updating a project, include `"*"` in the `shared_with` field:
 
 ```json
 {
   "project_handle": "my-public-project",
   "description": "A publicly accessible project",
-  "authorizedReaders": ["*"]
+  "shared_with": ["*"]
 }
 ```
 
@@ -22,7 +22,7 @@ When creating or updating a project, include `"*"` in the `authorizedReaders` fi
 
 When a project has public read access enabled, the following endpoints can be accessed without authentication:
 
-- `GET /v1/projects/{user}/{project}` - Retrieve project metadata (including owner and authorizedReaders)
+- `GET /v1/projects/{user}/{project}` - Retrieve project metadata (including owner and shared_with)
 - `GET /v1/embeddings/{user}/{project}` - Retrieve all embeddings for the project
 - `GET /v1/embeddings/{user}/{project}/{text_id}` - Retrieve a specific embedding
 - `GET /v1/similars/{user}/{project}/{text_id}` - Find similar documents
@@ -50,7 +50,7 @@ A `public_read` boolean flag is stored in the `projects` table to indicate wheth
 
 ### Backwards Compatibility
 
-For backwards compatibility, when `"*"` is included in `authorizedReaders`:
+For backwards compatibility, when `"*"` is included in `shared_with`:
 - The `public_read` flag is set to true (enabling unauthenticated access)
 - All existing users are still added to the `users_projects` table as readers
 - This ensures that existing authentication mechanisms continue to work
@@ -58,7 +58,7 @@ For backwards compatibility, when `"*"` is included in `authorizedReaders`:
 ### Project Metadata Display
 
 When a project has `public_read` enabled:
-- The `authorizedReaders` field will display `["*"]` instead of an expanded list of all users
+- The `shared_with` field will display `["*"]` instead of an expanded list of all users
 - This makes it clear that the project is publicly accessible
 - Anonymous users can view project metadata including owner, description, and the `["*"]` indicator
 
@@ -76,7 +76,7 @@ When a project has `public_read` enabled:
 ```bash
 # Get project metadata without authentication
 curl http://localhost:8080/v1/projects/alice/public-project
-# Returns: {"project_handle": "public-project", "owner": "alice", "authorizedReaders": ["*"], ...}
+# Returns: {"project_handle": "public-project", "owner": "alice", "shared_with": ["*"], ...}
 
 # Get all embeddings without authentication
 curl http://localhost:8080/v1/embeddings/alice/public-project
@@ -105,4 +105,4 @@ curl -X POST http://localhost:8080/v1/embeddings/alice/public-project \
 
 ## Migration
 
-Existing projects are not affected. The `public_read` flag defaults to `false`, so all existing projects continue to require authentication for read operations unless explicitly updated to include `"*"` in their `authorizedReaders`.
+Existing projects are not affected. The `public_read` flag defaults to `false`, so all existing projects continue to require authentication for read operations unless explicitly updated to include `"*"` in their `shared_with`.

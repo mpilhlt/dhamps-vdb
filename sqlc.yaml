@@ -33,6 +33,7 @@ sql:
           api_standard: "APIStandard"
           api_standard_handle: "APIStandardHandle"
           api_key_encrypted: "APIKeyEncrypted"
+          has_api_key: "HasAPIKey"
           vdb_key: "VDBKey"
           # - column: "users.vdb_key"
           #   go_type:

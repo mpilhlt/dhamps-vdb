@@ -13,6 +13,7 @@ import (
 )
 
 func resetDbFunc(ctx context.Context, input *models.ResetDbRequest) (*models.ResetDbResponse, error) {
+
 	// Get the database connection pool from the context
 	pool, err := GetDBPool(ctx)
 	if err != nil {
@@ -22,7 +23,6 @@ func resetDbFunc(ctx context.Context, input *models.ResetDbRequest) (*models.Res
 		fmt.Print("    Resetting Database: database connection pool is nil\n")
 		return nil, huma.Error500InternalServerError("database connection pool is nil")
 	}
-
 	queries := database.New(pool)
 
 	// delete all records
@@ -65,7 +65,7 @@ func sanityCheckFunc(ctx context.Context, input *models.SanityCheckRequest) (*mo
 
 	// Check each project
 	for _, p := range projects {
-		project, err := queries.RetrieveProject(ctx, database.RetrieveProjectParams{Owner: p.Owner, ProjectHandle: p.ProjectHandle})
+		project, err := queries.RetrieveProject(ctx, database.RetrieveProjectParams(p))
 		if err != nil {
 			issues = append(issues, fmt.Sprintf("Project %s/%s: unable to retrieve project: %v", p.Owner, p.ProjectHandle, err))
 			continue
@@ -172,7 +172,6 @@ func RegisterAdminRoutes(pool *pgxpool.Pool, api huma.API) error {
 		// Middlewares Middlewares `yaml:"-"` // Middleware to run before the operation, useful for logging, etc.
 		Tags: []string{"admin"},
 	}
-
 	sanityCheckOp := huma.Operation{
 		OperationID: "sanityCheck",
 		Method:      http.MethodGet,

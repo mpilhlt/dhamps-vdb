@@ -92,7 +92,7 @@ instances (user-specific)
 instances_shared_with (n:m sharing)
 ├── user_handle (FK → users)
 ├── instance_id (FK → instances)
-├── role (reader/writer/owner)
+├── role (reader/editor/owner)
 └── PRIMARY KEY(user_handle, instance_id)
 
 projects (1:1 with instances)
