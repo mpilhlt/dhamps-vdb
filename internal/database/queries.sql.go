@@ -1184,6 +1184,107 @@ func (q *Queries) GetSimilarsByVector(ctx context.Context, arg GetSimilarsByVect
 	return items, nil
 }
 
+const getSimilarsByVectorWithProject = `-- name: GetSimilarsByVectorWithProject :many
+SELECT e."text_id"
+FROM embeddings e
+JOIN projects p
+ON e."project_id" = p."project_id"
+WHERE p."owner" = $1
+  AND p."project_handle" = $2
+  AND 1 - (e.vector <=> $3::halfvec) >= $4::double precision
+ORDER BY e.vector <=> $3::halfvec
+LIMIT $5 OFFSET $6
+`
+
+type GetSimilarsByVectorWithProjectParams struct {
+	Owner         string                 `db:"owner" json:"owner"`
+	ProjectHandle string                 `db:"project_handle" json:"project_handle"`
+	Column3       pgvector_go.HalfVector `db:"column_3" json:"column_3"`
+	Column4       float64                `db:"column_4" json:"column_4"`
+	Limit         int32                  `db:"limit" json:"limit"`
+	Offset        int32                  `db:"offset" json:"offset"`
+}
+
+func (q *Queries) GetSimilarsByVectorWithProject(ctx context.Context, arg GetSimilarsByVectorWithProjectParams) ([]pgtype.Text, error) {
+	rows, err := q.db.Query(ctx, getSimilarsByVectorWithProject,
+		arg.Owner,
+		arg.ProjectHandle,
+		arg.Column3,
+		arg.Column4,
+		arg.Limit,
+		arg.Offset,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []pgtype.Text
+	for rows.Next() {
+		var text_id pgtype.Text
+		if err := rows.Scan(&text_id); err != nil {
+			return nil, err
+		}
+		items = append(items, text_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getSimilarsByVectorWithProjectAndFilter = `-- name: GetSimilarsByVectorWithProjectAndFilter :many
+SELECT e."text_id"
+FROM embeddings e
+JOIN projects p
+ON e."project_id" = p."project_id"
+WHERE p."owner" = $1
+  AND p."project_handle" = $2
+  AND 1 - (e.vector <=> $3::halfvec) >= $4::double precision
+  AND (e."metadata" ->> $5::text IS NULL OR trim(e."metadata" ->> $5::text) <> trim($6::text))
+ORDER BY e.vector <=> $3::halfvec
+LIMIT $7 OFFSET $8
+`
+
+type GetSimilarsByVectorWithProjectAndFilterParams struct {
+	Owner         string                 `db:"owner" json:"owner"`
+	ProjectHandle string                 `db:"project_handle" json:"project_handle"`
+	Column3       pgvector_go.HalfVector `db:"column_3" json:"column_3"`
+	Column4       float64                `db:"column_4" json:"column_4"`
+	Column5       string                 `db:"column_5" json:"column_5"`
+	Column6       string                 `db:"column_6" json:"column_6"`
+	Limit         int32                  `db:"limit" json:"limit"`
+	Offset        int32                  `db:"offset" json:"offset"`
+}
+
+func (q *Queries) GetSimilarsByVectorWithProjectAndFilter(ctx context.Context, arg GetSimilarsByVectorWithProjectAndFilterParams) ([]pgtype.Text, error) {
+	rows, err := q.db.Query(ctx, getSimilarsByVectorWithProjectAndFilter,
+		arg.Owner,
+		arg.ProjectHandle,
+		arg.Column3,
+		arg.Column4,
+		arg.Column5,
+		arg.Column6,
+		arg.Limit,
+		arg.Offset,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []pgtype.Text
+	for rows.Next() {
+		var text_id pgtype.Text
+		if err := rows.Scan(&text_id); err != nil {
+			return nil, err
+		}
+		items = append(items, text_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getSystemDefinitions = `-- name: GetSystemDefinitions :many
 SELECT definitions."definition_handle", definitions."definition_id"
 FROM definitions

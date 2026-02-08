@@ -12,6 +12,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/pgvector/pgvector-go"
 )
 
 // TODO: Allow to get similars to a submission that includes ready-made embeddings
@@ -104,8 +105,107 @@ func getSimilarFunc(ctx context.Context, input *models.GetSimilarRequest) (*mode
 }
 
 func postSimilarFunc(ctx context.Context, input *models.PostSimilarRequest) (*models.SimilarResponse, error) {
-	// Implement your logic here
-	return nil, nil
+	// Check if only one of input.MetadataPath and input.MetadataValue are given
+	if input.MetadataPath != "" && input.MetadataValue == "" {
+		return nil, huma.Error400BadRequest("metadata_path is set but metadata_value is not")
+	}
+	if input.MetadataPath == "" && input.MetadataValue != "" {
+		return nil, huma.Error400BadRequest("metadata_value is set but metadata_path is not")
+	}
+
+	// Check if user exists
+	_, err := getUserFunc(ctx, &models.GetUserRequest{UserHandle: input.UserHandle})
+	if err != nil {
+		return nil, err
+	}
+
+	// Get the database connection pool from the context
+	pool, err := GetDBPool(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	queries := database.New(pool)
+
+	// Check if project exists and get the instance information
+	project, err := queries.RetrieveProject(ctx, database.RetrieveProjectParams{
+		Owner:         input.UserHandle,
+		ProjectHandle: input.ProjectHandle,
+	})
+	if err != nil {
+		if err.Error() == "no rows in result set" {
+			return nil, huma.Error404NotFound(fmt.Sprintf("user %s's project %s not found", input.UserHandle, input.ProjectHandle))
+		}
+		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get project. %v", err))
+	}
+
+	// Get the instance to validate dimensions
+	if !project.InstanceID.Valid {
+		return nil, huma.Error400BadRequest("project does not have an associated instance")
+	}
+
+	instance, err := queries.RetrieveInstanceByID(ctx, project.InstanceID.Int32)
+	if err != nil {
+		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to retrieve instance. %v", err))
+	}
+
+	// Validate that the vector dimensions match the instance dimensions
+	if len(input.Body.Vector) != int(instance.Dimensions) {
+		return nil, huma.Error400BadRequest(fmt.Sprintf("vector dimension mismatch: expected %d dimensions, got %d", instance.Dimensions, len(input.Body.Vector)))
+	}
+
+	// Convert the vector to pgvector format
+	vector := pgvector.NewHalfVector(input.Body.Vector)
+
+	// Run the query, either with or without metadata filter
+	var sim []pgtype.Text
+
+	if input.MetadataPath == "" {
+		params := database.GetSimilarsByVectorWithProjectParams{
+			Owner:         input.UserHandle,
+			ProjectHandle: input.ProjectHandle,
+			Column3:       vector,
+			Column4:       input.Threshold,
+			Limit:         min(int32(input.Limit), int32(input.Count)),
+			Offset:        int32(input.Offset),
+		}
+		fmt.Printf("getting similar items for vector with params: user=%s, project=%s, threshold=%v\n", params.Owner, params.ProjectHandle, params.Column4)
+		sim, err = queries.GetSimilarsByVectorWithProject(ctx, params)
+	} else {
+		params := database.GetSimilarsByVectorWithProjectAndFilterParams{
+			Owner:         input.UserHandle,
+			ProjectHandle: input.ProjectHandle,
+			Column3:       vector,
+			Column4:       input.Threshold,
+			Column5:       input.MetadataPath,
+			Column6:       input.MetadataValue,
+			Limit:         min(int32(input.Limit), int32(input.Count)),
+			Offset:        int32(input.Offset),
+		}
+		fmt.Printf("getting similar items for vector with params: user=%s, project=%s, threshold=%v, filter=%s=%s\n", params.Owner, params.ProjectHandle, params.Column4, params.Column5, params.Column6)
+		sim, err = queries.GetSimilarsByVectorWithProjectAndFilter(ctx, params)
+	}
+	fmt.Printf("got this response from the database: %v\n", sim)
+	if err != nil {
+		if err.Error() == "no rows in result set" {
+			return nil, huma.Error404NotFound("no similar items found")
+		}
+		return nil, huma.Error500InternalServerError(fmt.Sprintf("unable to get similar items. %v", err))
+	}
+	if len(sim) == 0 {
+		return nil, huma.Error404NotFound("no similar items found")
+	}
+
+	// Build response
+	s := []string{}
+	for _, r := range sim {
+		s = append(s, r.String)
+	}
+	response := &models.SimilarResponse{}
+	response.Body.UserHandle = input.UserHandle
+	response.Body.ProjectHandle = input.ProjectHandle
+	response.Body.IDs = s
+	return response, nil
 }
 
 // RegisterSimilarRoutes registers the routes for the Similar service
