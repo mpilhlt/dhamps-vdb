@@ -49,12 +49,12 @@ func getSimilarFunc(ctx context.Context, input *models.GetSimilarRequest) (*mode
 	// Get the database connection pool from the context
 	pool, err := GetDBPool(ctx)
 	if err != nil {
-		return nil, err
+		return nil, huma.Error500InternalServerError(fmt.Sprintf("database connection error: %v", err))
 	}
 
 	// Run the query, either with or without metadata filter
 	queries := database.New(pool)
-	var sim []pgtype.Text
+	var sim []database.GetSimilarsByIDRow
 
 	if input.MetadataPath == "" {
 		params := database.GetSimilarsByIDParams{
@@ -79,7 +79,12 @@ func getSimilarFunc(ctx context.Context, input *models.GetSimilarRequest) (*mode
 			Offset:        int32(input.Offset),
 		}
 		fmt.Printf("getting similar items for %v\n", params)
-		sim, err = queries.GetSimilarsByIDWithFilter(ctx, params)
+		var simWithFilter []database.GetSimilarsByIDWithFilterRow
+		simWithFilter, err = queries.GetSimilarsByIDWithFilter(ctx, params)
+		// Convert to common row type
+		for _, r := range simWithFilter {
+			sim = append(sim, database.GetSimilarsByIDRow{TextID: r.TextID, Similarity: r.Similarity})
+		}
 	}
 	fmt.Printf("got this response from the database: %v\n", sim)
 	if err != nil {
@@ -93,14 +98,17 @@ func getSimilarFunc(ctx context.Context, input *models.GetSimilarRequest) (*mode
 	}
 
 	// Build response
-	s := []string{}
+	results := []models.SimilarResultItem{}
 	for _, r := range sim {
-		s = append(s, r.String)
+		results = append(results, models.SimilarResultItem{
+			ID:         r.TextID.String,
+			Similarity: r.Similarity,
+		})
 	}
 	response := &models.SimilarResponse{}
 	response.Body.UserHandle = input.UserHandle
 	response.Body.ProjectHandle = input.ProjectHandle
-	response.Body.IDs = s
+	response.Body.Results = results
 	return response, nil
 }
 
@@ -122,7 +130,7 @@ func postSimilarFunc(ctx context.Context, input *models.PostSimilarRequest) (*mo
 	// Get the database connection pool from the context
 	pool, err := GetDBPool(ctx)
 	if err != nil {
-		return nil, err
+		return nil, huma.Error500InternalServerError(fmt.Sprintf("database connection error: %v", err))
 	}
 
 	queries := database.New(pool)
@@ -159,7 +167,7 @@ func postSimilarFunc(ctx context.Context, input *models.PostSimilarRequest) (*mo
 	vector := pgvector.NewHalfVector(input.Body.Vector)
 
 	// Run the query, either with or without metadata filter
-	var sim []pgtype.Text
+	var sim []database.GetSimilarsByVectorWithProjectRow
 
 	if input.MetadataPath == "" {
 		params := database.GetSimilarsByVectorWithProjectParams{
@@ -182,7 +190,12 @@ func postSimilarFunc(ctx context.Context, input *models.PostSimilarRequest) (*mo
 			Limit:         min(int32(input.Limit), int32(input.Count)),
 			Offset:        int32(input.Offset),
 		}
-		sim, err = queries.GetSimilarsByVectorWithProjectAndFilter(ctx, params)
+		var simWithFilter []database.GetSimilarsByVectorWithProjectAndFilterRow
+		simWithFilter, err = queries.GetSimilarsByVectorWithProjectAndFilter(ctx, params)
+		// Convert to common row type
+		for _, r := range simWithFilter {
+			sim = append(sim, database.GetSimilarsByVectorWithProjectRow{TextID: r.TextID, Similarity: r.Similarity})
+		}
 	}
 	if err != nil {
 		if err.Error() == "no rows in result set" {
@@ -195,14 +208,17 @@ func postSimilarFunc(ctx context.Context, input *models.PostSimilarRequest) (*mo
 	}
 
 	// Build response
-	s := []string{}
+	results := []models.SimilarResultItem{}
 	for _, r := range sim {
-		s = append(s, r.String)
+		results = append(results, models.SimilarResultItem{
+			ID:         r.TextID.String,
+			Similarity: r.Similarity,
+		})
 	}
 	response := &models.SimilarResponse{}
 	response.Body.UserHandle = input.UserHandle
 	response.Body.ProjectHandle = input.ProjectHandle
-	response.Body.IDs = s
+	response.Body.Results = results
 	return response, nil
 }
 

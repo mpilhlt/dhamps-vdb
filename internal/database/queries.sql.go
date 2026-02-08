@@ -1024,7 +1024,7 @@ func (q *Queries) GetSharedUsersForInstance(ctx context.Context, arg GetSharedUs
 }
 
 const getSimilarsByID = `-- name: GetSimilarsByID :many
-SELECT e2."text_id"
+SELECT e2."text_id", (1 - (e1.vector <=> e2.vector))::float8 AS similarity
 FROM embeddings e1
 CROSS JOIN embeddings e2
 JOIN projects
@@ -1049,7 +1049,12 @@ type GetSimilarsByIDParams struct {
 	Offset        int32       `db:"offset" json:"offset"`
 }
 
-func (q *Queries) GetSimilarsByID(ctx context.Context, arg GetSimilarsByIDParams) ([]pgtype.Text, error) {
+type GetSimilarsByIDRow struct {
+	TextID     pgtype.Text `db:"text_id" json:"text_id"`
+	Similarity float64     `db:"similarity" json:"similarity"`
+}
+
+func (q *Queries) GetSimilarsByID(ctx context.Context, arg GetSimilarsByIDParams) ([]GetSimilarsByIDRow, error) {
 	rows, err := q.db.Query(ctx, getSimilarsByID,
 		arg.TextID,
 		arg.Owner,
@@ -1062,13 +1067,13 @@ func (q *Queries) GetSimilarsByID(ctx context.Context, arg GetSimilarsByIDParams
 		return nil, err
 	}
 	defer rows.Close()
-	var items []pgtype.Text
+	var items []GetSimilarsByIDRow
 	for rows.Next() {
-		var text_id pgtype.Text
-		if err := rows.Scan(&text_id); err != nil {
+		var i GetSimilarsByIDRow
+		if err := rows.Scan(&i.TextID, &i.Similarity); err != nil {
 			return nil, err
 		}
-		items = append(items, text_id)
+		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -1077,7 +1082,7 @@ func (q *Queries) GetSimilarsByID(ctx context.Context, arg GetSimilarsByIDParams
 }
 
 const getSimilarsByIDWithFilter = `-- name: GetSimilarsByIDWithFilter :many
-SELECT e2."text_id"
+SELECT e2."text_id", (1 - (e1.vector <=> e2.vector))::float8 AS similarity
 FROM embeddings e1
 CROSS JOIN embeddings e2
 JOIN projects
@@ -1105,7 +1110,12 @@ type GetSimilarsByIDWithFilterParams struct {
 	Offset        int32       `db:"offset" json:"offset"`
 }
 
-func (q *Queries) GetSimilarsByIDWithFilter(ctx context.Context, arg GetSimilarsByIDWithFilterParams) ([]pgtype.Text, error) {
+type GetSimilarsByIDWithFilterRow struct {
+	TextID     pgtype.Text `db:"text_id" json:"text_id"`
+	Similarity float64     `db:"similarity" json:"similarity"`
+}
+
+func (q *Queries) GetSimilarsByIDWithFilter(ctx context.Context, arg GetSimilarsByIDWithFilterParams) ([]GetSimilarsByIDWithFilterRow, error) {
 	rows, err := q.db.Query(ctx, getSimilarsByIDWithFilter,
 		arg.TextID,
 		arg.Owner,
@@ -1120,13 +1130,13 @@ func (q *Queries) GetSimilarsByIDWithFilter(ctx context.Context, arg GetSimilars
 		return nil, err
 	}
 	defer rows.Close()
-	var items []pgtype.Text
+	var items []GetSimilarsByIDWithFilterRow
 	for rows.Next() {
-		var text_id pgtype.Text
-		if err := rows.Scan(&text_id); err != nil {
+		var i GetSimilarsByIDWithFilterRow
+		if err := rows.Scan(&i.TextID, &i.Similarity); err != nil {
 			return nil, err
 		}
-		items = append(items, text_id)
+		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -1185,7 +1195,7 @@ func (q *Queries) GetSimilarsByVector(ctx context.Context, arg GetSimilarsByVect
 }
 
 const getSimilarsByVectorWithProject = `-- name: GetSimilarsByVectorWithProject :many
-SELECT e."text_id"
+SELECT e."text_id", (1 - (e.vector <=> $3::halfvec))::float8 AS similarity
 FROM embeddings e
 JOIN projects p
 ON e."project_id" = p."project_id"
@@ -1205,7 +1215,12 @@ type GetSimilarsByVectorWithProjectParams struct {
 	Offset        int32                  `db:"offset" json:"offset"`
 }
 
-func (q *Queries) GetSimilarsByVectorWithProject(ctx context.Context, arg GetSimilarsByVectorWithProjectParams) ([]pgtype.Text, error) {
+type GetSimilarsByVectorWithProjectRow struct {
+	TextID     pgtype.Text `db:"text_id" json:"text_id"`
+	Similarity float64     `db:"similarity" json:"similarity"`
+}
+
+func (q *Queries) GetSimilarsByVectorWithProject(ctx context.Context, arg GetSimilarsByVectorWithProjectParams) ([]GetSimilarsByVectorWithProjectRow, error) {
 	rows, err := q.db.Query(ctx, getSimilarsByVectorWithProject,
 		arg.Owner,
 		arg.ProjectHandle,
@@ -1218,13 +1233,13 @@ func (q *Queries) GetSimilarsByVectorWithProject(ctx context.Context, arg GetSim
 		return nil, err
 	}
 	defer rows.Close()
-	var items []pgtype.Text
+	var items []GetSimilarsByVectorWithProjectRow
 	for rows.Next() {
-		var text_id pgtype.Text
-		if err := rows.Scan(&text_id); err != nil {
+		var i GetSimilarsByVectorWithProjectRow
+		if err := rows.Scan(&i.TextID, &i.Similarity); err != nil {
 			return nil, err
 		}
-		items = append(items, text_id)
+		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -1233,7 +1248,7 @@ func (q *Queries) GetSimilarsByVectorWithProject(ctx context.Context, arg GetSim
 }
 
 const getSimilarsByVectorWithProjectAndFilter = `-- name: GetSimilarsByVectorWithProjectAndFilter :many
-SELECT e."text_id"
+SELECT e."text_id", (1 - (e.vector <=> $3::halfvec))::float8 AS similarity
 FROM embeddings e
 JOIN projects p
 ON e."project_id" = p."project_id"
@@ -1256,7 +1271,12 @@ type GetSimilarsByVectorWithProjectAndFilterParams struct {
 	Offset        int32                  `db:"offset" json:"offset"`
 }
 
-func (q *Queries) GetSimilarsByVectorWithProjectAndFilter(ctx context.Context, arg GetSimilarsByVectorWithProjectAndFilterParams) ([]pgtype.Text, error) {
+type GetSimilarsByVectorWithProjectAndFilterRow struct {
+	TextID     pgtype.Text `db:"text_id" json:"text_id"`
+	Similarity float64     `db:"similarity" json:"similarity"`
+}
+
+func (q *Queries) GetSimilarsByVectorWithProjectAndFilter(ctx context.Context, arg GetSimilarsByVectorWithProjectAndFilterParams) ([]GetSimilarsByVectorWithProjectAndFilterRow, error) {
 	rows, err := q.db.Query(ctx, getSimilarsByVectorWithProjectAndFilter,
 		arg.Owner,
 		arg.ProjectHandle,
@@ -1271,13 +1291,13 @@ func (q *Queries) GetSimilarsByVectorWithProjectAndFilter(ctx context.Context, a
 		return nil, err
 	}
 	defer rows.Close()
-	var items []pgtype.Text
+	var items []GetSimilarsByVectorWithProjectAndFilterRow
 	for rows.Next() {
-		var text_id pgtype.Text
-		if err := rows.Scan(&text_id); err != nil {
+		var i GetSimilarsByVectorWithProjectAndFilterRow
+		if err := rows.Scan(&i.TextID, &i.Similarity); err != nil {
 			return nil, err
 		}
-		items = append(items, text_id)
+		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

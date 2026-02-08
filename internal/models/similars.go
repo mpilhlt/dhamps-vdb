@@ -31,8 +31,13 @@ type PostSimilarRequest struct {
 type SimilarResponse struct {
 	Header []http.Header `json:"header,omitempty" doc:"Response headers"`
 	Body   struct {
-		UserHandle    string   `json:"user_handle" doc:"User handle"`
-		ProjectHandle string   `json:"project_handle" doc:"Project handle"`
-		IDs           []string `json:"ids" doc:"List of similar document identifiers"`
+		UserHandle    string                 `json:"user_handle" doc:"User handle"`
+		ProjectHandle string                 `json:"project_handle" doc:"Project handle"`
+		Results       []SimilarResultItem    `json:"results" doc:"List of similar documents with similarity scores"`
 	}
+}
+
+type SimilarResultItem struct {
+	ID         string  `json:"id" doc:"Document identifier"`
+	Similarity float64 `json:"similarity" doc:"Similarity score (0-1, where 1 is most similar)"`
 }
